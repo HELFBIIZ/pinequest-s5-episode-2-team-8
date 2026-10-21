@@ -8,7 +8,7 @@ const root = process.env.ROOT || resolve(dirname(fileURLToPath(import.meta.url))
 const read = (p) => readFileSync(join(root, p), 'utf8');
 const problems = [];
 const local = (u) => !/^(https?:|data:|#|mailto:)/.test(u);
-const norm = (u) => u.replace(/^\.\//, '');
+const norm = (u) => u.replace(/^\.\//, '').replace(/\\/g, '/');
 
 const html = read('index.html');
 const htmlRefs = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]).filter(local).map(norm);
@@ -19,7 +19,7 @@ const sw = read('sw.js');
 const swFiles = [...sw.matchAll(/'(\.\/[^']*)'/g)].map((m) => norm(m[1])).filter(Boolean);
 for (const f of swFiles) if (f && !existsSync(join(root, f))) problems.push(`sw.js caches missing file: ${f}`);
 
-const walk = (d) => readdirSync(join(root, d)).flatMap((n) => (statSync(join(root, d, n)).isDirectory() ? walk(join(d, n)) : [join(d, n)]));
+const walk = (d) => readdirSync(join(root, d)).flatMap((n) => (statSync(join(root, d, n)).isDirectory() ? walk(`${d}/${n}`) : [`${d}/${n}`]));
 for (const js of walk('js').filter((f) => f.endsWith('.js'))) {
   if (!htmlRefs.includes(js)) problems.push(`${js} is not loaded by index.html`);
   if (!swFiles.includes(js)) problems.push(`${js} is not in the sw.js offline cache`);
@@ -27,7 +27,7 @@ for (const js of walk('js').filter((f) => f.endsWith('.js'))) {
 
 const fontsCss = read('assets/fonts/fonts.css');
 for (const m of fontsCss.matchAll(/url\('([^']+)'\)/g)) {
-  const f = join('assets/fonts', m[1]);
+  const f = `assets/fonts/${m[1]}`;
   if (!existsSync(join(root, f))) problems.push(`fonts.css references missing font: ${f}`);
   if (!swFiles.includes(f)) problems.push(`${f} is not in the sw.js offline cache`);
 }
