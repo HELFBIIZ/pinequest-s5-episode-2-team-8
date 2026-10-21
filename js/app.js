@@ -294,7 +294,11 @@
       h('h1', null, res.stars === 3 ? L('Гайхалтай!', 'Amazing!') : res.stars === 2 ? L('Сайн байна!', 'Well done!') : L('Сайн оролдлого!', 'Nice try!')),
       winner ? h('div', { class: 'winner' }, winner) : null,
       res.summary ? h('p', { class: 'muted' }, res.summary) : null,
-      players.length > 1 && res.scores ? TG.scoreboard(players, res.scores, -1) : null,
+      players.length > 1
+        ? (res.scores ? TG.scoreboard(players, res.scores, -1)
+          : h('div', { class: 'together-row' }, players.map((p) => h('span', { class: 'tp', style: { '--pc': p.color } },
+            h('span', { class: 'sb-e' }, p.emoji), ' ', p.name))))
+        : null,
       res.reward ? rewardChip(res.reward) : null,
       h('p', { class: 'res-msg' }, together
         ? L(`Хамтдаа өнгөрүүлсэн мөч хамгийн том шагнал. Гэр бүлийн тэнгэрт +${res.stars} од гэрэлтлээ! ✨`, `Time together is the greatest prize. +${res.stars} stars now shine in your family sky! ✨`)
