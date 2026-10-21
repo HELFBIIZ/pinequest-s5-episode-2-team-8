@@ -378,8 +378,9 @@
       const first = !pr.done, boost = multi() ? 1.5 : 1;
       pr.done = true; pr.best = Math.max(pr.best || 0, multi() ? Math.max(...tally) : right); pr.with = pr.with || {}; pr.with[mode] = (pr.with[mode] || 0) + 1; S.save();
       let reward = null;
-      if (first) { reward = TG.villageReward ? TG.villageReward(Math.round(50 * boost), Math.round(60 * boost)) : null; TG.villageQuest && TG.villageQuest('lesson'); S.logActivity && S.logActivity({ kind: 'lesson', id: l.id }); }
+      if (first) { reward = TG.villageReward ? TG.villageReward(Math.round(50 * boost), Math.round(60 * boost)) : null; S.logActivity && S.logActivity({ kind: 'lesson', id: l.id }); }
       else if (multi()) reward = TG.villageReward ? TG.villageReward(20, 25) : null;
+      TG.villageQuest && TG.villageQuest('lesson'); // every finished lesson counts for quests
       TG.basar.noteTogether(mode, players, l.id);
       TG.achievements && TG.achievements.check();
       TG.sfx.win(); TG.confetti(70);

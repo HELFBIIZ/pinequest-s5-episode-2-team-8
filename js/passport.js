@@ -106,6 +106,13 @@
   const nextId = (p) => ORDER.find((id) => !pass(p).stamps[id]) || null;
   const unlocked = (p, id) => !!pass(p).stamps[id] || id === nextId(p);
 
+  /** Give the province's stamp (from the travel map's guide). */
+  function stamp(id) {
+    const p = S.active(); if (!p || pass(p).stamps[id]) return;
+    pass(p).stamps[id] = Date.now(); S.save(); TG.sfx.win();
+    if (TG.villageReward) TG.villageReward(25, 35);
+    S.logActivity && S.logActivity({ kind: 'stamp', id }); TG.villageQuest && TG.villageQuest('stamp'); TG.achievements && TG.achievements.check();
+  }
   function landCanvas(id, cls = 'pp-land', w = 120, hh = 60, animate = true) {
     const c = h('canvas', { class: cls, width: w, height: hh }), x = c.getContext('2d'), t0 = performance.now();
     const loop = () => { drawLand(x, id, (performance.now() - t0) / 1000, w, hh); if (animate && c.isConnected) requestAnimationFrame(loop); };
@@ -135,34 +142,22 @@
     if (!a || !j || !unlocked(p, id)) return screen({ shell });
     const got = pass(p).stamps[id], i = ORDER.indexOf(id);
     const eth = TG.ethnic ? TG.ethnic.ETHNIC.filter((e) => e.aimags[0] === id || (e.aimags.includes(id) && e.id !== 'khalkh')) : [];
-    const quiz = h('div', { class: 'pp-quiz' });
-    const drawQuiz = () => {
-      if (got || pass(p).stamps[id]) { quiz.replaceChildren(h('div', { class: 'pp-stamped' }, h('span', { class: 'pp-stamp big' }, a.icon), h('b', null, L('Тамга авсан!', 'Stamped!')), h('small', null, TG.fmtDate(pass(p).stamps[id])))); return; }
-      const opts = [...j.q.o.map((o, k) => ({ o, ok: k === j.q.a }))].sort(() => Math.random() - 0.5);
-      const out = h('div');
-      quiz.replaceChildren(h('h3', null, '🛂 ', L('Тамга авах асуулт', 'Question for the stamp')), h('p', null, tx(j.q.q)),
-        h('div', { class: 'l-opts' }, opts.map(({ o, ok }) => h('button', { class: 'l-opt', onclick: (e) => {
-          if (!ok) { e.currentTarget.classList.add('wrong'); e.currentTarget.disabled = true; TG.sfx.bad(); out.replaceChildren(h('p', { class: 'muted' }, '💡 ', L('Дээрх түүх, газруудыг дахин уншаад үзээрэй.', 'Read the history and landmarks above again.'))); return; }
-          pass(p).stamps[id] = Date.now(); S.save(); TG.sfx.win(); TG.confetti(70);
-          const r = TG.villageReward ? TG.villageReward(25, 35) : null; S.logActivity && S.logActivity({ kind: 'stamp', id }); TG.achievements && TG.achievements.check();
-          const nx = nextId(p);
-          drawQuiz();
-          quiz.appendChild(h('div', null, r ? h('div', { class: 'l-reward' }, `🪙 +${r.coins} · ⭐ +${r.xp} XP`) : null,
-            nx ? h('button', { class: 'btn primary big block', onclick: () => TG.go('aimag', { id: nx }) }, '🧭 ', L('Дараагийн аймаг: ', 'Next province: '), tx(TG.aimags.byId(nx).name), ' →') : h('p', null, '🏆 ', L('Бүх аймгаар аялж дууслаа!', 'You visited every province!'))));
-        } }, tx(o)))), out);
-    };
-    drawQuiz();
+    const seen = ((p.travel || {})[id] || []).length, stampedAt = pass(p).stamps[id];
+    const quiz = h('div', { class: 'pp-quiz' },
+      stampedAt ? h('div', { class: 'pp-stamped' }, h('span', { class: 'pp-stamp big' }, a.icon), h('b', null, L('Тамга авсан!', 'Stamped!')), h('small', null, TG.fmtDate(stampedAt))) : null,
+      h('button', { class: 'btn primary big block', onclick: () => TG.travel.open(id) }, '🚌 ', stampedAt ? L('Дахин аялах', 'Travel there again') : L(`${a.name.mn} руу аялах`, `Travel to ${a.name.en}`)),
+      h('small', { class: 'muted' }, stampedAt ? L(`${seen}/3 газраар аялсан.`, `Visited ${seen}/3 places.`) : L('Тэнд очиж 3 алдартай газраар аялаад, нутгийн хөтчөөс тамгаа аваарай.', 'Go there, visit the 3 famous places and get your stamp from the local guide.')));
     return shell([
       h('div', { class: 'pp-top' }, h('button', { class: 'icon-btn', 'aria-label': 'back', onclick: () => TG.go('passport') }, TG.icon('arrowLeft')), h('span', null, `${i + 1} / ${ORDER.length}`)),
       h('section', { class: 'pp-visit px-card' }, landCanvas(id, 'pp-land big', 160, 80),
         h('div', { class: 'pp-title' }, h('span', { class: 'pp-icon' }, a.icon), h('div', null, h('h1', null, tx(a.name)), h('small', null, `${L('Төв', 'Centre')}: ${tx(a.center)}`, p.aimag === id ? ' · 📍 ' + L('Миний нутаг', 'My home province') : '')))),
+      h('section', { class: 'card pp-go' }, quiz),
       h('section', { class: 'card' }, h('h3', null, '📍 ', L('Алдартай газрууд', 'Famous places')),
         j.marks.map((m) => h('div', { class: 'pp-mark' }, h('b', null, tx(m.name)), h('p', null, tx(m.desc))))),
       h('section', { class: 'card' }, h('h3', null, '📜 ', L('Түүх', 'History')), h('p', null, tx(j.history)), h('p', { class: 'muted' }, '💡 ', tx(a.fact)),
         eth.length ? h('p', null, '👥 ', L('Энд амьдардаг ястнууд: ', 'Peoples living here: '), eth.map((e) => tx(e.name)).join(', ')) : null),
-      h('section', { class: 'card' }, quiz),
       h('button', { class: 'btn block', onclick: () => TG.basar.open({ prompt: L(`${tx(a.name)} аймгийн тухай сонирхолтой зүйл хэлээч`, `Tell me something interesting about ${tx(a.name)} province`) }) }, '🐕 ', L('Басараас энэ аймгийн тухай асуух', 'Ask Basar about this province')),
     ]);
   }
-  TG.passport = { J, ORDER, drawLand, landCanvas, screen, visit, nextId, stamps: (p) => Object.keys(pass(p).stamps).length };
+  TG.passport = { J, ORDER, drawLand, landCanvas, screen, visit, nextId, stamp, stamps: (p) => Object.keys(pass(p).stamps).length };
 })(window.TG);

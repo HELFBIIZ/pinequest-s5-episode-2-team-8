@@ -92,6 +92,7 @@
       const st = stats(); st.total = (st.total || 0) + 1; if (ok) st.right = (st.right || 0) + 1;
       if (q.topic) { st.topics = st.topics || {}; const tp = (st.topics[q.topic] = st.topics[q.topic] || { right: 0, total: 0 }); tp.total++; if (ok) tp.right++; }
       S.save(); TG.achievements && TG.achievements.check();
+      if (ok) TG.villageQuest && TG.villageQuest('quiz'); // any correct answer counts, in chat, lessons or quiz parties
       exp.replaceChildren(h('b', null, ok ? L('Зөв! Вуф вуф! 🎉', 'Correct! Woof woof! 🎉') : L('Бараг л! Зөв хариулт: ', 'Almost! The answer is: ') + (ok ? '' : q.options[q.answer])), h('p', null, q.explain));
       exp.classList.remove('hidden');
       onDone && onDone(ok);
@@ -207,7 +208,7 @@
       const holder = say('basar', h('span', { class: 'b-dots' }, h('i'), h('i'), h('i')));
       const q = await api.quiz(topic);
       holder.querySelector('.b-bubble').replaceChildren(api.quizCard(q, (ok) => {
-        if (ok) { TG.villageReward && TG.villageReward(5, 8); TG.villageQuest && TG.villageQuest('quiz'); }
+        if (ok) { TG.villageReward && TG.villageReward(5, 8); }
         setTimeout(() => say('basar', L('Дахиад нэг асуулт уу?', 'Another one?'), h('div', { class: 'b-chips' }, h('button', { class: 'chip', onclick: () => quizInChat(topic) }, L('Тийм! 🎯', 'Yes! 🎯')))), 500);
       }));
       log.scrollTop = log.scrollHeight;

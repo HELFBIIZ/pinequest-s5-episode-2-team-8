@@ -77,6 +77,7 @@
   }
   function quest(k, n = 1) {
     if (!V()) return;
+    if (typeof npcProgress === 'function') npcProgress(k, n);
     for (const q of quests()) if (q.k === k && !q.done) {
       const was = q.p; q.p = Math.min(QUESTS[k].n, q.p + n);
       if (q.p === QUESTS[k].n && was < q.p) TG.toast('📜 ' + L('Даалгавар биеллээ! Самбараас шагналаа аваарай.', 'Quest complete! Claim it at the board.'));
@@ -86,7 +87,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
+  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -327,7 +328,7 @@
     const pi = WD.plotAt(m.x, m.y); if (pi >= 0) return { type: 'plot', i: pi };
     let best = null, bd = 1.05;
     const consider = (d, a) => { if (d < bd) { bd = d; best = a; } };
-    for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : { type: o.id });
+    for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     consider(Math.hypot(fx - (WD.DOCK.x + 0.5), fy - (WD.DOCK.y + 0.7)), { type: 'fish' });
     for (const q of live.sheep) consider(Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) - 0.35, { type: 'sheep', s: q });
     if (best) return best;
@@ -356,6 +357,7 @@
       case 'uya': return ['ui:horse', L('Морь', 'Horses')];
       case 'archery': return ['ui:bow', L('Сур харваа', 'Archery')];
       case 'emee': return ['ui:heart', L('Эмээ', 'Grandma')];
+      case 'npcq': return ['ui:chat', L('Ярилцах', 'Talk')];
     }
     return ['ui:star', ''];
   }
@@ -382,6 +384,7 @@
       case 'uya': return uyaModal();
       case 'archery': return archeryModal();
       case 'emee': return emeeVisit();
+      case 'npcq': return npcTalk(a.id);
     }
   }
 
@@ -397,7 +400,7 @@
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
     if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
     const pi = WD.plotAt(tx0, ty0); if (pi >= 0) return goTo({ x: tx0, y: ty0 }, { type: 'plot', i: pi });
-    const o = WD.occ[tx0 + ',' + ty0]; if (o && o.door) return goTo(o.door, o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : { type: o.id });
+    const o = WD.occ[tx0 + ',' + ty0]; if (o && o.door) return goTo(o.door, o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     if (tx0 === WD.DOCK.x && ty0 === WD.DOCK.y) return goTo(WD.DOCK, { type: 'fish' });
     if (!WD.blocked(tx0, ty0)) return goTo({ x: tx0, y: ty0 }, null);
     const n = WD.nearestOpen(tx0, ty0, live.me.x, live.me.y); if (n) goTo(n, null);
@@ -509,16 +512,16 @@
   /** Season look, drawn into the low-res buffer so it stays pixel-crisp: tint plus falling snow, leaves or petals. */
   function seasonFx(b, bw, bh, t, c) {
     const id = live.season;
-    if (id === 'winter') { b.globalCompositeOperation = 'screen'; b.fillStyle = 'rgba(150,175,205,.42)'; b.fillRect(0, 0, bw + 1, bh + 1); b.globalCompositeOperation = 'source-over'; }
+    if (id === 'winter') { b.fillStyle = 'rgba(235,242,250,.16)'; b.fillRect(0, 0, bw + 1, bh + 1); } // a light frost, so the town stays clear and readable
     else if (id === 'autumn') { b.globalCompositeOperation = 'multiply'; b.fillStyle = '#ffd59a'; b.fillRect(0, 0, bw + 1, bh + 1); b.globalCompositeOperation = 'source-over'; }
     else if (id === 'spring') { b.fillStyle = 'rgba(255,200,230,.06)'; b.fillRect(0, 0, bw + 1, bh + 1); }
-    const n = id === 'winter' ? 70 : id === 'summer' ? 10 : 28;
+    const n = id === 'winter' ? 34 : id === 'summer' ? 10 : 28;
     for (let i = 0; i < n; i++) {
       const sp = id === 'winter' ? 14 + (i % 5) * 4 : id === 'summer' ? 4 : 10 + (i % 4) * 3;
       const x0 = (WD.hash(i, 7) * (bw + 40) + Math.sin(t * 0.8 + i) * (id === 'summer' ? 18 : 6)) % (bw + 40) - 20;
       const y0 = id === 'summer' ? (WD.hash(i, 3) * bh + Math.sin(t * 1.7 + i) * 6) : ((WD.hash(i, 11) * (bh + 30) + t * sp) % (bh + 30)) - 15;
       const X = Math.round(x0), Y = Math.round(y0);
-      if (id === 'winter') { PX.R(b, X, Y, i % 3 ? 1 : 2, i % 3 ? 1 : 2, '#ffffff'); }
+      if (id === 'winter') { b.globalAlpha = 0.7; PX.R(b, X, Y, 1, 1, '#ffffff'); if (i % 4 === 0) PX.R(b, X + 1, Y, 1, 1, '#dce8f5'); b.globalAlpha = 1; } // small, soft flakes that don't hide the town
       else if (id === 'autumn') { PX.R(b, X, Y, 2, 1, ['#e8752a', '#c9461e', '#f2b33d'][i % 3]); PX.R(b, X + (Math.floor(t * 3 + i) % 2), Y + 1, 1, 1, '#a8501c'); }
       else if (id === 'spring') { PX.R(b, X, Y, 1, 1, i % 2 ? '#ffb7d5' : '#ffffff'); if (i % 3 === 0) PX.R(b, X + 1, Y, 1, 1, '#ff8fb1'); }
       else { const on = Math.floor(t * 6 + i) % 2; PX.R(b, X, Y, 1, 1, '#ffffff'); if (on) { PX.R(b, X - 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); PX.R(b, X + 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); } } // butterflies
@@ -581,6 +584,8 @@
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
+    const tps = WD.objects.filter((q) => q.kind === 'npcq');
+    for (const np of tps) { const d = NPCS[np.id]; if (d) ents.push({ y: np.y, f: () => { shadow(np.x * T, np.y * T); sprite(PX.char(d.look, Math.floor(t / 3 + np.x) % 5 === 4 ? 2 : 0, 0), np.x * T, np.y * T - 12); } }); }
     const em = WD.objects.find((q) => q.kind === 'emee');
     if (em) ents.push({ y: em.y, f: () => { shadow(em.x * T, em.y * T); sprite(PX.char(EMEE, Math.floor(t / 3) % 4 === 2 ? 1 : 0, 0), em.x * T, em.y * T - 12); } });
     if (live.race) {
@@ -602,6 +607,7 @@
     const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
+    for (const np of tps) { const d = NPCS[np.id]; if (!d) continue; const [sx, sy] = S(np.x * T + 8, np.y * T - 16); pixelText(ctx, tx(d.name).split(' ').pop(), sx, sy, textSize() * 0.8, '#ffffff'); const mk = npcMark(np.id); if (mk) pixelText(ctx, mk, sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180 + np.x) * 2) * live.view.k / 2, textSize() * 1.8, mk === '?' ? '#7fe07a' : '#f7c646'); }
     if (em) { const [sx, sy] = S(em.x * T + 8, em.y * T - 16); pixelText(ctx, L('Эмээ', 'Grandma'), sx, sy, textSize(), '#f7c646'); if (!(V().emee && V().emee.visits)) pixelText(ctx, '!', sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2, textSize() * 1.8, '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
     labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
@@ -1122,6 +1128,177 @@
     raf = requestAnimationFrame(loop);
   }
 
+  // ================================================================ townspeople with quest chains
+  const NQ = (k, n, mn, en, c, x) => ({ k, n, t: Tx(mn, en), c, x });
+  const NPCS = {
+    herder: { name: Tx('Малчин Батбаяр', 'Herder Batbayar'), look: { deel: 'brown', skin: '#D9A06E', hat: 'mongol', neck: null, face: null, pet: null },
+      hello: Tx('Сайн уу, хүү/охин минь! Мал маллах амаргүй ч сайхан ажил шүү.', 'Hello, child! Herding is hard work, but wonderful.'),
+      chain: [NQ('pet', 3, 'Хониддоо дасгая: тэднийг 3 удаа илбээрэй.', 'Help the sheep get to know you: pet them 3 times.', 20, 25), NQ('harvest', 2, 'Малын тэжээлд 2 ургац хураагаад ирээрэй.', 'Harvest 2 crops for the animals.', 25, 30), NQ('etiquette', 1, 'Эмээгийн гэрт ёсоор зочлоод ир. Малчин хүн ёсоо мэддэг байх ёстой!', 'Visit Grandma’s ger with good manners. A herder knows the customs!', 35, 40)],
+      done: Tx('Чи жинхэнэ малчин болох нь! Малчид хонь бүрээ таньдаг, гэр бүл шиг хайрладаг.', 'You’ll make a real herder! Herders know every sheep and love them like family.') },
+    fisher: { name: Tx('Загасчин Дорж өвөө', 'Grandpa Dorj the fisher'), look: { deel: 'teal', skin: '#B97A4A', hat: 'cap', neck: null, face: null, pet: null },
+      hello: Tx('Нуур тайван байна. Загасчлахад тэвчээр хэрэгтэй.', 'The lake is calm today. Fishing takes patience.'),
+      chain: [NQ('fish', 1, 'Нэг загас барьж үзээрэй. Гүүрэн дээрээс загасчилна.', 'Catch your first fish from the dock.', 15, 20), NQ('fish', 3, 'Одоо 3 загас бариарай. Хадран барьвал буцааж тавиарай!', 'Now catch 3 fish. If you catch a taimen, let it go!', 30, 35), NQ('basar', 2, 'Басараас Монголын гол мөрөн, нууруудын тухай 2 асуулт асуу.', 'Ask Basar 2 questions about Mongolia’s rivers and lakes.', 25, 30)],
+      done: Tx('Сайн загасчин байгалиа хайрладаг. Хөвсгөл нуур бол Монголын хамгийн гүн нуур шүү!', 'A good fisher loves nature. Lake Khövsgöl is Mongolia’s deepest lake!') },
+    farmer: { name: Tx('Тариачин Сарнай эгч', 'Farmer Sarnai'), look: { deel: 'green', skin: '#EDBB93', hat: 'flower', neck: null, face: null, pet: null },
+      hello: Tx('Цэцэрлэгт ажиллах сайхан шүү! Надад туслах уу?', 'Gardening is lovely! Will you help me?'),
+      chain: [NQ('plant', 4, '4 үр тариарай.', 'Plant 4 seeds.', 20, 25), NQ('water', 5, 'Ургамлуудаа 5 удаа услаарай.', 'Water the plants 5 times.', 20, 25), NQ('harvest', 3, '3 ургац хураагаарай.', 'Harvest 3 crops.', 30, 35)],
+      done: Tx('Баярлалаа! Сэлэнгэ аймаг Монголын талх, үр тарианы өлгий шүү.', 'Thank you! Selenge province is the cradle of Mongolia’s bread and grain.') },
+    teacher: { name: Tx('Багш Оюун', 'Teacher Oyun'), look: { deel: 'blue', skin: '#F6D3B3', hat: null, neck: 'scarf', face: 'glasses', pet: null },
+      hello: Tx('Сурах бичиг уншихаас гадна тоглож сурах нь бас гоё!', 'Besides books, learning by playing is great fun!'),
+      chain: [NQ('lesson', 1, 'Сургуулийн гэрт нэг хичээл дуусгаарай.', 'Finish one lesson in the school ger.', 30, 40), NQ('quiz', 3, 'Басарын 3 асуултад зөв хариулаарай.', 'Answer 3 of Basar’s questions correctly.', 25, 35), NQ('stamp', 1, 'Аймгийн паспортоороо нэг аймагт аялж тамга аваарай.', 'Travel to a province with your passport and earn a stamp.', 35, 45)],
+      done: Tx('Гайхалтай сурагч! “Эрдэм ухаан, эрдэнийн сан” гэдэг шүү.', 'An amazing student! As we say, “knowledge is a treasure”.') },
+    trainer: { name: Tx('Уяач Ганбаатар', 'Horse trainer Ganbaatar'), look: { deel: 'gold', skin: '#D9A06E', hat: 'loovuuz', neck: null, face: null, pet: null },
+      hello: Tx('Сайн уяач морио хайрлаж, сайн мэддэг. Хурдан морь уяачаас эхэлдэг.', 'A good trainer loves and knows their horse. Every fast horse starts with its trainer.'),
+      chain: [NQ('race', 1, 'Морин уралдаанд нэг удаа оролцоорой.', 'Ride in one horse race.', 25, 30), NQ('race', 2, 'Дахиад 2 уралдаанд уралдаж мориндоо дасгал хийлгээрэй.', 'Ride 2 more races to train your horse.', 35, 40), NQ('wrestle', 1, 'Наадмын талбайд нэг даваа давж үзээрэй.', 'Win one round at the wrestling arena.', 30, 35)],
+      done: Tx('Чи морио сайн мэдэх болжээ! Уяачид морио уралдааны өмнө “сойдог”, өөрөөр хэлбэл тусгайлан бэлтгэдэг.', 'You know your horse well now! Before a race, trainers “soi” their horses: they prepare them in a special way.') },
+    archer: { name: Tx('Мэргэн Тулга ах', 'Tulga the archer'), look: { deel: 'red', skin: '#B97A4A', hat: 'mongol', neck: 'medal', face: null, pet: null },
+      hello: Tx('Сайн харваач амьсгалаа тайвшруулж, салхиа ажигладаг.', 'A good archer breathes calmly and watches the wind.'),
+      chain: [NQ('archery', 3, 'Сурын талбайд 3 бай онооорой.', 'Hit 3 targets at the archery range.', 25, 30), NQ('archery', 6, 'Одоо 6 бай онооорой. Салхийг тооцоорой!', 'Now hit 6 targets. Mind the wind!', 35, 40), NQ('together', 1, 'Гэр бүлтэйгээ нэг бодит ажил хамт хийгээрэй.', 'Do one real-life activity with your family.', 40, 45)],
+      done: Tx('Чи мэргэн болж байна! Сайн харваачийг монголчууд “мэргэн” гэж цоллодог.', 'You’re becoming a mergen! That is what Mongols call a great archer.') },
+  };
+  const npcState = (id) => { const v = V(); v.npc = v.npc || {}; return (v.npc[id] = v.npc[id] || { step: 0, p: 0, on: false }); };
+  /** Progress the townspeople's tasks (called with every daily-quest event). */
+  function npcProgress(k, n = 1) {
+    if (!V()) return;
+    for (const [id, d] of Object.entries(NPCS)) {
+      const st = npcState(id), q = d.chain[st.step];
+      if (!st.on || !q || q.k !== k || st.p >= q.n) continue;
+      st.p = Math.min(q.n, st.p + n);
+      if (st.p >= q.n) TG.toast(`❓ ${tx(d.name)}: ${L('даалгавар биеллээ! Очиж шагналаа аваарай.', 'task done! Go and collect your reward.')}`);
+    }
+  }
+  const npcMark = (id) => { const st = npcState(id), q = NPCS[id].chain[st.step]; if (!q) return ''; if (!st.on) return '!'; return st.p >= q.n ? '?' : ''; };
+  function npcPic(look, size = 56) { const c = h('canvas', { class: 'px-icon', width: 16, height: 28, style: { width: size + 'px', height: Math.round(size * 28 / 16) + 'px' } }); c.getContext('2d').drawImage(PX.char(look, 0, 0), 0, 0); return c; }
+  function npcTalk(id) {
+    const d = NPCS[id]; if (!d) return;
+    const st = npcState(id), body = h('div', { class: 'npc-talk' });
+    const draw = () => {
+      const q = d.chain[st.step];
+      const steps = h('div', { class: 'npc-steps' }, d.chain.map((_, i) => h('i', { class: i < st.step ? 'on' : i === st.step ? 'cur' : '' })));
+      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, h('p', null, tx(d.done))), h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
+      const ready = st.on && st.p >= q.n;
+      rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)),
+        h('div', { class: 'emee-say' }, h('p', null, st.on ? (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)),
+        st.on ? h('div', null, h('div', { class: 'meter' }, h('span', { style: { width: (st.p / q.n) * 100 + '%' } })), h('small', { class: 'muted' }, `${st.p}/${q.n} · 🪙 +${q.c} · ⭐ +${q.x} XP`)) : null,
+        h('div', { class: 'row-btns' },
+          !st.on ? h('button', { class: 'btn primary', onclick: () => { st.on = true; st.p = 0; S.save(); TG.sfx.chime && TG.sfx.chime(); draw(); } }, L('Тэгье, хийе!', 'Okay, I’ll do it!'))
+            : ready ? h('button', { class: 'btn primary', onclick: () => {
+              const r = reward(q.c, q.x); st.step++; st.p = 0; st.on = st.step < d.chain.length; S.save(); TG.confetti(40);
+              TG.toast(`🎁 ${tx(d.name)}: 🪙 +${r ? r.coins : q.c}`); checkAch(); draw();
+            } }, '🎁 ', L('Шагнал авах', 'Collect reward')) : h('button', { class: 'btn', onclick: () => close() }, L('Одоо хийнэ!', 'I’m on it!'))));
+    };
+    draw();
+    const close = TG.modal(body, { cls: 'v-modal' });
+  }
+  TG.villageNpcs = { NPCS, state: npcState };
+
+  // ================================================================ inside your own ger: walk around and use the furniture
+  const GER_TEA = [Tx('Сүүтэй цайг сүү, ус, давс, цайгаар чанадаг. Зочинд хамгийн түрүүнд цай өргөдөг.', 'Milk tea is made with milk, water, salt and tea leaves. Guests are always offered tea first.'), Tx('Цайгаа шанагаар өндрөөс самарвал илүү амттай болдог гэдэг.', 'Ladling the tea from high up is said to make it tastier.')];
+  const SNACKS = [Tx('Ааруул шүдийг бэхжүүлдэг гэж ярьдаг. Ням!', 'People say aaruul makes teeth strong. Crunch!'), Tx('Борцог бол гурилаар хийсэн шарсан боов.', 'Boortsog are fried dough pastries.'), Tx('Өрөмтэй боорцог бол зочны дуртай амттан.', 'Boortsog with öröm cream is a guest’s favourite treat.')];
+  function playMelody() {
+    if (S.state.settings.sound === false) return;
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)(), notes = [392, 440, 523, 587, 523, 440, 392, 330, 392];
+      notes.forEach((f, i) => { // a slow pentatonic tune with a soft, bowed sound
+        const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime + i * 0.38;
+        o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t0); o.frequency.linearRampToValueAtTime(f * 1.01, t0 + 0.3);
+        g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.07, t0 + 0.08); g.gain.linearRampToValueAtTime(0, t0 + 0.42);
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+        o.connect(lp); lp.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + 0.45);
+      });
+      setTimeout(() => ac.close(), 4200);
+    } catch (e) { /* no audio */ }
+  }
+  function enterGer(i, visitor) {
+    const l = lotsArr()[i]; if (!l) return;
+    const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id), today = S.dkey();
+    v.homeDay = v.homeDay || {};
+    const W2 = 240, H2 = 170, cx = 120;
+    const base = document.createElement('canvas'); base.width = W2; base.height = H2; PX.interior(base, R.ROOF[l.roof] || R.ROOF.blue, furn);
+    { const b2 = base.getContext('2d'); PX.R(b2, 64, 52, 26, 14, '#2b1e2e'); PX.R(b2, 65, 53, 24, 12, '#c98a4b'); PX.R(b2, 65, 53, 24, 2, '#e5a157'); PX.R(b2, 70, 55, 6, 4, '#ffffff'); PX.R(b2, 80, 56, 5, 3, '#f3e6c4'); } // low table with a bowl and aaruul
+    const cv = h('canvas', { class: 'ger-cv', width: W2, height: H2 }), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
+    const say = h('div', { class: 'ger-say' }), act = h('button', { class: 'btn primary block ger-act', disabled: true });
+    const me = { x: cx, y: 150, tx: cx, ty: 150, dir: 3, moving: false }, dog = { x: cx + 18, y: 156 }, fx = { steam: 0, zzz: 0, notes: 0 };
+    const keys = new Set();
+    const floor = (px, py) => ((px - cx) / 100) ** 2 + ((py - 98) / 60) ** 2 <= 1;
+    const spot = (id, sx, sy, mn, en, run, need) => ({ id, x: sx, y: sy, name: Tx(mn, en), run, need });
+    const dayOnce = (k) => { if (!own || v.homeDay[k] === today) return false; v.homeDay[k] = today; S.save(); return true; };
+    const sayIt = (txt) => { rc(say, h('p', null, txt)); };
+    const spots = [
+      spot('door', cx, 152, 'Гарах', 'Leave', () => close()),
+      spot('table', 77, 70, 'Ааруул идэх', 'Eat aaruul', () => { TG.sfx.pop && TG.sfx.pop(); sayIt('🧀 ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); }),
+      spot('khoimor', cx, 44, 'Хойморт суух', 'Sit in the khoimor', () => sayIt(L('Хоймор бол гэрийн хамгийн хүндэт газар. Гэрийн эзэн тань зочдоо, ахмадуудаа энд урьдаг.', 'The khoimor is the place of honour. As the host, you invite elders and guests to sit here.'))),
+    ];
+    if (has('tulga')) spots.push(spot('tulga', cx, 86, 'Цай чанах', 'Make milk tea', () => { fx.steam = performance.now(); TG.sfx.pour ? TG.sfx.pour(0.6) : TG.sfx.tap(); sayIt('🍵 ' + tx(TG.pick(GER_TEA))); if (dayOnce('tea')) reward(5, 10); }));
+    if (has('or')) spots.push(spot('or', 40, 96, 'Унтаж амрах', 'Sleep and rest', () => {
+      fx.zzz = performance.now(); TG.sfx.chime && TG.sfx.chime();
+      if (own && v.rest !== today) { v.rest = today; v.water = v.can; S.save(); reward(5, 10); sayIt(L('😴 Сайхан амарлаа! Усны сав дүүрч, +10 XP.', '😴 A good rest! Water refilled, +10 XP.')); hud(); }
+      else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
+    }));
+    if (has('avdar')) spots.push(spot('avdar', cx, 40, 'Авдраа нээх', 'Open the chest', () => chestModal()));
+    if (has('morinkhuur')) spots.push(spot('morinkhuur', 148, 46, 'Морин хуур тоглох', 'Play the morin khuur', () => { fx.notes = performance.now(); playMelody(); sayIt(L('🎻 Морин хуурын аялгуу гэрийг дүүргэлээ. Хөөрхөн Намжилын морь сонсож байгаа юм шиг…', '🎻 The fiddle’s tune fills the ger, as if Khökhöö Namjil’s horse were listening…')); if (dayOnce('music')) reward(0, 8); }));
+    if (has('shirdeg')) spots.push(spot('shirdeg', cx, 118, 'Басартай суух', 'Sit with Basar', () => { dog.x = me.x + 14; dog.y = me.y + 2; sayIt('🐕 ' + tx(TG.pick(TG.BASAR.FACTS))); }));
+    if (has('shagai')) spots.push(spot('shagai', 154, 144, 'Шагай хаях', 'Throw shagai', () => {
+      const S4 = ['🐎', '🐫', '🐑', '🐐'], roll = [0, 1, 2, 3].map(() => Math.floor(Math.random() * 4)), horses = roll.filter((r) => r === 0).length;
+      TG.sfx.roll ? TG.sfx.roll() : TG.sfx.tap();
+      sayIt(`🦴 ${roll.map((r) => S4[r]).join(' ')}  ·  ${horses === 4 ? L('Дөрвөн морь! Маш ховор!', 'Four horses! Very rare!') : L(`${horses} морь буулаа.`, `${horses} horse side(s).`)}`);
+      if (horses === 4 && dayOnce('shagai4')) reward(20, 20);
+    }));
+    const missing = R.FURNITURE.filter((f) => !has(f.id));
+    function chestModal() {
+      const fishN = Object.values(v.fish || {}).reduce((a, b) => a + b, 0), prodN = Object.values(v.produce || {}).reduce((a, b) => a + b, 0), t = R.titleFor(v.wr);
+      TG.modal(h('div', null, h('h2', null, '🧰 ', L('Миний авдар', 'My chest')), h('p', { class: 'muted' }, L('Авдарт гэр бүлийн үнэт зүйлсийг хадгалдаг.', 'Families keep their treasures in the avdar.')),
+        h('div', { class: 'stat-cards' },
+          h('div', { class: 'stat' }, h('small', null, L('Загас', 'Fish')), h('b', null, fishN)), h('div', { class: 'stat' }, h('small', null, L('Ургац', 'Crops')), h('b', null, prodN)), h('div', { class: 'stat' }, h('small', null, L('Тамга', 'Stamps')), h('b', null, TG.passport ? TG.passport.stamps(S.active()) : 0))),
+        h('div', { class: 'v-list' },
+          t ? h('div', { class: 'v-row' }, pic('ui:wrestle'), h('div', { class: 'v-row-b' }, h('b', null, L('Бөхийн цол', 'Wrestling title')), h('small', null, tx(R.TITLES.find((q) => q.id === t).name)))) : null,
+          v.arch && v.arch.best ? h('div', { class: 'v-row' }, pic('ui:bow'), h('div', { class: 'v-row-b' }, h('b', null, L('Сур харваа', 'Archery')), h('small', null, `${v.arch.best}/12`))) : null,
+          v.horse && v.horse.wins ? h('div', { class: 'v-row' }, pic('ui:trophy'), h('div', { class: 'v-row-b' }, h('b', null, L('Түрүү морь', 'Race wins')), h('small', null, String(v.horse.wins)))) : null,
+          ...(v.owned || []).slice(0, 12).map((id) => { const it = R.ITEMS.find((q) => q.id === id); return it ? h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name)))) : null; }))), { cls: 'v-modal' });
+    }
+    let raf = 0, last = performance.now(), near = null;
+    const loop = (ts) => {
+      const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+      let ix = (keys.has('r') ? 1 : 0) - (keys.has('l') ? 1 : 0), iy = (keys.has('d') ? 1 : 0) - (keys.has('u') ? 1 : 0);
+      if (ix || iy) { const n = Math.hypot(ix, iy); me.tx = me.x + (ix / n) * 6; me.ty = me.y + (iy / n) * 6; }
+      const dx = me.tx - me.x, dy = me.ty - me.y, d = Math.hypot(dx, dy);
+      me.moving = d > 1;
+      if (me.moving) { const sp = 62 * dt, nx = me.x + (dx / d) * Math.min(sp, d), ny = me.y + (dy / d) * Math.min(sp, d); if (floor(nx, ny)) { me.x = nx; me.y = ny; } else { me.tx = me.x; me.ty = me.y; } me.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0); }
+      dog.x += (me.x + 14 - dog.x) * Math.min(1, dt * 2.5); dog.y += (me.y + 4 - dog.y) * Math.min(1, dt * 2.5);
+      near = null; let bd = 22; for (const s2 of spots) { const dd = Math.hypot(s2.x - me.x, s2.y - me.y); if (dd < bd) { bd = dd; near = s2; } }
+      act.disabled = !near; act.textContent = near ? `${tx(near.name)} (Space)` : L('Тавилга руу ойртоорой', 'Walk up to something');
+      x.drawImage(base, 0, 0);
+      if (near && near.id !== 'door') { x.strokeStyle = `rgba(247,198,70,${0.6 + 0.3 * Math.sin(ts / 150)})`; x.lineWidth = 1; x.beginPath(); x.ellipse(near.x, near.y + 4, 14, 6, 0, 0, Math.PI * 2); x.stroke(); }
+      const ft = (k, dur) => ts - fx[k] < dur;
+      if (ft('steam', 3000)) for (let k = 0; k < 4; k++) { const q = ((ts / 900 + k / 4) % 1); x.fillStyle = `rgba(255,255,255,${0.7 - q * 0.6})`; x.fillRect(Math.round(cx - 2 + Math.sin(ts / 300 + k) * 3), Math.round(80 - q * 26), 2, 2); }
+      if (ft('zzz', 2500)) { x.fillStyle = '#ffffff'; x.font = '700 9px Rubik, sans-serif'; x.fillText('z', 46, 80 - ((ts / 60) % 14)); x.fillText('Z', 52, 72 - ((ts / 50) % 16)); }
+      if (ft('notes', 3600)) for (let k = 0; k < 3; k++) { const q = ((ts / 1200 + k / 3) % 1); x.fillStyle = '#f7c646'; x.fillRect(Math.round(154 + k * 6 + Math.sin(ts / 200 + k) * 3), Math.round(44 - q * 30), 2, 2); x.fillRect(Math.round(156 + k * 6 + Math.sin(ts / 200 + k) * 3), Math.round(39 - q * 30), 1, 5); }
+      const ents = [{ y: dog.y, f: () => x.drawImage(PX.bankhar(Math.hypot(me.x + 14 - dog.x, me.y + 4 - dog.y) > 3 ? 1 + Math.floor(ts / 120) % 2 : 3), Math.round(dog.x - 11), Math.round(dog.y - 16)) },
+        { y: me.y, f: () => x.drawImage(PX.char({ ...v.look, ride: null }, me.dir, me.moving ? 1 + Math.floor(ts / 125) % 2 : 0), Math.round(me.x - 8), Math.round(me.y - 26)) }];
+      ents.sort((a, b) => a.y - b.y).forEach((e) => e.f());
+      raf = requestAnimationFrame(loop);
+    };
+    cv.addEventListener('pointerdown', (e) => {
+      const r = cv.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W2, py = (e.clientY - r.top) / r.height * H2;
+      const hit = spots.find((s2) => Math.hypot(s2.x - px, s2.y - py) < 16);
+      if (hit && Math.hypot(hit.x - me.x, hit.y - me.y) < 24) return hit.run();
+      me.tx = hit ? hit.x : px; me.ty = hit ? hit.y + 8 : py;
+    });
+    act.addEventListener('click', () => near && near.run());
+    const KEY = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
+    const kd = (e) => { if (document.querySelectorAll('.modal-back').length > 1) return; if (KEY[e.code]) { e.preventDefault(); keys.add(KEY[e.code]); } else if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); e.stopPropagation(); if (!e.repeat && near) near.run(); } };
+    const ku = (e) => { if (KEY[e.code]) keys.delete(KEY[e.code]); };
+    window.addEventListener('keydown', kd, true); window.addEventListener('keyup', ku, true);
+    sayIt(own ? L('Гэртээ тавтай морил! Босгоо алхаж давлаа ✓. Тавилга руу ойртоод дараарай.', 'Welcome home! You stepped over the threshold ✓. Walk up to the furniture and press.') : L(`${l.n}-ийн гэрт зочиллоо. Эргэн тойрноо нар зөв ажиглаарай.`, `You are visiting ${l.n}'s ger. Look around, moving sunwise.`));
+    const close = TG.modal(h('div', { class: 'ger-inside' },
+      h('div', { class: 'ger-top' }, h('h2', null, own ? L('Миний гэр', 'My ger') : `${l.n} · ${L('гэр', 'ger')}`), own ? h('small', { class: 'muted' }, `${furn.length}/${R.FURNITURE.length} ${L('тавилга', 'furniture')}`) : null),
+      cv, say, act,
+      own ? h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { homeModal(i); } }, '🛋️ ', L('Тохижуулах', 'Decorate'), missing.length ? ` (${missing.length})` : ''), h('button', { class: 'btn', onclick: () => { wardrobe(); } }, '👘 ', L('Хувцас', 'Wardrobe')))
+        : h('div', { class: 'row-btns' }, h('button', { class: 'btn primary', onclick: () => { if (live.online) net.send({ t: 'say', k: 'p', i: 0 }); else live.me.bubble = { text: tx(R.PHRASES[0]), t0: performance.now() }; close(); } }, L('Мэндлээд гарах', 'Say hi and leave')))),
+      { cls: 'v-modal ger-modal', onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', kd, true); window.removeEventListener('keyup', ku, true); } });
+    raf = requestAnimationFrame(loop);
+  }
+
   function openBasar() {
     const dg = live && live.dog, b = dg && dg.bubble;
     if (dg) dg.bubble = null;
@@ -1242,8 +1419,8 @@
   function lotAction(i) {
     const l = lotsArr()[i];
     if (!l) return myLot() >= 0 ? TG.toast(L('Танд аль хэдийн гэр байна!', 'You already have a ger!')) : buyGer(i);
-    if (l.by === V().id) return homeModal(i);
-    visitGer(l);
+    if (l.by === V().id) return enterGer(i);
+    enterGer(i, true);
   }
   function gerPreview(roof, door, scale) {
     const c = h('canvas', { class: 'v-gerprev', width: 48 * scale, height: 50 * scale }), x = c.getContext('2d');
@@ -1297,7 +1474,7 @@
     const draw = () => {
       PX.interior(cv, R.ROOF[l.roof] || R.ROOF.blue, l.furn || []);
       const today = S.dkey(), rested = v.rest === today;
-      rc(body, h('h2', null, L('Миний гэр', 'My ger')), cv,
+      rc(body, h('h2', null, L('Гэрээ тохижуулах', 'Decorate my ger')), cv,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, L('Хувцас', 'Wardrobe')),
           h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.rest = today; v.water = v.can; S.save(); reward(5, 10); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: +10 XP, усны сав дүүрлээ.', 'You rested at home: +10 XP, water refilled.')); draw(); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),

@@ -53,6 +53,13 @@
     { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
     { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
     { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
+    // townspeople with quests (see NPCS in village.js)
+    { id: 'herder', kind: 'npcq', x: 25, y: 16, w: 1, h: 1, door: { x: 25, y: 17 } },
+    { id: 'fisher', kind: 'npcq', x: 23, y: 6, w: 1, h: 1, door: { x: 23, y: 7 } },
+    { id: 'farmer', kind: 'npcq', x: 12, y: 14, w: 1, h: 1, door: { x: 12, y: 13 } },
+    { id: 'teacher', kind: 'npcq', x: 13, y: 6, w: 1, h: 1, door: { x: 13, y: 7 } },
+    { id: 'trainer', kind: 'npcq', x: 38, y: 15, w: 1, h: 1, door: { x: 38, y: 16 } },
+    { id: 'archer', kind: 'npcq', x: 44, y: 32, w: 1, h: 1, door: { x: 44, y: 31 } },
     { id: 'lantern4', kind: 'lantern', x: 40, y: 11, w: 1, h: 1 },
     { id: 'lantern5', kind: 'lantern', x: 40, y: 14, w: 1, h: 1 },
     ...LOT_X.map((x, i) => ({ id: 'lot' + i, kind: 'lot', i, x, y: 28, w: 3, h: 3, door: { x: x + 1, y: 31 } })),

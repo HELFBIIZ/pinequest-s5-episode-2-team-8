@@ -1327,3 +1327,24 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .emee-say p.gentle { background: #fff0f5; box-shadow: inset 0 0 0 2px #f492ba; }
 .emee-visit .l-scene { width: 100%; }
 @media (max-width: 480px) { .hub-row { grid-template-columns: repeat(3, 1fr); gap: 6px; } .hub-card b { font-size: .8rem; } .race-classes { grid-template-columns: repeat(2, 1fr); } .tree-sides, .tree-row { grid-template-columns: 1fr 58px 1fr; } }
+
+/* ---------- townspeople, ger interior, aimag travel ---------- */
+.npc-head { display: flex; gap: 12px; align-items: center; padding-right: 36px; }
+.npc-head h2 { margin: 0 0 6px; }
+.npc-steps { display: flex; gap: 4px; }
+.npc-steps i { width: 26px; height: 6px; background: #e6c48a; }
+.npc-steps i.on { background: #5c9a36; }
+.npc-steps i.cur { background: #f7c646; }
+.npc-talk .meter { margin: 6px 0 2px; }
+.modal.ger-modal, .modal.travel-modal { max-width: 640px; }
+.ger-inside, .travel { display: flex; flex-direction: column; gap: 8px; }
+.ger-top, .travel-head { display: flex; align-items: center; gap: 10px; padding-right: 40px; }
+.ger-top h2, .travel-head h2 { margin: 0; }
+.travel-head small { color: #7a5432; font-weight: 800; }
+.travel-prog { margin-left: auto; font-family: var(--font-display); font-weight: 800; color: #5a2d10; white-space: nowrap; }
+.ger-cv, .travel-cv { width: 100%; image-rendering: pixelated; display: block; box-shadow: inset 0 0 0 2px #8a4b1f, 0 0 0 2px #8a4b1f; touch-action: none; cursor: pointer; background: #3a2a1e; }
+.ger-say p, .travel-info { margin: 0; padding: 10px 12px; background: #fffaf0; box-shadow: inset 0 0 0 2px #c99a5a; font-weight: 700; }
+.travel-info p { margin: 4px 0; }
+.travel-info .l-opts { margin-top: 6px; }
+.travel-q { font-weight: 800; }
+.pp-go { display: flex; flex-direction: column; gap: 8px; }
