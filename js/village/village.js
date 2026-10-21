@@ -107,7 +107,7 @@
       this.closed = false; setStatus('connecting');
       if (location.protocol === 'file:') return setStatus('solo');
       let ok = false;
-      try { const r = await fetch('api/hello', { cache: 'no-store' }); ok = r.ok && (await r.json()).naadamy === true; } catch (e) { ok = false; }
+      try { const r = await fetch('api/hello', { cache: 'no-store' }); const j = r.ok ? await r.json() : {}; ok = j.naadamy === true; if (live) live.urls = j.urls || []; } catch (e) { ok = false; }
       if (!live || this.closed) return;
       if (!ok) return setStatus('solo');
       this.open();
@@ -232,6 +232,8 @@
   function start(root, canvas, els, setCleanup) {
     if (!root.isConnected) return;
     const v = V(), prof = S.active();
+    const qRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+    if (R.ROOM_RE.test(qRoom) && v.room !== qRoom) { v.room = qRoom; S.save(); }
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
     live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
@@ -268,12 +270,13 @@
     let k = Math.max(1, Math.round(devW / ((cssW < 640 ? 11 : 24) * T)));
     k = Math.max(k, Math.ceil(devW / (WD.W * T)), Math.ceil(devH / (WD.H * T)));
     const bw = Math.ceil(devW / k), bh = Math.ceil(devH / k);
-    live.buf.c.width = bw; live.buf.c.height = bh; live.buf.x.imageSmoothingEnabled = false;
+    live.buf.c.width = bw + 1; live.buf.c.height = bh + 1; live.buf.x.imageSmoothingEnabled = false; // +1 px so sub-pixel scrolling never shows an edge
     live.view = { devW, devH, dpr, k, bw, bh, cssW };
   }
+  /** Camera in art pixels, NOT rounded: rounding here made the view jump a whole art pixel (4–6 screen pixels). */
   function cam() {
     const { bw, bh } = live.view;
-    return { x: clamp(Math.round(live.cam.x * T + 8 - bw / 2), 0, WD.W * T - bw), y: clamp(Math.round(live.cam.y * T + 4 - bh / 2), 0, WD.H * T - bh) };
+    return { x: clamp(live.cam.x * T + 8 - bw / 2, 0, WD.W * T - bw), y: clamp(live.cam.y * T + 4 - bh / 2, 0, WD.H * T - bh) };
   }
 
   // ---------------------------------------------------------------- HUD
@@ -458,53 +461,60 @@
   }
 
   function draw(t) {
-    const ctx = live.ctx, b = live.buf.x, { devW, devH, dpr, k, bw, bh } = live.view, c = cam(), nowMs = now(), pn = performance.now();
-    b.clearRect(0, 0, bw, bh);
+    const ctx = live.ctx, b = live.buf.x, { devW, devH, dpr, k, bw, bh } = live.view, cf = cam(), nowMs = now(), pn = performance.now();
+    // 1) static world + crops into the low-res buffer at a whole-pixel camera…
+    const c = { x: Math.floor(cf.x), y: Math.floor(cf.y) };
+    b.fillStyle = '#76b947'; b.fillRect(0, 0, bw + 1, bh + 1);
     b.drawImage(live.terrain, -c.x, -c.y);
     const x0 = Math.max(0, Math.floor(c.x / T)), x1 = Math.min(WD.W - 1, Math.ceil((c.x + bw) / T)), y0 = Math.max(0, Math.floor(c.y / T)), y1 = Math.min(WD.H - 1, Math.ceil((c.y + bh) / T));
-    // water sparkle (2 frames, pixel accurate)
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       if (WD.g[y][x] !== 'w') continue;
       const ph = (t * 0.9 + WD.hash(x, y) * 7) % 3; if (ph > 1.2) continue;
       const X = x * T - c.x + 3 + Math.floor(WD.hash(y, x) * 9), Y = y * T - c.y + 4 + Math.floor(WD.hash(x + 1, y) * 9);
       PX.R(b, X, Y, ph < 0.6 ? 3 : 2, 1, ph < 0.6 ? PX.K.foam : PX.K.waterL);
     }
-    // crops
     const gd = garden();
     for (let i = 0; i < R.PLOTS; i++) {
       const p = R.normalize(gd[i], nowMs); if (!p) continue;
       const { x, y } = WD.plots[i], X = x * T - c.x, Y = y * T - c.y;
-      if (X < -16 || Y < -16 || X > bw || Y > bh) continue;
+      if (X < -16 || Y < -16 || X > bw + 1 || Y > bh + 1) continue;
       PX.crop(b, X, Y, p.c, p.s, !!p.w, R.mature(p) && ((t * 1.6 + i * 0.37) % 2) < 0.35);
       if (R.needsWater(p)) PX.drop(b, X + 11, Y - 5 + (Math.floor(t * 3 + i) % 2));
     }
-    // characters, depth sorted
+    // 2) …then upscale it, shifted by the camera's fractional part in real screen pixels (smooth scrolling)
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(live.buf.c, -Math.round((cf.x - c.x) * k), -Math.round((cf.y - c.y) * k), (bw + 1) * k, (bh + 1) * k);
+    // 3) characters straight onto the screen at screen-pixel precision (no art-pixel snapping = no shaking)
+    const SX = (wx) => Math.round((wx - cf.x) * k), SY = (wy) => Math.round((wy - cf.y) * k);
+    const sprite = (img, wx, wy, flip) => {
+      const X = SX(wx), Y = SY(wy), w = img.width * k, hh = img.height * k;
+      if (X > devW || Y > devH || X + w < 0 || Y + hh < 0) return;
+      if (flip) { ctx.save(); ctx.translate(X + w, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, hh); ctx.restore(); } else ctx.drawImage(img, X, Y, w, hh);
+    };
+    const shadow = (wx, wy) => { const X = SX(wx), Y = SY(wy); ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(X + 4 * k, Y + 13 * k, 9 * k, k); ctx.fillRect(X + 3 * k, Y + 14 * k, 11 * k, k); ctx.fillRect(X + 4 * k, Y + 15 * k, 9 * k, k); };
     const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
-    const shadow = (X, Y) => PX.ell(b, X + 8, Y + 14, 5, 1, 'rgba(30,20,10,.25)');
-    live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { const X = Math.round(q.px * T) - c.x, Y = Math.round(q.py * T) - c.y; shadow(X, Y); blit(b, PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), X, Y + 2, q.flip); } }));
+    live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
     const person = (o) => {
-      if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const X = Math.round(o.petPos.x * T) - c.x, Y = Math.round(o.petPos.y * T) - c.y, a = PX.animal(o.look.pet, frame(o)); shadow(X - 2, Y - 1); blit(b, a, X + 2, Y + 16 - a.height, o.px > o.petPos.x + 0.05); } });
-      ents.push({ y: o.py, f: () => { const X = Math.round(o.px * T) - c.x, Y = Math.round(o.py * T) - c.y; shadow(X, Y); b.drawImage(PX.char(o.look, o.dir, frame(o)), X, Y - 12); } });
+      if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const a = PX.animal(o.look.pet, frame(o)); shadow(o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.px > o.petPos.x + 0.05); } });
+      ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, frame(o)), o.px * T, o.py * T - 12); } });
     };
     for (const o of live.others.values()) person(o);
     const v = V(); person({ ...live.me, look: v.look });
-    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => b.drawImage(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T - c.x, o.y * T - c.y - 2) }); });
+    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
     const zs = WD.objects.find((q) => q.kind === 'npc');
-    if (zs) ents.push({ y: zs.y, f: () => { const X = zs.x * T - c.x, Y = zs.y * T - c.y; shadow(X, Y); b.drawImage(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), X, Y - 12); } });
+    if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
-    // evening: dark tint + stepped lantern glow
+    // 4) evening: dark tint + stepped lantern glow
     const hr = new Date().getHours();
     if (hr >= 19 || hr < 6) {
-      b.fillStyle = 'rgba(18,22,70,.38)'; b.fillRect(0, 0, bw, bh);
-      b.globalCompositeOperation = 'lighter';
-      for (const o of WD.objects.filter((q) => q.kind === 'lantern')) { const X = o.x * T + 8 - c.x, Y = o.y * T - 6 - c.y; PX.ell(b, X, Y, 26, 20, 'rgba(255,200,110,.10)'); PX.ell(b, X, Y, 15, 12, 'rgba(255,200,110,.14)'); PX.ell(b, X, Y, 6, 5, 'rgba(255,220,140,.2)'); }
-      b.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = 'rgba(18,22,70,.38)'; ctx.fillRect(0, 0, devW, devH);
+      ctx.globalCompositeOperation = 'lighter';
+      const glow = (cx, cy, rx, ry, col) => { ctx.fillStyle = col; for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy * dy) / ((ry + 0.5) * (ry + 0.5))))); ctx.fillRect(SX(cx - hw), SY(cy + dy), (hw * 2 + 1) * k, k); } };
+      for (const o of WD.objects.filter((q) => q.kind === 'lantern')) { const X = o.x * T + 8, Y = o.y * T - 6; glow(X, Y, 26, 20, 'rgba(255,200,110,.10)'); glow(X, Y, 15, 12, 'rgba(255,200,110,.14)'); glow(X, Y, 6, 5, 'rgba(255,220,140,.2)'); }
+      ctx.globalCompositeOperation = 'source-over';
     }
-    // upscale with crisp pixels
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(live.buf.c, 0, 0, bw * k, bh * k);
-    // text layer (pixel font, screen space)
-    const S = (wx, wy) => [(wx - c.x) * k, (wy - c.y) * k];
+    // 5) text layer (pixel font)
+    const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
@@ -710,7 +720,16 @@
       if (live.status !== 'solo') net.rejoin(); else TG.toast(L('Сервертэй холбогдоогүй тул ганцаараа горимд байна.', 'No server connection, so you are in solo mode.'));
     };
     const others = live ? [...live.others.values()] : [];
-    body.append(h('h2', null, L('Хамт тоглох өрөө', 'Play-together room')),
+    const local = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
+    const base = local && live.urls && live.urls[0] ? live.urls[0] : location.origin + location.pathname.replace(/[^/]*$/, '');
+    const share = `${base}?room=${live.room || v.room}`;
+    const qr = h('canvas', { class: 'v-qr', 'aria-label': 'QR' });
+    try { TG.qr.toCanvas(qr, share, 6); } catch (e) { /* too long */ }
+    const invite = live.status === 'online' ? h('div', { class: 'v-invite' },
+      h('div', { class: 'label' }, L('Найзаа урих: утасны камераар уншуулаарай', 'Invite friends: scan with a phone camera')), qr,
+      h('div', { class: 'v-url' }, share),
+      h('p', { class: 'privacy' }, L('Найзууд чинь яг ижил Wi-Fi-д холбогдсон байх ёстой. Сургууль, зочны Wi-Fi төхөөрөмжүүдийг хооронд нь холбохгүй байж болно. Тэгвэл утасны hotspot ашиглаарай.', 'Friends must be on the same Wi-Fi. Some school or guest Wi-Fi blocks devices from seeing each other; if so, use a phone hotspot.'))) : null;
+    body.append(h('h2', null, L('Хамт тоглох өрөө', 'Play-together room')), invite,
       live.status === 'online'
         ? h('div', null, h('p', { class: 'muted' }, L(`"${live.room}" өрөөнд ${others.length + 1} хүн байна. Ижил кодтой хүмүүс нэг нутагт тоглож, нэг цэцэрлэгт тарина.`, `${others.length + 1} people in room "${live.room}". Everyone with the same code shares one village and garden.`)),
           h('div', { class: 'v-chips' }, h('span', { class: 'v-chip wide active' }, portrait(V().look, 22), ' ', live.name, ` (${L('та', 'you')})`), others.map((o) => h('span', { class: 'v-chip wide' }, portrait(o.look, 22), ' ', o.name, ` · ${o.lvl}`))))

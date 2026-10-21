@@ -12,9 +12,12 @@ const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
 const R = require('./js/village/rules.js');
+const QR = require('./js/qr.js');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || process.argv[2] || 8000);
+const lanIPs = () => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
+let actualPort = PORT;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -27,7 +30,7 @@ function serveStatic(req, res) {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/api/hello') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    return res.end(JSON.stringify({ naadamy: true, rooms: rooms.size, players: [...rooms.values()].reduce((n, r) => n + r.players.size, 0) }));
+    return res.end(JSON.stringify({ naadamy: true, rooms: rooms.size, players: [...rooms.values()].reduce((n, r) => n + r.players.size, 0), urls: lanIPs().map((ip) => `http://${ip}:${actualPort}/`) }));
   }
   let p = decodeURIComponent(url.pathname);
   if (BLOCKED.some((re) => re.test(p))) { res.writeHead(404); return res.end(); }
@@ -278,11 +281,27 @@ function leave(conn) {
 // ---------------------------------------------------------------- start
 const server = http.createServer(serveStatic);
 server.on('upgrade', upgrade);
-server.listen(PORT, '0.0.0.0', () => {
-  const port = server.address().port;
-  const ips = Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === 'IPv4' && !i.internal).map((i) => i.address);
-  console.log(`\n  Naadamy is running!\n\n  On this computer:  http://localhost:${port}`);
-  ips.forEach((ip) => console.log(`  Same Wi-Fi:        http://${ip}:${port}`));
+let tries = 0;
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE' && PORT !== 0 && tries < 10) {
+    // the port is taken (often another copy of Naadamy): say so and use the next free port
+    const busy = actualPort;
+    http.get({ host: '127.0.0.1', port: busy, path: '/api/hello', timeout: 800 }, (r) => { let b = ''; r.on('data', (d) => (b += d)); r.on('end', () => { if (/naadamy/.test(b)) console.log(`  Note: Naadamy is already running on port ${busy}. You can just open http://localhost:${busy}`); }); }).on('error', () => {});
+    tries++; actualPort++;
+    console.log(`  Port ${busy} is busy, trying ${actualPort}…`);
+    return setTimeout(() => server.listen(actualPort, '0.0.0.0'), 150);
+  }
+  console.error('  Could not start the server:', err.message);
+  process.exit(1);
+});
+server.on('listening', () => {
+  const port = actualPort = server.address().port, ips = lanIPs();
+  console.log(`\n  \x1b[1mNaadamy is running!\x1b[0m\n\n  On this computer:  http://localhost:${port}`);
+  ips.forEach((ip) => console.log(`  Same Wi-Fi:        \x1b[1mhttp://${ip}:${port}\x1b[0m`));
+  if (ips.length && process.stdout.isTTY) { console.log('\n  Friends on the same Wi-Fi can scan this with their phone camera:\n'); console.log(QR.toTerminal(`http://${ips[0]}:${port}/`).split('\n').map((l) => '  ' + l).join('\n')); }
+  console.log('\n  If friends cannot connect: some school/guest Wi-Fi blocks devices from');
+  console.log('  seeing each other. Use a phone hotspot or a home router instead.');
   console.log('\n  Press Ctrl+C to stop.\n');
   if (process.send) process.send({ port });
 });
+server.listen(PORT, '0.0.0.0');
