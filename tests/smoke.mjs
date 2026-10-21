@@ -78,6 +78,31 @@ try {
   const restored = await page.evaluate(() => document.activeElement === window.__before);
   if (!restored) errors.push('modal accessibility: focus was not restored after closing');
 
+  step = 'chrome accessibility';
+  await page.evaluate(() => TG.go('home'));
+  await sleep(200);
+  const chromeNav = await page.evaluate(() => {
+    const skip = document.querySelector('.skip-link');
+    const nav = document.querySelector('.bottom-nav');
+    const current = document.querySelector('.nav-btn[aria-current="page"]');
+    const brand = document.querySelector('.brand');
+    const main = document.getElementById('main');
+    return {
+      skipHref: skip && skip.getAttribute('href'),
+      skipText: skip && skip.textContent,
+      navLabel: nav && nav.getAttribute('aria-label'),
+      currentIsHome: !!(current && current.classList.contains('active')),
+      brandLabel: brand && brand.getAttribute('aria-label'),
+      hasMain: !!main,
+    };
+  });
+  if (chromeNav.skipHref !== '#main') errors.push(`chrome accessibility: skip link href is "${chromeNav.skipHref}", expected "#main"`);
+  if (!chromeNav.skipText) errors.push('chrome accessibility: skip link has no text');
+  if (!chromeNav.navLabel) errors.push('chrome accessibility: bottom nav has no aria-label');
+  if (!chromeNav.currentIsHome) errors.push('chrome accessibility: home tab is not marked aria-current="page"');
+  if (!chromeNav.brandLabel) errors.push('chrome accessibility: brand button has no aria-label');
+  if (!chromeNav.hasMain) errors.push('chrome accessibility: main landmark #main is missing');
+
   step = 'village (solo mode, no server)';
   await page.evaluate(() => TG.go('village')); await sleep(900);
   await check('village screen', '.village canvas');
