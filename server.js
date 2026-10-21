@@ -35,7 +35,7 @@ function serveStatic(req, res) {
   if (!file.startsWith(ROOT + path.sep)) { res.writeHead(403); return res.end(); }
   fs.readFile(file, (err, body) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': p.endsWith('sw.js') ? 'no-cache' : 'public, max-age=60' });
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': file.endsWith('.woff2') ? 'public, max-age=604800' : 'no-cache' });
     res.end(body);
   });
 }
