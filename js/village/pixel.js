@@ -232,23 +232,68 @@
     if (has('or')) { R(x, 18, H2 / 2 - 8, 22, 40, K.out); R(x, 19, H2 / 2 - 7, 20, 38, K.wood); R(x, 21, H2 / 2 - 5, 16, 34, K.white); R(x, 21, H2 / 2 - 5, 16, 8, K.light); R(x, W2 - 40, H2 / 2 - 8, 22, 40, K.out); R(x, W2 - 39, H2 / 2 - 7, 20, 38, K.wood); R(x, W2 - 37, H2 / 2 - 5, 16, 34, K.white); R(x, W2 - 37, H2 / 2 - 5, 16, 8, K.pink); }
     if (has('shagai')) { blob(x, cx + 34, H2 - 26, 5, 4, K.woodL); P(x, cx + 32, H2 - 27, K.white); P(x, cx + 35, H2 - 25, K.white); }
   }
-  /** Wrestler in zodog-shuudag (vest and briefs) with gutal boots, facing right. pose: grip | push | fall | dance */
+  /** Mongolian wrestler (32×48, facing right): open-front zodog jacket with long sleeves, back panel and waist cord,
+      tight shuudag briefs, knee-high gutal boots with upturned toes, wrestling hat for the eagle dance.
+      pose: idle | grip | push | dance | fall */
   function wrestler(col, skin, pose, frame) {
-    const key = ['w', col, skin, pose, frame].join(); if (cache.has(key)) return cache.get(key);
-    const { c, x } = mk(28, 32), D = shade(col, -0.3);
-    if (pose === 'fall') {
-      R(x, 2, 24, 24, 6, K.out); R(x, 3, 25, 6, 4, skin); R(x, 9, 25, 6, 4, col); R(x, 15, 25, 6, 4, skin); R(x, 21, 24, 5, 5, K.boot); blob(x, 4, 23, 3, 3, skin); P(x, 3, 22, K.hair);
-      cache.set(key, c); return c;
+    const key = ['w2', col, skin, pose, frame].join(); if (cache.has(key)) return cache.get(key);
+    if (pose === 'fall') {                                   // lying on the back: rotate the standing figure
+      const s = wrestler(col, skin, 'lie', 0), m = mk(48, 32);
+      m.x.translate(0, 32); m.x.rotate(-Math.PI / 2); m.x.drawImage(s, 0, 0);
+      cache.set(key, m.c); return m.c;
     }
-    const lean = pose === 'push' ? 3 : pose === 'grip' ? 1 : 0, up = pose === 'dance' ? (frame ? -3 : 1) : 0;
-    R(x, 7, 26, 5, 5, K.out); R(x, 8, 27, 4, 4, '#8a4a22'); R(x, 15, 26, 6, 5, K.out); R(x, 16, 27, 5, 4, '#8a4a22'); P(x, 21, 27, '#8a4a22');
-    R(x, 8, 20, 3, 7, skin); R(x, 16, 20, 3, 7, skin);
-    R(x, 7 + lean, 17, 13, 5, K.out); R(x, 8 + lean, 18, 11, 3, col);
-    R(x, 8 + lean, 9, 11, 9, K.out); R(x, 9 + lean, 10, 9, 7, skin); R(x, 9 + lean, 10, 3, 7, col); R(x, 9 + lean, 10, 9, 2, col); R(x, 15 + lean, 12, 3, 4, shade(skin, -0.12));
-    if (pose === 'dance') { R(x, 1, 10 + up, 8, 3, col); R(x, 19, 10 + up, 8, 3, col); R(x, 0, 11 + up, 2, 2, skin); R(x, 26, 11 + up, 2, 2, skin); }
-    else { R(x, 17 + lean, 11, 8, 3, col); R(x, 24 + lean > 26 ? 25 : 24 + lean, 11, 3, 3, skin); R(x, 6 + lean, 11, 4, 5, D); }
-    blob(x, 13 + lean, 6, 3, 3, skin); R(x, 11 + lean, 2, 6, 2, K.hair); P(x, 15 + lean, 6, K.eye);
-    if (pose === 'dance') { R(x, 10, 0, 7, 2, K.red); R(x, 12, -1, 3, 2, K.gold); }
+    const { c, x } = mk(32, 48);
+    const D = shade(col, -0.32), Lt = shade(col, 0.22), sk = skin, skD = shade(skin, -0.16), skL = shade(skin, 0.14), leather = '#5a3420', leatherD = '#3a2012';
+    const lean = pose === 'push' ? 3 : pose === 'grip' ? 1 : 0, dance = pose === 'dance', lift = dance && frame === 1;
+    // ---- gutal boots: bulky knee-high leather, thick sole, ornament stripe, strongly upturned toe
+    const boot = (bx, top) => {
+      R(x, bx, top, 8, 46 - top, K.out); R(x, bx + 1, top + 1, 6, 44 - top, leather); R(x, bx + 6, top + 1, 1, 44 - top, leatherD);
+      R(x, bx + 1, top + 1, 6, 1, K.gold); R(x, bx + 1, top + 2, 6, 1, K.red); R(x, bx + 3, top + 3, 2, 42 - top, K.goldD); P(x, bx + 3, top + 5, K.red); P(x, bx + 4, top + 8, K.red);
+      R(x, bx + 6, 42, 3, 3, K.out); R(x, bx + 6, 43, 2, 1, leather); P(x, bx + 9, 41, K.out); P(x, bx + 9, 40, K.out); P(x, bx + 8, 42, leather); P(x, bx + 8, 41, K.out); // upturned toe
+      R(x, bx, 45, 9, 2, '#24120a'); P(x, bx + 1, 45, '#4a2a18');                                           // thick felt sole
+    };
+    // ---- legs: bare, muscular thighs and knees (shuudag leaves them uncovered)
+    const backTop = 36, frontTop = lift ? 33 : 36;
+    R(x, 8, 28, 7, backTop - 28 + 1, K.out); R(x, 9, 28, 5, backTop - 28, sk); R(x, 13, 29, 1, backTop - 30, skD); P(x, 10, 31, skL); P(x, 10, 34, skD); P(x, 11, 34, skD);
+    if (lift) { R(x, 16, 28, 8, 6, K.out); R(x, 17, 28, 6, 5, sk); R(x, 17, 32, 6, 1, skD); P(x, 18, 29, skL); }
+    else { R(x, 16, 28, 7, frontTop - 28 + 1, K.out); R(x, 17, 28, 5, frontTop - 28, sk); R(x, 21, 29, 1, frontTop - 30, skD); P(x, 18, 31, skL); P(x, 18, 34, skD); P(x, 19, 34, skD); }
+    boot(7, backTop); boot(15, frontTop);
+    // ---- shuudag: very short, tight, high-cut briefs
+    R(x, 8, 25, 16, 1, K.out); R(x, 8, 26, 16, 1, K.out); R(x, 9, 26, 14, 1, D);
+    R(x, 8, 27, 1, 1, K.out); R(x, 23, 27, 1, 1, K.out); R(x, 9, 27, 14, 1, col); P(x, 11, 27, Lt);
+    R(x, 9, 28, 2, 1, K.out); R(x, 21, 28, 2, 1, K.out); R(x, 11, 28, 10, 1, col); P(x, 15, 28, D);
+    R(x, 11, 29, 10, 1, K.out); R(x, 13, 29, 6, 1, col); R(x, 13, 30, 6, 1, K.out);
+    // ---- back arm (drawn behind the torso)
+    const arm = (pts, cuffAt) => { pts.forEach(([ax, ay, w, h2]) => { R(x, ax - 1, ay - 1, w + 2, h2 + 2, K.out); }); pts.forEach(([ax, ay, w, h2]) => { R(x, ax, ay, w, h2, col); R(x, ax, ay + h2 - 1, w, 1, D); }); const [fx, fy] = cuffAt; R(x, fx - 1, fy - 1, 4, 4, K.out); R(x, fx, fy, 2, 2, sk); R(x, fx - 1, fy, 1, 2, K.gold); };
+    if (dance) arm(frame ? [[1, 17, 9, 3]] : [[1, 13, 4, 3], [5, 14, 5, 3]], frame ? [0, 17] : [0, 12]);
+    else if (pose === 'idle' || pose === 'lie') arm([[9, 16, 3, 8]], [10, 24]);
+    else arm([[11 + lean, 19, 15, 3]], [26 + lean, 19]);
+    // ---- zodog back panel (covers back and shoulders; the front is open)
+    R(x, 6 + lean, 14, 7, 12, K.out); R(x, 7 + lean, 15, 5, 10, col); R(x, 7 + lean, 15, 1, 10, D); R(x, 7 + lean, 24, 5, 1, K.gold); R(x, 11 + lean, 16, 1, 9, K.gold);
+    // ---- bare torso: chest and belly with muscle shading
+    R(x, 11 + lean, 15, 12, 11, K.out); R(x, 12 + lean, 15, 10, 10, sk);
+    R(x, 13 + lean, 19, 3, 1, skD); R(x, 17 + lean, 19, 3, 1, skD); P(x, 16 + lean, 18, skD);           // pectorals
+    R(x, 16 + lean, 21, 1, 4, skD); P(x, 14 + lean, 22, skD); P(x, 18 + lean, 22, skD); P(x, 16 + lean, 25, skD); // abs + navel
+    P(x, 14 + lean, 16, skL); P(x, 13 + lean, 17, skL); R(x, 21 + lean, 16, 1, 8, skD);
+    // ---- shoulder yoke + open-front strap of the zodog, tied with a cord at the belly
+    R(x, 7 + lean, 12, 17, 4, K.out); R(x, 8 + lean, 13, 15, 2, col); R(x, 8 + lean, 15, 15, 1, D); R(x, 8 + lean, 12, 15, 1, Lt);
+    for (let i = 0; i < 9; i++) { const sx = 20 + lean - Math.round(i * 0.35); R(x, sx, 15 + i, 2, 1, col); P(x, sx - 1, 15 + i, K.gold); }
+    R(x, 12 + lean, 23, 10, 1, D); P(x, 18 + lean, 23, K.gold); P(x, 18 + lean, 24, D); P(x, 19 + lean, 25, D);       // cord + knot
+    // ---- front arm (over the torso)
+    if (dance) arm(frame ? [[21 + lean, 17, 10, 3]] : [[21, 14, 5, 3], [26, 13, 5, 3]], frame ? [30, 17] : [30, 12]);
+    else if (pose === 'idle' || pose === 'lie') arm([[20, 16, 3, 9]], [21, 25]);
+    else arm([[20 + lean, 16, 9, 3], [27 + lean, 16, 2, 3]], [29 + lean > 29 ? 29 : 29 + lean, 16]);
+    // ---- head: short hair, ear, eye, determined brow
+    const hx = 16 + lean, hy = 9;
+    blob(x, hx, hy, 4, 4, sk);
+    R(x, hx - 4, hy - 4, 8, 3, K.hair); R(x, hx - 4, hy - 2, 3, 4, K.hair); P(x, hx - 1, hy - 4, K.hairL);
+    P(x, hx - 1, hy + 1, skD); P(x, hx + 2, hy, K.eye); R(x, hx + 1, hy - 1, 3, 1, K.hair); P(x, hx + 3, hy + 3, skD); P(x, hx + 4, hy + 1, skD);
+    // ---- wrestling hat (worn for the eagle dance): red dome, gold knot, dark brim with upturned points
+    if (dance) {
+      R(x, hx - 6, hy - 4, 13, 2, K.out); R(x, hx - 5, hy - 4, 11, 1, '#24307a'); P(x, hx - 6, hy - 5, '#24307a'); P(x, hx + 6, hy - 5, '#24307a');
+      for (let r = 0; r < 4; r++) { const w = 4 - r; R(x, hx - w - 1, hy - 5 - r, w * 2 + 3, 1, K.out); R(x, hx - w, hy - 5 - r, w * 2 + 1, 1, r === 3 ? '#e35a4c' : K.red); }
+      R(x, hx - 1, hy - 10, 2, 2, K.gold); P(x, hx, hy - 11, K.goldD);
+    }
     cache.set(key, c); return c;
   }
 
@@ -421,7 +466,7 @@
         fish: () => { const f = iconCanvas('fish:perch'); x.drawImage(f, 0, 0); },
         lock: () => { R(x, 4, 7, 8, 7, K.out); R(x, 5, 8, 6, 5, K.gold); R(x, 5, 3, 6, 5, K.out); R(x, 6, 4, 4, 4, 'rgba(0,0,0,0)'); x.clearRect(6, 4, 4, 3); P(x, 8, 10, K.out); },
         ger: () => { const g = gerSprite(K.blue, K.red); x.drawImage(g, 0, 0, 48, 50, 0, 0, 16, 17); },
-        wrestle: () => { const w = wrestler('#e14b3d', '#edbb93', 'dance', 0); x.drawImage(w, 0, 0, 28, 32, 0, 1, 14, 16); const w2 = wrestler('#3f76db', '#d9a06e', 'grip', 0); x.save(); x.translate(16, 1); x.scale(-1, 1); x.drawImage(w2, 0, 0, 28, 32, 0, 0, 10, 12); x.restore(); },
+        wrestle: () => { const w = wrestler('#d8342b', '#edbb93', 'dance', 0); x.drawImage(w, 0, 0, 32, 48, 2, 0, 11, 16); },
         ovoo: () => { for (let r = 0; r < 5; r++) for (let i = -r; i <= r; i++) R(x, 7 + i * 1.5 | 0, 7 + r * 2, 2, 2, [K.rock, K.rockL, K.rockD][(i + r + 6) % 3]); R(x, 7, 1, 1, 7, K.woodD); line(x, 7, 2, 3, 7, K.light); line(x, 8, 2, 12, 6, K.blue); },
         logo: () => { ell(x, 8, 15, 8, 3, K.grass); blob(x, 12, 3, 2, 2, K.gold, K.goldD); for (let c2 = 2; c2 < 14; c2++) { const dx = (c2 - 8) / 6; const top = 9 - Math.round(4 * Math.sqrt(Math.max(0, 1 - dx * dx))); R(x, c2, top, 1, 10 - top, K.white); P(x, c2, top - 1, K.out); } R(x, 3, 9, 10, 4, K.out); R(x, 4, 9, 8, 3, K.felt); R(x, 4, 9, 8, 1, K.blue); R(x, 7, 10, 2, 3, K.red); },
       })[id]();

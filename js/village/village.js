@@ -903,14 +903,15 @@
     if (t && v.look.title !== t) { v.look.title = t; S.save(); sendLook(); return t; }
     return null;
   }
-  function wrestlerPic(pose, col, size = 56) { const c = h('canvas', { class: 'px-icon', width: 28, height: 32, style: { width: size + 'px', height: Math.round(size * 32 / 28) + 'px' } }); c.getContext('2d').drawImage(PX.wrestler(col, R.SKINS.includes(V().look.skin) ? V().look.skin : R.SKINS[0], pose, 0), 0, 0); return c; }
+  const RED = '#d8342b', BLUE = '#2b5bd8'; // traditional zodog colours
+  function wrestlerPic(pose, col, size = 48) { const c = h('canvas', { class: 'px-icon', width: 32, height: 48, style: { width: size + 'px', height: Math.round(size * 48 / 32) + 'px' } }); c.getContext('2d').drawImage(PX.wrestler(col, R.SKINS.includes(V().look.skin) ? V().look.skin : R.SKINS[0], pose, 0), 0, 0); return c; }
   function arenaModal() {
     const v = V(), wr = v.wr, t = titleObj(R.titleFor(wr));
     const next = R.TITLES.find((q) => (q.id === 'avarga' ? (wr.champ || 0) < 2 : (wr.best || 0) < q.need));
     const others = live.online ? [...live.others.values()] : [];
     const stat = (k, n) => h('div', { class: 'stat' }, h('small', null, k), h('b', null, n));
     const close = TG.modal(h('div', null,
-      h('div', { class: 'v-wr-head' }, wrestlerPic('dance', '#e14b3d'), h('div', null, h('h2', null, L('Бөхийн барилдаан', 'Mongolian wrestling')), h('p', { class: 'muted' }, t ? `★ ${tx(t.name)}` : L('Цолгүй бөх', 'No title yet')))),
+      h('div', { class: 'v-wr-head' }, wrestlerPic('dance', RED), h('div', null, h('h2', null, L('Бөхийн барилдаан', 'Mongolian wrestling')), h('p', { class: 'muted' }, t ? `★ ${tx(t.name)}` : L('Цолгүй бөх', 'No title yet')))),
       h('div', { class: 'stat-cards' }, stat(L('Шилдэг давлага', 'Best rounds'), wr.best || 0), stat(L('Түрүү', 'Wins'), wr.champ || 0), stat(L('Ялалт', 'Victories'), (wr.wins || 0) + (wr.pvpW || 0))),
       h('p', { class: 'hint' }, !next ? L('Та хамгийн дээд цол Аварга хүртсэн! 🏆', 'You hold the highest title, Avarga! 🏆')
         : next.id === 'avarga' ? L('Наадамд дахин түрүүлбэл Аварга цол хүртэнэ!', 'Win the Naadam once more to become an Avarga!')
@@ -936,8 +937,8 @@
   }
   function wrestleMatch(cfg, onEnd) {
     const v = V(), mySkin = R.SKINS.includes(v.look.skin) ? v.look.skin : R.SKINS[0];
-    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0 };
-    const cv = h('canvas', { class: 'v-wr-canvas', width: 160, height: 84 }), cx = cv.getContext('2d');
+    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0, intro: performance.now() };
+    const cv = h('canvas', { class: 'v-wr-canvas', width: 192, height: 108 }), cx = cv.getContext('2d');
     const score = h('div', { class: 'v-wr-score' }), msg = h('div', { class: 'v-wr-msg' }, L('Мэхээ сонго!', 'Choose your move!'));
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
@@ -958,16 +959,22 @@
       const dt = Math.min(0.05, (ts - lastT) / 1000); lastT = ts;
       st.off += (st.target - st.off) * Math.min(1, dt * 8);
       if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * (cfg.ai ? 3.2 + cfg.round * 0.12 : 3.6)) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
-      // pixel scene
-      cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, 160, 84);
-      for (let i = 0; i < 60; i++) { cx.fillStyle = i % 2 ? '#d4ae72' : '#f6e2b8'; cx.fillRect((i * 37) % 160, 30 + ((i * 53) % 54), 1, 1); }
-      cx.fillStyle = '#6b4220'; cx.fillRect(0, 0, 160, 22); for (let i = 0; i < 26; i++) { cx.fillStyle = ['#e14b3d', '#3f76db', '#f7c646', '#2ea35f', '#ffffff'][i % 5]; cx.fillRect(4 + i * 6, 12 + (i % 2) * 4, 4, 4); cx.fillStyle = i % 3 ? '#edbb93' : '#d9a06e'; cx.fillRect(5 + i * 6, 9 + (i % 2) * 4, 2, 3); }
-      const f = Math.floor(ts / 250) % 2, o = Math.round(st.off);
-      const A = PX.wrestler('#e14b3d', mySkin, st.pose[0], f), B = PX.wrestler('#3f76db', cfg.opp.skin || '#D9A06E', st.pose[1], f);
-      const ax = 80 - 26 + o + (st.pose[0] === 'dance' ? -10 : 0), bx = 80 - 2 + o + (st.pose[1] === 'dance' ? 10 : 0);
-      cx.fillStyle = 'rgba(40,20,0,.25)'; cx.fillRect(ax + 6, 78, 18, 2); cx.fillRect(bx + 4, 78, 18, 2);
-      cx.drawImage(A, ax, 48);
-      cx.save(); cx.translate(bx + 28, 48); cx.scale(-1, 1); cx.drawImage(B, 0, 0); cx.restore();
+      // pixel scene: crowd stands, flags, sand ring, the zasuul watching
+      const Wc = 192, Hc = 108, ground = 100;
+      cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, Wc, Hc);
+      for (let i = 0; i < 90; i++) { cx.fillStyle = i % 2 ? '#d4ae72' : '#f6e2b8'; cx.fillRect((i * 37) % Wc, 40 + ((i * 53) % 66), 1, 1); }
+      cx.fillStyle = '#5a361c'; cx.fillRect(0, 0, Wc, 30); cx.fillStyle = '#7a4a26'; cx.fillRect(0, 10, Wc, 2); cx.fillRect(0, 21, Wc, 2);
+      for (let row = 0; row < 2; row++) for (let i = 0; i < 31; i++) { const px0 = 3 + i * 6 + row * 3, py0 = 3 + row * 11, bob = Math.floor(ts / 400 + i + row) % 3 === 0 ? -1 : 0; cx.fillStyle = ['#d8342b', '#2b5bd8', '#f7c646', '#2ea35f', '#ffffff', '#9466e0'][(i + row * 2) % 6]; cx.fillRect(px0, py0 + 4 + bob, 4, 4); cx.fillStyle = (i + row) % 3 ? '#edbb93' : '#c98a5a'; cx.fillRect(px0 + 1, py0 + 1 + bob, 2, 3); cx.fillStyle = '#2b1e14'; cx.fillRect(px0 + 1, py0 + bob, 2, 1); }
+      [[8, '#2b5bd8'], [60, '#d8342b'], [132, '#f7c646'], [184, '#2b5bd8']].forEach(([fx, fc]) => { cx.fillStyle = '#4a2a14'; cx.fillRect(fx, 30, 1, 14); cx.fillStyle = fc; for (let r = 0; r < 5; r++) cx.fillRect(fx + 1, 30 + r, 5 - Math.abs(r - 2), 1); });
+      cx.fillStyle = '#b98a50'; cx.fillRect(0, 44, Wc, 1);
+      const zs = PX.char(ZASUUL, 0, Math.floor(ts / 900) % 2 && st.over ? 1 : 0); cx.fillStyle = 'rgba(40,20,0,.25)'; cx.fillRect(167, ground - 1, 12, 2); cx.drawImage(zs, 165, ground - 28);
+      const f = Math.floor(ts / 260) % 2, o = Math.round(st.off), ent = Math.min(1, (ts - st.intro) / 600);
+      const myPose = st.pose[0], opPose = st.pose[1];
+      const A = PX.wrestler(RED, mySkin, myPose === 'grip' && f && st.phase === 'timing' ? 'push' : myPose, f), B = PX.wrestler(BLUE, cfg.opp.skin || '#D9A06E', opPose, f);
+      const cxm = 92, ax = Math.round(cxm - 30 - (1 - ent) * 24) + o + (myPose === 'dance' ? -12 : 0), bx = Math.round(cxm - 4 + (1 - ent) * 24) + o + (opPose === 'dance' ? 12 : 0);
+      const draw1 = (img, X, flip, fallen) => { const Y = ground - img.height; cx.fillStyle = 'rgba(40,20,0,.28)'; cx.fillRect(X + 4, ground - 1, img.width - 8, 2); if (flip) { cx.save(); cx.translate(X + img.width, Y); cx.scale(-1, 1); cx.drawImage(img, 0, 0); cx.restore(); } else cx.drawImage(img, X, Y); };
+      draw1(A, ax - (myPose === 'fall' ? 16 : 0), false);
+      draw1(B, bx + (opPose === 'fall' ? 2 : 0), true);
       raf = requestAnimationFrame(loop);
     };
     function lock() {
@@ -1023,7 +1030,7 @@
   function onWrestleMsg(m) {
     const v = V();
     if (m.t === 'wr-invite') {
-      const close = TG.modal(h('div', { class: 'center' }, wrestlerPic('dance', '#3f76db', 64), h('h2', null, L('Барилдах урилга!', 'Wrestling challenge!')),
+      const close = TG.modal(h('div', { class: 'center' }, wrestlerPic('dance', BLUE, 56), h('h2', null, L('Барилдах урилга!', 'Wrestling challenge!')),
         h('p', null, `${m.name} ${L('тантай барилдахыг хүсэж байна.', 'wants to wrestle you.')}`),
         h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { net.send({ t: 'wr-decline', from: m.from }); close(); } }, L('Дараа', 'Not now')),
           h('button', { class: 'btn primary', onclick: () => { net.send({ t: 'wr-accept', from: m.from }); close(); } }, L('Барилдъя!', "Let's wrestle!")))), { cls: 'v-modal' });
