@@ -1,5 +1,11 @@
 # Тоглоом — Хамтдаа суралцъя (Play together, grow together)
 
+> **Энэ нь team-ийн ажлын хувилбар (mirror) юм.**
+> Pinequest S5 · Episode 2 · Team 8 — үндсэн (canonical) repo: **https://github.com/pinecone-studio/pinequest-s5-episode-2-team-8**
+> Pitch, үнэлгээ, бүх түүхтэй хувилбар энд байна. Энэ хувилбар нь зөвхөн хувийн backup / portfolio зориулалттай бөгөөд
+> бүх зохиогчийн эрх, team-ийн зохиогчийн нэр (ma · mmmargad006, Turuu, wildjasoniscool-glitch, Naadamy) хадгалагдана.
+> App code © Team 8, Pinequest S5 Episode 2.
+
 **Pinequest · Pinecone Academy · Theme: "Fine-Tune for the Future — Equal Access to Health, Education, Skills"**
 
 A learning-games platform for Mongolian children aged 3–18, built so that kids learn **with** their family and friends, not alone with a screen.
