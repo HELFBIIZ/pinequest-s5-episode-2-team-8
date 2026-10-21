@@ -127,6 +127,7 @@ try {
       const st = await page.evaluate(() => {
         const panel = document.querySelector('.l-panel'); if (!panel) return 'none';
         if (panel.querySelector('.l-done')) return 'done';
+        const solo = panel.querySelector('.with-opt'); if (solo) { solo.click(); return 'picker'; }
         const q = panel.querySelector('.b-opt:not(:disabled)'); if (q) { q.click(); return 'quiz'; }
         const nx = [...panel.querySelectorAll('.btn.primary')].find((b) => !b.classList.contains('hidden') && !b.disabled && !b.classList.contains('l-tap'));
         if (nx) { nx.click(); return 'next'; }
@@ -157,11 +158,67 @@ try {
   }
   const learned = await page.evaluate(() => TG.learn.LESSONS.every((l) => TG.learn.done(l.id)));
   if (!learned) errors.push('lessons: progress was not saved');
+  // learn together: a lesson with family takes turns and counts for the parent dashboard
+  step = 'lesson with family';
+  await page.evaluate(() => TG.go('lesson', { id: 'nuuts' })); await sleep(300);
+  await page.evaluate(() => [...document.querySelectorAll('.with-opt')][1].click()); await sleep(150);
+  await page.evaluate(() => document.querySelector('.with-picker .fam-chip').click()); await sleep(150);
+  await page.evaluate(() => [...document.querySelectorAll('.with-picker .btn.primary')].pop().click()); await sleep(250);
+  await check('turn badge in a family lesson', '.l-panel .turn-badge');
+  step = 'quiz party with a friend';
+  await page.evaluate(() => TG.basar.quizParty('ger')); await sleep(250);
+  await page.evaluate(() => [...document.querySelectorAll('.with-opt')][2].click()); await sleep(150);
+  await page.evaluate(() => { const i = document.querySelector('.add-friend .input'); i.value = 'Ану'; document.querySelector('.add-friend .btn').click(); }); await sleep(150);
+  await page.evaluate(() => [...document.querySelectorAll('.with-picker .btn.primary')].pop().click()); await sleep(400);
+  for (let k = 0; k < 4; k++) { await page.evaluate(() => { const o = document.querySelector('.b-opt:not(:disabled)'); if (o) o.click(); }); await sleep(120); await page.evaluate(() => { const n = [...document.querySelectorAll('.basar-modal .btn.primary')].find((x) => !x.classList.contains('hidden')); if (n) n.click(); }); await sleep(250); }
+  await check('quiz party scoreboard', '.basar-modal .l-score');
+  if (!(await page.evaluate(() => (TG.store.active().together || {}).friends >= 1))) errors.push('learn together: the friends quiz was not recorded');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
   step = 'ger unlocked after the lesson';
   await page.evaluate(() => TG.go('village')); await sleep(700);
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.lot(0); }); await sleep(300);
   await check('ger builder unlocked', '.modal .v-gerbox + .label, .modal .v-chips');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+
+  // horse riding and the Naadam horse race
+  step = 'horse riding';
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.mount('chestnut'); }); await sleep(200);
+  if (!(await page.evaluate(() => TG.store.active().village.look.ride === 'horse'))) errors.push('horse: mounting did not work');
+  step = 'horse race';
+  await page.evaluate(() => TG._village.race()); await sleep(3300);
+  if ((await page.evaluate(() => TG._village.raceState() && TG._village.raceState().phase)) !== 'go') errors.push('horse race: the race did not start after the countdown');
+  for (let i = 1; i < 7; i++) { await page.evaluate((i) => { const L = TG._village.live(), q = TG.vworld.RACE[i]; L.me.px = q.x - 0.5; L.me.py = q.y - 0.82; }, i); await sleep(120); }
+  await sleep(300);
+  if (!(await page.evaluate(() => TG.store.active().village.horse.races === 1))) errors.push('horse race: finishing the race was not recorded');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => TG._village.dismount()); await sleep(100);
+  step = 'wrestling techniques';
+  await page.evaluate(() => TG._village.tournament(8)); await sleep(400);
+  const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
+  if (nMoves !== 7) errors.push(`wrestling: expected 7 techniques, found ${nMoves}`);
+  if (!(await page.evaluate(() => /3/.test(document.querySelector('.v-wrestle .eyebrow').textContent)))) errors.push('wrestling: late rounds should need 3 falls');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  // Basar understands English and does simple maths offline
+  step = 'Basar in English';
+  await page.evaluate(() => TG.basar.open()); await sleep(250);
+  for (const q of ['What is a ger?', '6 x 7']) { await page.evaluate((q) => { const i = document.querySelector('.b-input'); i.value = q; [...document.querySelectorAll('.b-send .btn')].pop().click(); }, q); await sleep(350); }
+  const en = await page.evaluate(() => [...document.querySelectorAll('.b-row.basar .b-bubble')].slice(-2).map((b) => b.textContent));
+  if (!/clever home|khana/.test(en[0] || '')) errors.push(`Basar: English question got "${(en[0] || '').slice(0, 60)}"`);
+  if (!/42/.test(en[1] || '')) errors.push(`Basar: offline maths answer was "${(en[1] || '').slice(0, 60)}"`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  step = 'achievements';
+  await page.evaluate(() => TG.go('achievements')); await sleep(300);
+  await check('achievements screen', '.ach-grid .ach.on');
+  const achs = await page.evaluate(() => Object.keys(TG.store.active().ach || {}));
+  for (const id of ['first_lesson', 'all_lessons', 'ger_master', 'nuuts', 'with_friends']) if (!achs.includes(id)) errors.push(`achievements: "${id}" was not awarded`);
+  step = 'parent report';
+  await page.evaluate(() => TG.go('family')); await sleep(250);
+  await page.evaluate(() => { const g = document.querySelector('.gate-q'); if (!g) return; const q = g.textContent.match(/(\d+) × (\d+)/); document.querySelector('.gate-input').value = q[1] * q[2]; [...document.querySelectorAll('.gate .btn')].pop().click(); }); await sleep(400);
+  await check('parent sees badges', '.ach-earned .ach-chip');
+  await check('parent sees what was learned', '.learned li');
 
   for (const screen of ['memories', 'about']) {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);

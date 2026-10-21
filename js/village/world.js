@@ -49,6 +49,7 @@
     { id: 'bleachers', kind: 'bleachers', x: 42, y: 5, w: 12, h: 2 },
     { id: 'zasuul', kind: 'npc', x: 47, y: 8, w: 1, h: 1, door: { x: 47, y: 9 } },
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
+    { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
     { id: 'lantern4', kind: 'lantern', x: 40, y: 11, w: 1, h: 1 },
     { id: 'lantern5', kind: 'lantern', x: 40, y: 14, w: 1, h: 1 },
     ...LOT_X.map((x, i) => ({ id: 'lot' + i, kind: 'lot', i, x, y: 28, w: 3, h: 3, door: { x: x + 1, y: 31 } })),
@@ -57,6 +58,9 @@
   const occ = {};
   for (const o of objects) for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) { set(x, y, 'B'); occ[x + ',' + y] = o; }
   const DOCK = { x: 26, y: 5 };
+  // Horse race: from the Naadam arena west along the main road, south down the long road, east to the finish by the gers
+  // points are in feet coordinates (tile units, centre of the two-tile-wide roads)
+  const RACE = [{ x: 50, y: 13 }, { x: 34, y: 13 }, { x: 18, y: 13 }, { x: 18, y: 22 }, { x: 18, y: 32 }, { x: 28, y: 32 }, { x: 39.5, y: 32 }];
 
   // trees, flowers, rocks
   const trees = [], flowers = [];
@@ -107,7 +111,7 @@
   }
 
   // drawing lives in pixel.js (16-pixel tiles, pure pixel art)
-  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, lots, blocked, plotAt, findPath, nearestOpen, hash };
+  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, RACE, lots, blocked, plotAt, findPath, nearestOpen, hash };
   api.renderStatic = () => TG.pixel.renderStatic(api);
   TG.vworld = api;
 })(window.TG);

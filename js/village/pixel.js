@@ -315,7 +315,7 @@
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => o.kind !== 'npc').map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => o.kind !== 'npc').map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
@@ -403,6 +403,37 @@
   function animal(kind, frame) {
     const key = 'a:' + kind + frame; if (cache.has(key)) return cache.get(key);
     const A = ANIMALS[kind]; const { c, x } = mk(A.w, A.h); A.draw(x, frame); cache.set(key, c); return c;
+  }
+
+  // Mongolian horse for riding and racing (28×22, facing right). frame 0 stands, 1–4 gallop. saddle: draw a saddle.
+  const COATS = { bay: ['#8a5a33', '#6b4220', '#2b1e14'], black: ['#3a2c2c', '#241a1a', '#120c0c'], white: ['#ece4d4', '#c9bda6', '#8a7a64'], chestnut: ['#b5652e', '#8a4a1e', '#5a2a10'], gray: ['#a0a0aa', '#7a7a86', '#3a3a44'] };
+  function horse(coat, frame, saddle) {
+    const key = ['h', coat, frame, saddle].join(); if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(28, 22), [B, BD, MN] = COATS[coat] || COATS.bay, bob = frame === 2 || frame === 4 ? 1 : 0;
+    const legs = [[[7, 0], [9, 0], [17, 0], [19, 0]], [[5, -2], [8, 1], [18, 2], [21, -1]], [[7, 1], [10, -1], [16, -1], [19, 1]], [[9, -1], [6, 2], [20, 1], [17, -2]], [[8, 2], [10, 0], [18, -2], [16, 1]]][frame] || [];
+    legs.forEach(([lx, sw], i) => { const top = 13 + bob, len = 7 - (sw < 0 ? 1 : 0); line(x, lx, top, lx + sw, top + len, K.out); line(x, lx + 1, top, lx + 1 + sw, top + len, i % 2 ? BD : B); P(x, lx + sw, top + len, MN); P(x, lx + 1 + sw, top + len, MN); });
+    const sw = frame ? (frame % 2 ? 1 : -1) : 0; // tail swish
+    line(x, 6, 9 + bob, 2 + sw, 15 + bob, K.out); line(x, 5, 9 + bob, 1 + sw, 14 + bob, MN); line(x, 6, 10 + bob, 3 + sw, 16 + bob, MN);
+    blob(x, 13, 10 + bob, 8, 4, B, K.out); ell(x, 12, 9 + bob, 6, 1, shade(B, 0.15));
+    for (let r = 0; r < 7; r++) R(x, 18 + Math.round(r * 0.7), 9 + bob - r, 4, 3, B); // neck
+    line(x, 18, 8 + bob, 22, 2 + bob, MN); line(x, 19, 8 + bob, 23, 2 + bob, MN); // mane
+    blob(x, 24, 3 + bob, 3, 2, B, K.out); R(x, 25, 4 + bob, 3, 2, BD); P(x, 27, 4 + bob, K.out); P(x, 23, 2 + bob, K.eye); P(x, 22, 0 + bob, B); P(x, 22, 1 + bob, K.out);
+    if (saddle) { R(x, 10, 5 + bob, 8, 3, K.out); R(x, 11, 5 + bob, 6, 2, K.red); R(x, 11, 7 + bob, 6, 1, K.gold); R(x, 13, 8 + bob, 1, 4, K.woodD); P(x, 13, 12 + bob, K.gold); }
+    cache.set(key, c); return c;
+  }
+  /** Race checkpoint flag (8×16). */
+  function raceFlag(col, frame) {
+    const key = 'rf:' + col + frame; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(10, 16); R(x, 1, 1, 1, 15, K.woodD); R(x, 0, 15, 3, 1, K.out);
+    for (let r = 0; r < 5; r++) R(x, 2, 1 + r, 7 - Math.abs(r - 2) - (frame && r % 2 ? 1 : 0), 1, col);
+    blob(x, 1, 1, 1, 1, K.gold, K.goldD); cache.set(key, c); return c;
+  }
+  // уяа: the hitching line where race horses wait
+  function uya(x, o) {
+    const X = o.x * 16, Y = o.y * 16, w = o.w * 16;
+    R(x, X + 2, Y + 2, 3, 14, K.out); R(x, X + 3, Y + 3, 1, 13, K.wood); R(x, X + w - 5, Y + 2, 3, 14, K.out); R(x, X + w - 4, Y + 3, 1, 13, K.wood);
+    R(x, X + 3, Y + 4, w - 6, 1, K.woodD); [K.blue, K.red, K.gold, K.white].forEach((col, i) => R(x, X + 8 + i * Math.floor((w - 16) / 3), Y + 4, 3, 2, col));
+    x.drawImage(horse('bay', 0, true), X + 3, Y - 10); x.drawImage(horse('white', 0, true), X + w - 31, Y - 9);
   }
 
   // Басар: a Mongolian Bankhar dog. Big, fluffy, black coat with tan "four-eye" spots above the eyes,
@@ -523,6 +554,8 @@
         dog: () => { const f = bankharFace(0); x.drawImage(f, 0, 0, 24, 22, 0, 1, 16, 15); },
         book: () => { R(x, 1, 3, 14, 11, K.out); R(x, 2, 4, 6, 9, K.paper); R(x, 8, 4, 6, 9, '#fff3d6'); R(x, 7, 3, 2, 11, K.redD); [6, 8, 10].forEach((ly) => { R(x, 3, ly, 4, 1, K.woodL); R(x, 9, ly, 4, 1, K.woodL); }); },
         menu: () => { [4, 8, 12].forEach((ly) => { R(x, 2, ly - 1, 12, 3, K.out); R(x, 3, ly, 10, 1, K.paper); }); },
+        horse: () => { const hs = horse('bay', 0, true); x.drawImage(hs, 0, 0, 28, 22, 0, 2, 16, 13); },
+        trophy: () => { R(x, 4, 2, 8, 6, K.out); R(x, 5, 3, 6, 5, K.gold); R(x, 2, 3, 2, 3, K.goldD); R(x, 12, 3, 2, 3, K.goldD); R(x, 7, 8, 2, 3, K.goldD); R(x, 5, 11, 6, 3, K.out); R(x, 6, 12, 4, 1, K.woodL); P(x, 6, 4, K.white); },
         logo: () => { ell(x, 8, 15, 8, 3, K.grass); blob(x, 12, 3, 2, 2, K.gold, K.goldD); for (let c2 = 2; c2 < 14; c2++) { const dx = (c2 - 8) / 6; const top = 9 - Math.round(4 * Math.sqrt(Math.max(0, 1 - dx * dx))); R(x, c2, top, 1, 10 - top, K.white); P(x, c2, top - 1, K.out); } R(x, 3, 9, 10, 4, K.out); R(x, 4, 9, 8, 3, K.felt); R(x, 4, 9, 8, 1, K.blue); R(x, 7, 10, 2, 3, K.red); },
       })[id]();
     }
@@ -535,5 +568,5 @@
     return img;
   }
 
-  TG.pixel = { bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
 })(window.TG);

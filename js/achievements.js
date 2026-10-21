@@ -1,0 +1,60 @@
+/* Амжилтууд: badges a child earns by learning, doing things with family, and playing in Нутаг.
+   Parents see them (with dates) and what the child has learned on the parent dashboard. */
+(function (TG) {
+  const { L, tx } = TG;
+  const S = TG.store;
+  const T = (mn, en) => ({ mn, en });
+  const CATS = { learn: T('Сурах', 'Learning'), family: T('Гэр бүл, найз', 'Family & friends'), nutag: T('Нутаг', 'Nutag'), naadam: T('Наадам', 'Naadam') };
+  const lessons = (c) => (TG.learn ? TG.learn.LESSONS : []).filter((l) => c.learn[l.id] && c.learn[l.id].done).length;
+  const famDone = (c) => (TG.learn ? TG.learn.LESSONS : []).filter((l) => c.learn[l.id] && c.learn[l.id].family).length;
+  const lvl = (c) => (TG.vrules ? TG.vrules.level(c.v.xp || 0).l : 1);
+  // A(id, category, icon, name mn, name en, how mn, how en, test, progress?)
+  const A = (id, cat, icon, nm, ne, dm, de, test, prog) => ({ id, cat, icon, name: T(nm, ne), desc: T(dm, de), test, prog });
+  const LIST = [
+    A('first_lesson', 'learn', '📚', 'Анхны хичээл', 'First lesson', 'Өв соёлын анхны хичээлээ дуусгах', 'Finish your first heritage lesson', (c) => lessons(c) >= 1),
+    A('all_lessons', 'learn', '🎓', 'Өв соёлын сурагч', 'Heritage scholar', 'Бүх хичээлийг дуусгах', 'Finish every lesson', (c) => TG.learn && lessons(c) >= TG.learn.LESSONS.length, (c) => [lessons(c), TG.learn ? TG.learn.LESSONS.length : 4]),
+    A('ger_master', 'learn', '⛺', 'Гэрийн эзэн', 'Ger builder', 'Монгол гэр барьж сурах', 'Learn to build a Mongol ger', (c) => !!(c.learn.ger && c.learn.ger.done)),
+    A('dairy', 'learn', '🥛', 'Цагаан идээчин', 'Dairy maker', 'Цагаан идээ хийж сурах', 'Learn to make dairy foods', (c) => !!(c.learn.idee && c.learn.idee.done)),
+    A('manners', 'learn', '🙏', 'Ёсон дагуу', 'Good manners', 'Гэрийн ёс заншил сурах', 'Learn ger manners', (c) => !!(c.learn.customs && c.learn.customs.done)),
+    A('nuuts', 'learn', '📜', 'Нууц товчоо судлаач', 'Secret History explorer', 'Нууц товчооны үлгэрүүдийг сонсох', 'Hear the tales of the Secret History', (c) => !!(c.learn.nuuts && c.learn.nuuts.done)),
+    A('perfect', 'learn', '💯', 'Төгс оноо', 'Perfect score', 'Хичээлийн 3 асуултад бүгдэд нь зөв хариулах', 'Answer all 3 lesson questions right', (c) => Object.values(c.learn).some((x) => (x.best || 0) >= 3)),
+    A('quiz10', 'learn', '🧠', 'Сэргэлэн ухаан', 'Bright mind', 'Басарын 10 асуултад зөв хариулах', 'Answer 10 of Basar’s questions right', (c) => (c.b.right || 0) >= 10, (c) => [c.b.right || 0, 10]),
+    A('quiz50', 'learn', '🦉', 'Мэргэн', 'Wise one', 'Басарын 50 асуултад зөв хариулах', 'Answer 50 of Basar’s questions right', (c) => (c.b.right || 0) >= 50, (c) => [c.b.right || 0, 50]),
+    A('curious', 'learn', '❓', 'Сониуч', 'Curious', 'Басараас 10 асуулт асуух', 'Ask Basar 10 questions', (c) => (c.b.asked || 0) >= 10, (c) => [c.b.asked || 0, 10]),
+    A('all_topics', 'learn', '🌈', 'Олон талт', 'All-rounder', '6 сэдэв бүрээс нэг нэг асуултад зөв хариулах', 'Get a question right in all 6 topics', (c) => Object.keys(TG.BASAR ? TG.BASAR.TOPICS : {}).every((k) => c.b.topics && c.b.topics[k] && c.b.topics[k].right > 0),
+      (c) => [Object.keys(TG.BASAR ? TG.BASAR.TOPICS : {}).filter((k) => c.b.topics && c.b.topics[k] && c.b.topics[k].right > 0).length, 6]),
+    A('family1', 'family', '👨‍👩‍👧', 'Хамтдаа хийсэн', 'Done together', 'Гэр бүлээрээ анхны бодит ажлаа хийх', 'Do your first real activity with family', (c) => famDone(c) >= 1),
+    A('family_all', 'family', '🏡', 'Гэр бүлийн баатар', 'Family hero', 'Бүх гэр бүлийн ажлыг хийх', 'Do every family activity', (c) => TG.learn && famDone(c) >= TG.learn.LESSONS.length, (c) => [famDone(c), TG.learn ? TG.learn.LESSONS.length : 4]),
+    A('with_family', 'family', '💛', 'Гэр бүлээрээ сурсан', 'Learned with family', 'Хичээлийг гэр бүлтэйгээ хамт үзэх', 'Do a lesson together with family', (c) => (c.tg.family || 0) >= 1),
+    A('with_friends', 'family', '🤝', 'Найзуудтайгаа сурсан', 'Learned with friends', 'Хичээл эсвэл асуулт хариултыг найзуудтайгаа хийх', 'Do a lesson or quiz with friends', (c) => (c.tg.friends || 0) >= 1),
+    A('stars20', 'family', '⭐', 'Од түгээгч', 'Star collector', 'Гэр бүлийн 20 од цуглуулах', 'Collect 20 family stars', () => (S.state.familyStars || 0) >= 20, () => [S.state.familyStars || 0, 20]),
+    A('memory', 'family', '🎙️', 'Дурсамж хадгалагч', 'Memory keeper', 'Ахмадын яриаг Дурсамжийн номонд хадгалах', 'Save an elder’s story in the memory book', () => (S.state.memCount || 0) >= 1),
+    A('level5', 'nutag', '🌟', 'Нутгийн од', 'Village star', 'Нутагт 5-р түвшинд хүрэх', 'Reach level 5 in Nutag', (c) => lvl(c) >= 5, (c) => [lvl(c), 5]),
+    A('ger_built', 'nutag', '🏠', 'Өөрийн гэртэй', 'Home of my own', 'Нутагт өөрийн гэрээ барих', 'Build your own ger in Nutag', (c) => !!c.v.gerBuilt),
+    A('fisher', 'nutag', '🎣', 'Загасчин', 'Fisher', '5 загас барих', 'Catch 5 fish', (c) => (c.v.fishCaught || 0) >= 5, (c) => [c.v.fishCaught || 0, 5]),
+    A('rider', 'nutag', '🐎', 'Морь унаач', 'Rider', 'Морь унаж Нутгаар 200 алхам давхих', 'Ride 200 tiles around Nutag', (c) => (c.h.dist || 0) >= 200, (c) => [Math.floor(c.h.dist || 0), 200]),
+    A('race_win', 'naadam', '🏆', 'Түрүү морь', 'Winning horse', 'Морин уралдаанд түрүүлэх', 'Win a horse race', (c) => (c.h.wins || 0) >= 1),
+    A('race_top5', 'naadam', '🥇', 'Айргийн тав', 'Top five', '5 уралдаанд айргийн тавд орох', 'Finish in the top five in 5 races', (c) => (c.h.top5 || 0) >= 5, (c) => [c.h.top5 || 0, 5]),
+    A('wr_first', 'naadam', '💪', 'Анхны давалт', 'First win', 'Бөхийн барилдаанд анх удаа давах', 'Win your first wrestling round', (c) => (c.w.wins || 0) + (c.w.pvpW || 0) >= 1),
+    A('techs7', 'naadam', '🥋', 'Мэхний мастер', 'Technique master', '7 мэх бүрээр нэг нэг удаа давуулах', 'Score with all 7 techniques', (c) => Object.keys(c.w.techs || {}).length >= 7, (c) => [Object.keys(c.w.techs || {}).length, 7]),
+    A('nachin', 'naadam', '🦅', 'Начин', 'Nachin (Falcon)', 'Наадамд 5 даваа давах', 'Win 5 rounds at the Naadam', (c) => (c.w.best || 0) >= 5, (c) => [c.w.best || 0, 5]),
+    A('zaan', 'naadam', '🐘', 'Заан', 'Zaan (Elephant)', 'Наадамд 7 даваа давах', 'Win 7 rounds at the Naadam', (c) => (c.w.best || 0) >= 7, (c) => [c.w.best || 0, 7]),
+    A('arslan', 'naadam', '🦁', 'Арслан', 'Arslan (Lion)', 'Наадамд түрүүлэх', 'Win the whole Naadam', (c) => (c.w.champ || 0) >= 1),
+  ];
+  const ctxOf = (p) => { const v = p.village || {}; return { p, v, learn: p.learn || {}, b: p.basar || {}, w: v.wr || {}, h: v.horse || {}, tg: p.together || {} }; };
+  /** Award any newly earned badges for the active child. Returns the new ones. */
+  function check(silent) {
+    const p = S.active(); if (!p) return [];
+    p.ach = p.ach || {};
+    const c = ctxOf(p), fresh = [];
+    for (const a of LIST) { if (p.ach[a.id]) continue; let ok = false; try { ok = !!a.test(c); } catch (e) { ok = false; } if (ok) { p.ach[a.id] = Date.now(); fresh.push(a); } }
+    if (fresh.length) {
+      S.save();
+      if (!silent) fresh.forEach((a, i) => setTimeout(() => { TG.toast(`🏅 ${L('Шинэ амжилт', 'New achievement')}: ${a.icon} ${tx(a.name)}`); TG.sfx.chime && TG.sfx.chime(); }, 700 + i * 1500));
+      fresh.forEach((a) => S.logActivity && S.logActivity({ kind: 'ach', id: a.id }));
+    }
+    return fresh;
+  }
+  const progress = (a, p) => { if (!a.prog) return null; try { return a.prog(ctxOf(p)); } catch (e) { return null; } };
+  TG.achievements = { LIST, CATS, check, progress, byId: (id) => LIST.find((a) => a.id === id) };
+})(window.TG);

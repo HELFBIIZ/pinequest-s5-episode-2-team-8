@@ -10,6 +10,7 @@
     {
       id: 'ger', icon: '⛺', scene: 'ger', topic: 'ger', color: '#3f76db', final: { stage: 9 },
       title: T('Монгол гэр барих', 'Build a Mongol ger'),
+      learned: [T('Гэрийн хэсгүүд: шал, хана, хаалга, тооно, багана, унь, эсгий, бүрээс, бүслүүр', 'The ger’s parts: floor, khana, door, toono, bagana, uni, felt, cover, ropes'), T('Барих дараалал ба хаалга урагшаа харах шалтгаан', 'The building order and why the door faces south'), T('Эсгий гэрийг дулаан байлгадаг', 'Felt keeps the ger warm')],
       desc: T('Хана, тооно, униа зөв дарааллаар босгоод өөрийн гэрээ бариарай.', 'Raise the walls, crown and poles in the right order and build your own ger.'),
       steps: [
         { type: 'learn', title: T('Нүүдэлчдийн ухаалаг байшин', 'The nomads’ clever home'), text: T('Монгол гэрийг гэр бүлээрээ 1–2 цагт барьж, буулгаж болдог. Өвөл дулаан, зун сэрүүн. Өнөөдөр чи өөрөө барина!', 'A family can put up or take down a ger in 1–2 hours. Warm in winter, cool in summer. Today you will build one!') },
@@ -38,6 +39,7 @@
     {
       id: 'idee', icon: '🥛', scene: 'idee', topic: 'idee', color: '#e9a91f', final: { stage: 7 },
       title: T('Цагаан идээ хийх', 'Make Mongolian dairy'),
+      learned: [T('Цагаан идээ гэж юу вэ: тараг, өрөм, ааруул, бяслаг, айраг', 'What white foods are: yogurt, cream, aaruul, cheese, airag'), T('Тараг исгэх: буцалгах, бүлээн болтол хөргөх, хөрөнгө хийх', 'Making yogurt: boil, cool to lukewarm, add starter'), T('Ааруулыг шахаж, наранд хатаадаг', 'Aaruul is pressed and dried in the sun')],
       desc: T('Үнээ саагаад сүүгээ буцалгаж, өрөм, тараг, ааруул хийцгээе.', 'Milk the cow, boil the milk and make cream, yogurt and aaruul.'),
       steps: [
         { type: 'learn', stage: 0, title: T('Цагаан идээ гэж юу вэ?', 'What is “white food”?'), text: T('Монголчууд зун сүүгээр тараг, өрөм, ааруул, бяслаг, шар тос, айраг хийдэг. Үүнийг цагаан идээ гэнэ. Цагаан сараар ширээний тэргүүнд тавьдаг.', 'In summer Mongols make yogurt, cream, aaruul, cheese, butter and airag from milk. These are “white foods”, placed first on the Tsagaan Sar table.') },
@@ -62,6 +64,7 @@
     {
       id: 'customs', icon: '🙏', scene: 'inside', topic: 'customs', color: '#9466e0', final: {},
       title: T('Гэрийн ёс заншил', 'Ger manners'),
+      learned: [T('Хоймор, гал голомт, эрэгтэй ба эмэгтэй тал хаана байдаг', 'Where the khoimor, hearth and men’s and women’s sides are'), T('Босго гишгэхгүй, нар зөв явах, баганын дундуур гарахгүй', 'Don’t step on the threshold, move sunwise, don’t pass between the posts'), T('Ахмадад хоёр гараараа юм өгөх', 'Hand things to elders with both hands')],
       desc: T('Хоймор хаана вэ? Босго гишгэж болох уу? Гэрийн дотоод “газрын зураг”-ийг сур.', 'Where is the khoimor? Can you step on the threshold? Learn the ger’s inside “map”.'),
       steps: [
         { type: 'learn', title: T('Гэр бүр дотроо газрын зурагтай', 'Every ger has a map inside'), text: T('Монгол гэрт хүн бүр, эд зүйл бүр өөрийн байртай. Дээрээс харахад хаалга доор (урд), хоймор дээр (хойд) байна.', 'In a ger every person and thing has its place. From above, the door is at the bottom (south) and the khoimor at the top (north).') },
@@ -85,6 +88,7 @@
     {
       id: 'nuuts', icon: '📜', scene: 'story', topic: 'nuuts', color: '#c8483c', final: { ch: 'banner' },
       title: T('Нууц товчооны үлгэр', 'Tales of the Secret History'),
+      learned: [T('Бөртэ чоно, Гуа марал: Нууц товчооны эхлэл', 'Börte Chino and Gua Maral: how the Secret History begins'), T('Алан гуагийн таван сумны эв нэгдлийн сургаал', 'Alan Gua’s five arrows lesson on unity'), T('Тэмүжиний бага нас ба 1206 онд Чингис хаан болсон нь', 'Temüjin’s childhood and becoming Chinggis Khaan in 1206')],
       desc: T('Бөртэ чоно, таван сумны сургаал, бяцхан Тэмүжин, Чингис хаан болсон түүх.', 'The blue wolf, the five arrows, young Temüjin and how he became Chinggis Khaan.'),
       steps: [
         { type: 'story', ch: 'wolf', title: T('Бөртэ чоно, Гуа марал', 'The blue wolf and the doe'), text: T('“Монголын нууц товчоо” ингэж эхэлдэг: Дээр тэнгэрээс заяат төрсөн Бөртэ чоно, гэргий Гуа марал хоёр далайг гэтэлж ирээд Онон голын эх, Бурхан халдун ууланд нутаглажээ.', 'The Secret History begins: Börte Chino, born with destiny from Heaven, and his wife Gua Maral crossed the waters and settled at the source of the Onon river, by Mount Burkhan Khaldun.') },
@@ -114,6 +118,7 @@
   const progress = (id) => { const p = S.active(); if (!p) return {}; p.learn = p.learn || {}; return (p.learn[id] = p.learn[id] || {}); };
   const done = (id) => !!progress(id).done;
   TG.learn = { LESSONS, progress, done, byId: (id) => LESSONS.find((l) => l.id === id) };
+  const params_with = () => TG.learn.preset || null; // tests can preset { mode, players }
 
   /** Small animated scene canvas. Returns { el, st, stop }. */
   function sceneCanvas(kind, st, onClick) {
@@ -168,7 +173,8 @@
       h('section', { class: 'px-card l-quizcard' },
         h('h2', null, '🎯 ', L('Басарын асуулт хариулт', 'Basar’s quiz')),
         h('p', { class: 'muted' }, L(`Зөв хариулт: ${st.right || 0} / ${st.total || 0}`, `Correct answers: ${st.right || 0} / ${st.total || 0}`)),
-        h('div', { class: 'chips' }, Object.entries(TG.BASAR.TOPICS).map(([k, t]) => h('button', { class: 'chip', onclick: () => TG.basar.open({ topic: k }) }, t.icon, ' ', tx(t.name)))),
+        h('p', { class: 'muted' }, L('Сэдвээ сонгоод ганцаараа, гэр бүл эсвэл найзуудтайгаа ээлжлэн тоглоорой.', 'Pick a topic and play alone, or take turns with family or friends.')),
+        h('div', { class: 'chips' }, [['mix', '🎲', T('Холимог', 'Mixed')], ...Object.entries(TG.BASAR.TOPICS).map(([k, t]) => [k, t.icon, t.name])].map(([k, icon, name]) => h('button', { class: 'chip', onclick: () => TG.basar.quizParty(k) }, icon, ' ', tx(name)))),
         h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: () => TG.basar.open() }, '🐕 ', L('Басараас юу ч асуух', 'Ask Basar anything'))),
     ]);
   };
@@ -177,7 +183,7 @@
   TG.learn.lesson = ({ id, shell, setCleanup }) => {
     const l = TG.learn.byId(id) || LESSONS[0], pr = progress(id);
     const st = { stage: 0, sub: 0 };
-    let i = 0, timer = 0;
+    let i = 0, timer = 0, players = [], mode = 'solo', turn = 0;
     const panel = h('div', { class: 'l-panel px-card' });
     const dots = h('div', { class: 'l-dots' });
     const scene = sceneCanvas(l.scene, st, (ax, ay) => onSceneTap && onSceneTap(ax, ay));
@@ -188,6 +194,10 @@
     const nextBtn = (label) => h('button', { class: 'btn primary big block', onclick: () => { i++; show(); } }, label || L('Цааш →', 'Next →'));
     const drawDots = () => dots.replaceChildren(...l.steps.map((_, k) => h('i', { class: k < i ? 'on' : k === i ? 'cur' : '' })), h('i', { class: 'q' + (i >= l.steps.length ? ' cur' : '') }, '?'));
     const say = (txt) => h('div', { class: 'l-basar' }, TG.basar.face(1, 34), h('p', null, txt));
+    const multi = () => players.length > 1;
+    const turnEl = (s) => !multi() ? null : (s.type === 'learn' || s.type === 'story')
+      ? h('div', { class: 'turn-badge read' }, h('span', { class: 'tb-e' }, '📢'), h('b', null, L(`${players[turn % players.length].name} чангаар уншиж өгөөрэй`, `${players[turn % players.length].name}, read this out loud`)))
+      : TG.basar.turnBadge(players[turn % players.length]);
     const success = (step) => { TG.sfx.good(); if (step.stage !== undefined) { st.stage = step.stage; st.sub = 1; } return step.after ? say(tx(step.after)) : null; };
 
     function show() {
@@ -198,7 +208,8 @@
       if (s.stage !== undefined && s.type !== 'pick' && s.type !== 'zones' && s.type !== 'tf') { st.stage = s.stage; st.sub = s.type === 'tap' || s.type === 'hold' || s.type === 'timing' ? 0 : 1; }
       else if (s.type === 'pick' && s.stage !== undefined) { st.stage = s.stage - 1; st.sub = 1; }
       pr.step = Math.max(pr.step || 0, i); S.save();
-      const head = [h('h2', null, tx(s.title)), h('p', null, tx(s.text))];
+      const head = [turnEl(s), h('h2', null, tx(s.title)), h('p', null, tx(s.text))].filter(Boolean);
+      turn++;
       const out = h('div', { class: 'l-out' });
       if (s.type === 'learn' || s.type === 'story') return panel.replaceChildren(...head, nextBtn());
       if (s.type === 'pick') {
@@ -261,24 +272,30 @@
       st.stage = l.final.stage !== undefined ? l.final.stage : st.stage; st.sub = 1; if (l.final.ch) st.ch = l.final.ch; st.hl = null;
       const host = h('div');
       panel.replaceChildren(h('h2', null, '🎯 ', L('Басарын шалгалт', 'Basar’s check')), h('p', { class: 'muted' }, L('3 асуултад хариулаарай.', 'Answer 3 questions.')), host);
-      TG.basar.runQuiz(host, l.topic, 3, (right, n) => finish(right, n));
+      TG.basar.runQuiz(host, l.topic, multi() ? Math.max(3, players.length * 2) : 3, (right, n, tally) => finish(right, n, tally), players);
     }
-    function finish(right, n) {
-      const first = !pr.done;
-      pr.done = true; pr.best = Math.max(pr.best || 0, right); S.save();
+    function finish(right, n, tally) {
+      const first = !pr.done, boost = multi() ? 1.5 : 1;
+      pr.done = true; pr.best = Math.max(pr.best || 0, multi() ? Math.max(...tally) : right); pr.with = pr.with || {}; pr.with[mode] = (pr.with[mode] || 0) + 1; S.save();
       let reward = null;
-      if (first) { reward = TG.villageReward ? TG.villageReward(50, 60) : null; TG.villageQuest && TG.villageQuest('lesson'); S.logActivity && S.logActivity({ kind: 'lesson', id: l.id }); }
+      if (first) { reward = TG.villageReward ? TG.villageReward(Math.round(50 * boost), Math.round(60 * boost)) : null; TG.villageQuest && TG.villageQuest('lesson'); S.logActivity && S.logActivity({ kind: 'lesson', id: l.id }); }
+      else if (multi()) reward = TG.villageReward ? TG.villageReward(20, 25) : null;
+      TG.basar.noteTogether(mode, players, l.id);
+      TG.achievements && TG.achievements.check();
       TG.sfx.win(); TG.confetti(70);
       panel.replaceChildren(
         h('div', { class: 'l-done' }, h('div', { class: 'big-emoji' }, l.icon), h('h2', null, L('Хичээл дууслаа!', 'Lesson complete!')),
           h('p', null, L(`Басарын асуулт: ${right} / ${n} зөв`, `Basar’s quiz: ${right} / ${n} correct`)),
+          multi() ? TG.basar.scoreboard(players, tally) : null,
+          multi() ? h('p', { class: 'muted' }, mode === 'family' ? L('Гэр бүлээрээ сурсан тул +50% шагнал, гэр бүлийн +2 од! 💛', 'Learned with family: +50% reward and +2 family stars! 💛') : L('Найзуудтайгаа сурсан тул +50% шагнал! 🤝', 'Learned with friends: +50% reward! 🤝')) : null,
           reward ? h('div', { class: 'l-reward' }, `🪙 +${reward.coins}`, ' · ', `⭐ +${reward.xp} XP`) : null,
           l.id === 'ger' && first ? h('div', { class: 'l-unlock' }, '🔑 ', L('Нутагт өөрийн гэрээ барих эрх нээгдлээ! Гэр хорооллын хоосон газар очоорой.', 'You can now build your own ger in Nutag! Visit an empty lot in the ger neighbourhood.')) : null),
         TG.learn.familyCard(l),
         h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => TG.go('learn') }, L('Бусад хичээл', 'More lessons')), h('button', { class: 'btn primary', onclick: () => TG.go('village') }, L('Нутаг руу', 'To Nutag'))));
     }
 
-    show();
+    const begin = (choice) => { mode = choice.mode; players = choice.players; show(); };
+    if (params_with(id)) begin(params_with(id)); else { drawDots(); panel.replaceChildren(TG.basar.withPicker(begin, { title: L(`“${tx(l.title)}” хичээлийг хэнтэй үзэх вэ?`, `Who are you doing “${tx(l.title)}” with?`) })); }
     return h('div', { class: 'lesson', style: { '--lc': l.color } },
       h('div', { class: 'l-top' }, h('button', { class: 'icon-btn', 'aria-label': 'back', onclick: () => TG.go('learn') }, TG.icon('arrowLeft')), h('b', null, l.icon, ' ', tx(l.title)),
         h('button', { class: 'l-ask', onclick: () => TG.basar.open({ context: L(`Вуф! Бид “${tx(l.title)}” хичээл үзэж байна. Ойлгомжгүй юм байвал асуугаарай!`, `Woof! We’re doing “${tx(l.title)}”. Ask me anything you’re unsure about!`) }) }, TG.basar.face(0, 28), L('Асуух', 'Ask'))),

@@ -253,7 +253,7 @@ function onMessage(conn, text) {
 function armMatch(r, match) {
   clearTimeout(match.timer);
   match.timer = setTimeout(() => {          // a player who never answers gets a weak random move
-    for (const side of ['a', 'b']) if (!match.moves[side]) match.moves[side] = { m: R.MOVES[Math.floor(Math.random() * 3)].id, p: 0.15 };
+    for (const side of ['a', 'b']) if (!match.moves[side]) match.moves[side] = { m: R.MOVES[Math.floor(Math.random() * R.MOVES.length)].id, p: 0.15 };
     resolveMatch(r, match);
   }, 25000);
   match.timer.unref && match.timer.unref();

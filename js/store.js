@@ -19,6 +19,7 @@
     ],
     settings: { screenLimit: 45, sound: true, bigText: false, reduceMotion: false },
     familyStars: 0,
+    friends: [],
     missions: {},
     log: [],
     usage: {},

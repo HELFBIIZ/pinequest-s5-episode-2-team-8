@@ -40,9 +40,11 @@ try {
   ok(r1.body.model === 'claude-opus-5-5' && r1.body.output_config.effort === 'low' && r1.body.fallbacks === 'default', 'model, effort and refusal fallback are set');
   ok(r1.body.messages.length === 1 && r1.body.messages[0].role === 'user', 'history is cleaned to start with the child');
   ok(/Bankhar/.test(r1.body.system) && /7 years old/.test(r1.body.system) && /personal information/.test(r1.body.system), 'kid-safe Basar system prompt with the child’s age');
+  await post(a.base, { mode: 'chat', messages: [{ role: 'user', content: 'What is a ger?' }], lang: 'en' });
+  ok(/same language/.test(seen[1].body.system) && /right now that is English/.test(seen[1].body.system) && /anything a curious child asks/.test(seen[1].body.system), 'Basar answers in English when asked in English, and helps with any topic');
   const quiz = await post(a.base, { mode: 'quiz', topic: 'nuuts', age: 9 });
   ok(quiz.ok && quiz.quiz.answer === 2 && quiz.quiz.options.length === 4, 'quiz returns 4 options and the right answer');
-  ok(seen[1].body.output_config.format.type === 'json_schema', 'quiz uses structured JSON output');
+  ok(seen[2].body.output_config.format.type === 'json_schema', 'quiz uses structured JSON output');
   mode = 'refuse';
   const ref = await post(a.base, { mode: 'chat', messages: [{ role: 'user', content: 'x' }] });
   ok(!ref.ok && ref.reason === 'refusal', 'a refusal is reported so the app answers kindly');

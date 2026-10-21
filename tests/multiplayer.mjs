@@ -47,6 +47,12 @@ try {
   await until(() => b.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Бат' && o.look.hat === 'mongol')), 'B sees A with hat');
   ok('players see each other (names and outfits)');
 
+  await a.evaluate(() => TG._village.mount('black'));
+  await until(() => b.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Бат' && o.look.ride === 'horse' && o.look.coat === 'black')), 'B sees A on a black horse');
+  await a.evaluate(() => TG._village.dismount());
+  await until(() => b.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Бат' && !o.look.ride)), 'B sees A get off the horse');
+  ok('riding a horse is visible to friends');
+
   await a.evaluate(() => TG._village.goTo({ x: 15, y: 13 }, null));
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && Math.abs(o.x - 15) < 0.01 && Math.abs(o.y - 13) < 0.01; }), 'B sees A move', 12000);
   ok('movement is shared live');
