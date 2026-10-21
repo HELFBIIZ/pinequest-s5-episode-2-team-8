@@ -1,5 +1,11 @@
 # Naadamy — Хамтдаа суралцъя
 
+> **Энэ нь team-ийн ажлын хувилбар (mirror) юм.**
+> Pinequest S5 · Episode 2 · Team 8 — үндсэн (canonical) repo: **https://github.com/pinecone-studio/pinequest-s5-episode-2-team-8**
+> Pitch, үнэлгээ, бүх түүхтэй хувилбар энд байна. Энэ хувилбар нь зөвхөн хувийн backup / portfolio зориулалттай бөгөөд
+> бүх зохиогчийн эрх, team-ийн зохиогчийн нэр (ma · mmmargad006, Turuu, wildjasoniscool-glitch, Naadamy) хадгалагдана.
+> App code © Team 8, Pinequest S5 Episode 2.
+
 **Pinequest · Pinecone Academy · Сэдэв: "Ирээдүйгээ тохируулъя — Эрүүл мэнд, боловсрол, ур чадварт тэгш хүртээмж" (Fine-Tune for the Future)**
 
 3–18 насны монгол хүүхдүүдэд зориулсан суралцах тоглоомын платформ. Хүүхэд дэлгэцийн өмнө ганцаараа биш, гэр бүл, найз нөхөдтэйгөө **хамтдаа** суралцахаар бүтээгдсэн.
