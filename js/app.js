@@ -650,4 +650,6 @@
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {}));
   }
   render();
+  // a shared invite link (…?room=CODE) opens the village directly once a child profile exists
+  if (new URLSearchParams(location.search).get('room') && S.state.profiles.length) TG.go('village');
 })(window.TG);
