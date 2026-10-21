@@ -103,6 +103,17 @@ try {
   if (!chromeNav.brandLabel) errors.push('chrome accessibility: brand button has no aria-label');
   if (!chromeNav.hasMain) errors.push('chrome accessibility: main landmark #main is missing');
 
+  // screen changes: focus lands at the top of the new screen and the change is announced
+  step = 'screen change accessibility';
+  await page.evaluate(() => TG.go('missions'));
+  await sleep(320);
+  const screenChange = await page.evaluate(() => ({
+    focused: document.activeElement && document.activeElement.id,
+    announced: (document.querySelector('.sr-only[role="status"]') || {}).textContent || '',
+  }));
+  if (screenChange.focused !== 'main') errors.push(`screen change accessibility: focus stayed on "${screenChange.focused}" after navigating, expected "main"`);
+  if (!screenChange.announced) errors.push('screen change accessibility: the new screen was not announced');
+
   step = 'village (solo mode, no server)';
   await page.evaluate(() => TG.go('village')); await sleep(900);
   await check('village screen', '.village canvas');

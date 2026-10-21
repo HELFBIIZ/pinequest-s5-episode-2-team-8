@@ -27,11 +27,35 @@
     const el = document.getElementById('app').firstElementChild;
     if (el) { el.classList.remove('screen-in'); void el.offsetWidth; el.classList.add('screen-in'); }
   }
+  // The URL never changes, so nothing tells a screen reader that another screen
+  // opened. Name every screen, announce it politely and land the focus at the top
+  // of the new screen instead of leaving it on the button that was pressed.
+  const SCREEN_NAMES = {
+    home: ['Тоглоом', 'Play'], village: ['Нутаг', 'Village'], satis: ['Цэгцлэе', 'Puzzles'],
+    memories: ['Дурсамж', 'Memories'], missions: ['Гэр бүлийн даалгавар', 'Family missions'],
+    parents: ['Эцэг эхийн самбар', 'Parent dashboard'], about: ['Бидний тухай', 'About'],
+  };
+  let liveRegion = null;
+  function announceScreen() {
+    const pair = SCREEN_NAMES[screen];
+    if (!pair) return;                                   // games announce their own state
+    if (!liveRegion) { liveRegion = h('div', { class: 'sr-only', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(liveRegion); }
+    const text = L(pair[0], pair[1]);
+    liveRegion.textContent = '';
+    setTimeout(() => { liveRegion.textContent = text; }, 50);
+  }
+  function focusScreen() {
+    const main = document.getElementById('main');
+    if (!main) return;                                   // games and the intro screens own their focus
+    try { main.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+  }
   TG.go = function (name, p = {}) {
     if (cleanupGame) { try { cleanupGame(); } catch (e) { console.error(e); } cleanupGame = null; }
     const a = NAV_ORDER.indexOf(screen), b = NAV_ORDER.indexOf(name);
     screen = name; params = p;
-    transition(a >= 0 && b >= 0 && a !== b ? (b > a ? 'left' : 'right') : 'up', () => { render(); window.scrollTo(0, 0); });
+    transition(a >= 0 && b >= 0 && a !== b ? (b > a ? 'left' : 'right') : 'up', () => {
+      render(); window.scrollTo(0, 0); announceScreen(); focusScreen();
+    });
   };
   const soft = () => transition('fade', render); // tab / filter switches inside a screen
   function render() {
