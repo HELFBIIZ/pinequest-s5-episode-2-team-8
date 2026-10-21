@@ -935,7 +935,9 @@ blockquote { margin: 12px 0; padding: 14px 16px; background: var(--surface-2); b
 .v-music.hidden { display: none; }
 .credits { list-style: none; padding: 0; margin: 0 auto; max-width: 640px; display: grid; gap: 6px; font-size: .88rem; font-weight: 600; color: var(--ink-2); }
 .credits li { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
-.credits a { color: var(--blue); }
+/* an inline-block with padding, so the source link is a comfortable tap target
+   (WCAG 2.5.8) instead of a 19px sliver of text on a phone */
+.credits a { color: var(--blue); display: inline-block; padding: 3px 2px; margin: -3px -2px; min-height: 24px; line-height: 18px; }
 
 /* ---------- screen transitions ---------- */
 @keyframes vt-out-up { to { opacity: 0; transform: scale(.985); } }

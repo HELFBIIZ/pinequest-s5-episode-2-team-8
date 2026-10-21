@@ -264,6 +264,14 @@ try {
   });
   if (!dailyLink) errors.push('layout: the home screen has no "all missions" link');
   else if (dailyLink.h < 24) errors.push(`layout: the "all missions" link is only ${dailyLink.h}px tall, expected at least 24px (WCAG 2.5.8)`);
+  await page.evaluate(() => TG.go('about')); await sleep(250);
+  const creditLink = await page.evaluate(() => {
+    const a = document.querySelector('.credits a');
+    if (!a) return null;
+    return { h: Math.round(a.getBoundingClientRect().height) };
+  });
+  if (!creditLink) errors.push('layout: the about screen has no music credit source link');
+  else if (creditLink.h < 24) errors.push(`layout: the music credit link is only ${creditLink.h}px tall, expected at least 24px (WCAG 2.5.8)`);
   await page.setViewport({ width: 320, height: 568 });
   await sleep(250);
   await sideways('layout on a 320px phone (home)');
