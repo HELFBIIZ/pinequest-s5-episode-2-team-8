@@ -4,7 +4,6 @@
   const S = TG.store, R = TG.vrules, WD = TG.vworld, T = WD.T;
   const SPEED = 4.6;
   const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]]; // down, left, right, up
-  const PET_E = { lamb: '🐑', kitten: '🐈', puppy: '🐕', camel: '🐫', foal: '🐴' };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const Tx = (mn, en) => ({ mn, en });
   let live = null;
@@ -80,47 +79,20 @@
   TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a) }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
-  // ================================================================ avatar drawing (also used for the wardrobe preview)
-  function drawAvatar(ctx, x, y, look, dir, t, moving) {
-    const c = WD.circle, rr = WD.rr;
-    const bob = moving ? Math.abs(Math.sin(t * 14)) * 1.8 : Math.sin(t * 2.2) * 0.6;
-    const deel = R.DEELS[look.deel] || R.DEELS.blue, skin = look.skin || R.SKINS[0], step = moving ? Math.sin(t * 14) * 2 : 0;
-    ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(x, y, 9, 3.2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3A2A20'; rr(ctx, x - 6, y - 6 - (step > 0 ? 1 : 0), 5, 6, 2); ctx.fill(); rr(ctx, x + 1, y - 6 - (step < 0 ? 1 : 0), 5, 6, 2); ctx.fill();
-    const by = y - 22 - bob;
-    c(ctx, x - 10, by + 8 + step * 0.5, 3, deel); c(ctx, x + 10, by + 8 - step * 0.5, 3, deel);
-    rr(ctx, x - 9, by, 18, 17, 6); ctx.fillStyle = deel; ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x - 2, by + 1); ctx.quadraticCurveTo(x + 4, by + 4, x + 7, by + 9); ctx.stroke();
-    ctx.fillStyle = '#FDB022'; ctx.fillRect(x - 9, by + 10, 18, 3);
-    const hy = by - 7;
-    if (look.neck === 'scarf') { ctx.fillStyle = '#F04438'; rr(ctx, x - 8, by - 1, 16, 4, 2); ctx.fill(); ctx.fillRect(x + 3, by + 2, 4, 8); }
-    if (look.neck === 'khadag') { ctx.strokeStyle = '#8FD0FF'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 8, by + 1); ctx.quadraticCurveTo(x, by + 12, x + 8, by + 1); ctx.stroke(); ctx.fillStyle = '#8FD0FF'; ctx.fillRect(x - 9, by + 1, 3, 10); ctx.fillRect(x + 6, by + 1, 3, 10); }
-    if (look.neck === 'medal') { ctx.strokeStyle = '#2F6BFF'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 5, by); ctx.lineTo(x, by + 7); ctx.lineTo(x + 5, by); ctx.stroke(); c(ctx, x, by + 9, 3.4, '#FDB022'); c(ctx, x, by + 9, 1.6, '#DC8B05'); }
-    c(ctx, x, hy, 8.5, skin);
-    ctx.fillStyle = '#2B1D14';
-    if (dir === 3) { ctx.beginPath(); ctx.arc(x, hy, 8.8, 0, Math.PI * 2); ctx.fill(); }
-    else {
-      ctx.beginPath(); ctx.arc(x, hy - 0.5, 8.8, Math.PI * 1.03, Math.PI * 1.97); ctx.fill();
-      const ex = dir === 1 ? -2.5 : dir === 2 ? 2.5 : 0;
-      c(ctx, x - 3 + ex, hy + 1.6, 1.3, '#1F1A17'); c(ctx, x + 3 + ex, hy + 1.6, 1.3, '#1F1A17');
-      c(ctx, x - 5 + ex, hy + 4, 1.7, 'rgba(240,110,110,.35)'); c(ctx, x + 5 + ex, hy + 4, 1.7, 'rgba(240,110,110,.35)');
-      if (look.face === 'glasses') { ctx.strokeStyle = '#1F2A44'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x - 3 + ex, hy + 1.6, 2.6, 0, Math.PI * 2); ctx.moveTo(x + 5.6 + ex, hy + 1.6); ctx.arc(x + 3 + ex, hy + 1.6, 2.6, 0, Math.PI * 2); ctx.moveTo(x - 0.4 + ex, hy + 1.4); ctx.lineTo(x + 0.4 + ex, hy + 1.4); ctx.stroke(); }
-      if (look.face === 'sun') { ctx.fillStyle = '#141B2D'; rr(ctx, x - 6 + ex, hy, 5, 3.4, 1.5); ctx.fill(); rr(ctx, x + 1 + ex, hy, 5, 3.4, 1.5); ctx.fill(); ctx.fillRect(x - 1 + ex, hy + 0.6, 2, 1); }
+  // ================================================================ pixel art helpers
+  const PX = TG.pixel;
+  const portraitCache = new Map();
+  function portrait(look, size = 40) {
+    const key = JSON.stringify(look);
+    if (!portraitCache.has(key)) {
+      const s = PX.char(look, 0, 0), m = PX.mk(16, 18);
+      m.x.drawImage(s, 0, -2); portraitCache.set(key, m.c.toDataURL());
     }
-    if (look.hat === 'mongol') { ctx.fillStyle = '#B32D24'; ctx.beginPath(); ctx.ellipse(x, hy - 5, 11, 3.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#E8453C'; ctx.beginPath(); ctx.arc(x, hy - 6, 7, Math.PI, 0); ctx.fill(); c(ctx, x, hy - 14, 2.3, '#FDB022'); }
-    if (look.hat === 'flower') for (let i = 0; i < 6; i++) { const a = Math.PI * (1.08 + i * 0.168); c(ctx, x + Math.cos(a) * 8.5, hy - 1 + Math.sin(a) * 8.5, 2.5, ['#FF8FB1', '#FFD34E', '#FFFFFF', '#B49CFF'][i % 4]); }
-    if (look.hat === 'cap') { ctx.fillStyle = '#2F6BFF'; ctx.beginPath(); ctx.arc(x, hy - 1, 9, Math.PI, 0); ctx.fill(); if (dir !== 3) { ctx.fillStyle = '#1E50D6'; ctx.beginPath(); ctx.ellipse(x + (dir === 1 ? -7 : dir === 2 ? 7 : 0), hy - 1.5, dir === 0 ? 9 : 6, 2.4, 0, 0, Math.PI * 2); ctx.fill(); } }
-    if (look.hat === 'loovuuz') { ctx.fillStyle = '#8A5A33'; ctx.beginPath(); ctx.ellipse(x, hy - 6, 10, 7, 0, Math.PI, 0); ctx.fill(); for (let i = -2; i <= 2; i++) c(ctx, x + i * 4.2, hy - 4, 2.6, '#E3C29E'); ctx.fillStyle = '#E3C29E'; rr(ctx, x - 11, hy - 4, 4, 9, 2); ctx.fill(); rr(ctx, x + 7, hy - 4, 4, 9, 2); ctx.fill(); c(ctx, x, hy - 13, 2, '#E8453C'); }
-    if (look.hat === 'crown') { ctx.fillStyle = '#FDB022'; ctx.strokeStyle = '#DC8B05'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 7, hy - 6); ctx.lineTo(x - 7, hy - 13); ctx.lineTo(x - 3.5, hy - 9); ctx.lineTo(x, hy - 15); ctx.lineTo(x + 3.5, hy - 9); ctx.lineTo(x + 7, hy - 13); ctx.lineTo(x + 7, hy - 6); ctx.closePath(); ctx.fill(); ctx.stroke(); c(ctx, x, hy - 9, 1.5, '#F04438'); }
+    return h('img', { class: 'px-icon', src: portraitCache.get(key), width: size, height: Math.round(size * 18 / 16), alt: '' });
   }
-  TG.drawAvatar = drawAvatar;
-  function drawPet(ctx, pet, p, flip, t) {
-    if (!pet || !PET_E[pet]) return;
-    ctx.save(); ctx.translate(p.x * T + 16, p.y * T + 24 + Math.sin(t * 6) * 0.8);
-    if (flip) ctx.scale(-1, 1);
-    ctx.font = '15px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(PET_E[pet], 0, 0);
-    ctx.restore();
-  }
+  const itemKey = (it) => (it.slot === 'deel' ? 'deel:' + it.val : it.cat === 'pet' ? 'pet:' + it.val : it.cat === 'tool' ? 'tool:' + it.id : 'wear:' + it.slot + '-' + it.val);
+  const pic = (key, size = 32) => PX.icon(key, size);
+  TG.drawAvatarPixel = (ctx, look, scale) => { ctx.imageSmoothingEnabled = false; ctx.drawImage(PX.char(look, 0, 0), 0, 0, 16 * scale, 28 * scale); };
 
   // ================================================================ multiplayer connection
   const net = {
@@ -199,13 +171,13 @@
     garden()[m.i] = m.plot;
     const tile = WD.plots[m.i];
     if (m.by === v.id) {
-      if (m.act === 'plant') { const c = m.plot.c; v.seeds[c] = Math.max(0, (v.seeds[c] || 0) - 1); quest('plant'); TG.sfx.snap(); floatAt(tile, '🌱', '#12B76A'); reward(0, 2); }
-      if (m.act === 'water') { v.water = Math.max(0, v.water - 1); quest('water'); if (m.helped) quest('help'); TG.sfx.pour(0.4); floatAt(tile, m.helped ? '💧 +3 XP 🤝' : '💧 +1 XP', '#2F6BFF'); reward(0, m.helped ? 3 : 1); }
+      if (m.act === 'plant') { const c = m.plot.c; v.seeds[c] = Math.max(0, (v.seeds[c] || 0) - 1); quest('plant'); TG.sfx.snap(); floatAt(tile, '+2 XP', '#94d260'); reward(0, 2); }
+      if (m.act === 'water') { v.water = Math.max(0, v.water - 1); quest('water'); if (m.helped) quest('help'); TG.sfx.pour(0.4); floatAt(tile, m.helped ? '+3 XP ♥' : '+1 XP', '#93d4f6'); reward(0, m.helped ? 3 : 1); }
       if (m.act === 'harvest') {
         const cr = R.CROPS[m.crop];
-        v.produce[m.crop] = (v.produce[m.crop] || 0) + 1; quest('harvest'); TG.sfx.good(); floatAt(tile, `${cr.e} +${cr.xp} XP`, '#DC8B05'); reward(0, cr.xp);
-        if (!v.seen[m.crop]) { v.seen[m.crop] = 1; factCard(cr.e, tx(cr.name), tx(cr.fact), L('Шинэ ургац!', 'New crop!')); }
-        else TG.toast(`${cr.e} ${tx(cr.name)} · 💡 ${tx(cr.fact)}`);
+        v.produce[m.crop] = (v.produce[m.crop] || 0) + 1; quest('harvest'); TG.sfx.good(); floatAt(tile, `+${cr.xp} XP`, '#f7c646'); reward(0, cr.xp);
+        if (!v.seen[m.crop]) { v.seen[m.crop] = 1; factCard('crop:' + m.crop, tx(cr.name), tx(cr.fact), L('Шинэ ургац!', 'New crop!')); }
+        else TG.toast(`${tx(cr.name)} · 💡 ${tx(cr.fact)}`);
       }
     } else if (m.planter === v.id && m.act === 'water') { TG.toast(`💧 ${m.byName} ${L('таны ургамлыг усаллаа!', 'watered your plant!')}`); }
     else if (m.planter === v.id && m.act === 'harvest') { reward(5, 5); TG.toast(`🧺 ${m.byName} ${L('таны тарьсныг хураалаа. Хамтын ургац +5 🪙', 'harvested your crop. Shared harvest +5 🪙')}`); }
@@ -213,13 +185,13 @@
   }
   function plotAction(i) {
     const v = V(), p = R.normalize(garden()[i], now());
-    if (!p) return seedPicker(i);
+    if (!p) return live.sel && V().seeds[live.sel] > 0 ? act('plant', i, live.sel) : seedPicker(i);
     if (R.mature(p)) return act('harvest', i);
     if (R.needsWater(p)) {
       if (v.water <= 0) { TG.sfx.bad(); return TG.toast('🪣 ' + L('Усны сав хоосон. Худгаас ус аваарай!', 'Your can is empty. Refill at the well!')); }
       return act('water', i);
     }
-    TG.toast(`${R.CROPS[p.c].e} ${tx(R.CROPS[p.c].name)} · ${L('ургаж байна', 'growing')} ${fmtLeft(R.stageLeft(p, now()))}` + (p.n ? ` · ${L('тарьсан', 'planted by')}: ${p.n}` : ''));
+    TG.toast(`${tx(R.CROPS[p.c].name)} · ${L('ургаж байна', 'growing')} ${fmtLeft(R.stageLeft(p, now()))}` + (p.n ? ` · ${L('тарьсан', 'planted by')}: ${p.n}` : ''));
   }
   const fmtLeft = (ms) => { const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}${L('с', 's')}`; };
 
@@ -228,19 +200,23 @@
     quests();
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
     const els = {
-      me: h('button', { class: 'v-me', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill', onclick: () => shopModal() }),
-      water: h('div', { class: 'v-pill' }), net: h('button', { class: 'v-pill v-net', onclick: () => roomModal() }),
-      ctx: h('button', { class: 'v-act hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
+      me: h('button', { class: 'v-me px-frame', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
+      water: h('div', { class: 'v-pill px-frame' }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
+      ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
+      hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Үр сонгох', 'Choose seeds') }),
+      music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
-        h('button', { class: 'icon-btn v-back', 'aria-label': 'back', onclick: () => TG.go('home') }, TG.icon('arrowLeft')),
+        h('button', { class: 'v-back px-frame', 'aria-label': 'back', onclick: () => TG.go('home') }, TG.icon('arrowLeft')),
         els.me, h('div', { class: 'v-pills' }, els.coins, els.water, els.net)),
       h('div', { class: 'v-bottom' },
-        h('button', { class: 'v-round', 'aria-label': 'bag', onclick: () => bag() }, '🎒'),
-        h('button', { class: 'v-round', 'aria-label': 'talk', onclick: () => talk() }, '💬'),
-        h('button', { class: 'v-round', 'aria-label': 'quests', onclick: () => questModal() }, '📜'),
-        h('div', { class: 'v-spacer' }), els.ctx));
+        h('div', { class: 'v-tools' },
+          h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
+          h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
+          h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
+          els.music),
+        els.hotbar, els.ctx));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -252,13 +228,14 @@
     live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, room: v.room,
       me: { x: sp.x, y: sp.y, px: sp.x, py: sp.y, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, stepSent: null },
       others: new Map(), held: null, pending: null, floaters: [], sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
-      raf: 0, last: performance.now(), view: {}, terrain: null, res: 0, ctxTimer: 0 };
+      raf: 0, last: performance.now(), view: {}, terrain: WD.renderStatic(), buf: PX.mk(1, 1), ctxTimer: 0, sel: null };
     resize();
-    document.fonts && document.fonts.ready.then(() => { if (live) live.terrain = WD.renderStatic(live.res); });
+    document.fonts && document.fonts.load('10px Tiny5', 'Нутаг ӨҮ');
     window.addEventListener('resize', resize);
     canvas.addEventListener('pointerdown', onTap);
     window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKeyUp);
     net.connect(); hud(); updateCtx();
+    live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
     live.raf = requestAnimationFrame(frame);
     if (!v.tips) tips();
     setCleanup(stop);
@@ -268,34 +245,45 @@
     cancelAnimationFrame(live.raf);
     window.removeEventListener('resize', resize); window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp);
     net.close();
+    if (live.unMusic) live.unMusic();
     const v = V(); if (v) { v.pos = { x: live.me.x, y: live.me.y }; S.save(); }
     live = null;
   }
   function resize() {
     if (!live) return;
-    const w = live.root.clientWidth || innerWidth, hh = live.root.clientHeight || innerHeight, dpr = Math.min(2, devicePixelRatio || 1);
-    live.canvas.width = Math.round(w * dpr); live.canvas.height = Math.round(hh * dpr);
-    const pref = w < 640 ? Math.max(1.35, w / (8.5 * T)) : Math.min(2.4, Math.max(1.5, w / (17 * T)));
-    const scale = Math.max(pref, w / (WD.W * T), hh / (WD.H * T));
-    live.view = { w, h: hh, dpr, scale };
-    const res = Math.min(2.5, Math.max(1, Math.round(scale * dpr * 2) / 2));
-    if (res !== live.res) { live.res = res; live.terrain = WD.renderStatic(res); }
+    const cssW = live.root.clientWidth || innerWidth, cssH = live.root.clientHeight || innerHeight, dpr = Math.min(3, devicePixelRatio || 1);
+    const devW = Math.round(cssW * dpr), devH = Math.round(cssH * dpr);
+    live.canvas.width = devW; live.canvas.height = devH;
+    let k = Math.max(1, Math.round(devW / ((cssW < 640 ? 11 : 24) * T)));
+    k = Math.max(k, Math.ceil(devW / (WD.W * T)), Math.ceil(devH / (WD.H * T)));
+    const bw = Math.ceil(devW / k), bh = Math.ceil(devH / k);
+    live.buf.c.width = bw; live.buf.c.height = bh; live.buf.x.imageSmoothingEnabled = false;
+    live.view = { devW, devH, dpr, k, bw, bh, cssW };
   }
   function cam() {
-    const { w, h: hh, scale } = live.view;
-    return { x: clamp((live.me.px + 0.5) * T * scale - w / 2, 0, WD.W * T * scale - w), y: clamp((live.me.py + 0.5) * T * scale - hh / 2, 0, WD.H * T * scale - hh) };
+    const { bw, bh } = live.view;
+    return { x: clamp(Math.round(live.me.px * T + 8 - bw / 2), 0, WD.W * T - bw), y: clamp(Math.round(live.me.py * T + 4 - bh / 2), 0, WD.H * T - bh) };
   }
 
   // ---------------------------------------------------------------- HUD
   function hud() {
     if (!live) return;
     const v = V(), L1 = R.level(v.xp), e = live.els;
-    e.me.replaceChildren(h('span', { class: 'v-lvl' }, L1.l), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } }))));
-    e.coins.textContent = `🪙 ${v.coins}`;
-    e.water.textContent = `💧 ${v.water}/${v.can}`;
+    e.me.replaceChildren(portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
+    e.coins.replaceChildren(pic('ui:coin', 20), h('span', null, v.coins));
+    e.water.replaceChildren(pic('ui:drop', 20), h('span', null, `${v.water}/${v.can}`));
     const n = live.others.size + 1;
-    e.net.className = 'v-pill v-net ' + live.status;
-    e.net.textContent = live.status === 'online' ? `🟢 ${n} · ${live.room}` : live.status === 'solo' ? `⚪ ${L('Ганцаараа', 'Solo')}` : `🟡 ${L('Холбогдож байна', 'Connecting')}`;
+    e.net.className = 'v-pill px-frame v-net ' + live.status;
+    e.net.textContent = live.status === 'online' ? `● ${n} · ${live.room}` : live.status === 'solo' ? `○ ${L('Ганцаараа', 'Solo')}` : `◌ ${L('Холбогдож…', 'Connecting…')}`;
+    hotbar();
+    if (TG.music) { e.music.classList.toggle('hidden', !TG.music.available); e.music.textContent = TG.music.playing ? '♪' : '♪̸'; e.music.classList.toggle('off', !TG.music.playing); e.music.title = TG.music.title; }
+  }
+  function hotbar() {
+    const v = V(), owned = Object.keys(R.CROPS).filter((k) => v.seeds[k] > 0);
+    if (live.sel && !(v.seeds[live.sel] > 0)) live.sel = null;
+    live.els.hotbar.replaceChildren(...(owned.length ? owned.map((k) => h('button', { class: 'v-slot-btn' + (live.sel === k ? ' sel' : ''), title: tx(R.CROPS[k].name), 'aria-pressed': live.sel === k ? 'true' : 'false',
+      onclick: () => { live.sel = live.sel === k ? null : k; TG.sfx.tap(); hotbar(); updateCtx(); } }, pic('crop:' + k, 28), h('small', null, v.seeds[k])))
+      : [h('button', { class: 'v-slot-btn empty', onclick: () => shopModal('seeds') }, pic('ui:seed', 28), h('small', null, '+'))]));
   }
   function contextAction() {
     if (!live) return null;
@@ -308,22 +296,28 @@
   }
   function labelFor(a) {
     switch (a.type) {
-      case 'plot': { const p = R.normalize(garden()[a.i], now()); if (!p) return ['🌱', L('Тарих', 'Plant')]; if (R.mature(p)) return [R.CROPS[p.c].e, L('Хураах', 'Harvest')]; if (R.needsWater(p)) return ['💧', L('Услах', 'Water')]; return ['⏳', fmtLeft(R.stageLeft(p, now()))]; }
-      case 'home': return ['👗', L('Хувцаслах', 'Wardrobe')];
-      case 'arcade': return ['🎮', L('Тоглох', 'Play')];
-      case 'shop': return ['🛒', L('Дэлгүүр', 'Shop')];
-      case 'board': return ['📜', L('Даалгавар', 'Quests')];
-      case 'well': return ['🪣', L('Ус авах', 'Get water')];
-      case 'fish': return ['🎣', L('Загасчлах', 'Fish')];
-      case 'sheep': return ['🤍', L('Илбэх', 'Pet')];
+      case 'plot': {
+        const p = R.normalize(garden()[a.i], now());
+        if (!p) return live.sel ? ['crop:' + live.sel, L('Тарих', 'Plant')] : ['ui:seed', L('Тарих', 'Plant')];
+        if (R.mature(p)) return ['crop:' + p.c, L('Хураах', 'Harvest')];
+        if (R.needsWater(p)) return ['ui:drop', L('Услах', 'Water')];
+        return ['crop:' + p.c, fmtLeft(R.stageLeft(p, now()))];
+      }
+      case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
+      case 'arcade': return ['ui:play', L('Тоглох', 'Play')];
+      case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
+      case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
+      case 'well': return ['ui:drop', L('Ус авах', 'Get water')];
+      case 'fish': return ['ui:fish', L('Загасчлах', 'Fish')];
+      case 'sheep': return ['ui:heart', L('Илбэх', 'Pet')];
     }
-    return ['', ''];
+    return ['ui:star', ''];
   }
   function updateCtx() {
     if (!live) return;
     const a = contextAction(), b = live.els.ctx;
     b.classList.toggle('hidden', !a);
-    if (a) { const [e, t] = labelFor(a); b.replaceChildren(h('span', { class: 'v-act-e' }, e), h('span', null, t)); }
+    if (a) { const [k, t] = labelFor(a); b.replaceChildren(pic(k, 36), h('span', null, t)); }
   }
   function doAction(a) {
     if (!a || !live) return;
@@ -333,7 +327,7 @@
       case 'arcade': return arcade();
       case 'shop': return shopModal();
       case 'board': return questModal();
-      case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `💧 ${v.water}/${v.can}`, '#2F6BFF'); hud(); return; }
+      case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `${v.water}/${v.can}`, '#93d4f6'); hud(); return; }
       case 'fish': return fishing();
       case 'sheep': return petSheep(a.s);
     }
@@ -343,9 +337,10 @@
   function onTap(e) {
     if (!live) return;
     e.preventDefault();
-    const r = live.canvas.getBoundingClientRect(), c = cam(), s = live.view.scale;
-    const wx = (e.clientX - r.left + c.x) / s / T, wy = (e.clientY - r.top + c.y) / s / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
-    for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.7 && wy < o.py + 1) return playerCard(o);
+    const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
+    const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
+    const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
     if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
     const pi = WD.plotAt(tx0, ty0); if (pi >= 0) return goTo({ x: tx0, y: ty0 }, { type: 'plot', i: pi });
@@ -417,115 +412,101 @@
   }
 
   function draw(t) {
-    const ctx = live.ctx, { w, h: hh, dpr, scale } = live.view, c = cam(), nowMs = now(), pn = performance.now();
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#86BF5D'; ctx.fillRect(0, 0, w, hh);
-    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, -c.x * dpr, -c.y * dpr);
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(live.terrain, 0, 0, WD.W * T, WD.H * T);
-    const x0 = Math.max(0, Math.floor(c.x / scale / T) - 1), x1 = Math.min(WD.W - 1, Math.ceil((c.x + w) / scale / T) + 1);
-    const y0 = Math.max(0, Math.floor(c.y / scale / T) - 1), y1 = Math.min(WD.H - 1, Math.ceil((c.y + hh) / scale / T) + 1);
-    // water shimmer
-    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1.4;
+    const ctx = live.ctx, b = live.buf.x, { devW, devH, dpr, k, bw, bh } = live.view, c = cam(), nowMs = now(), pn = performance.now();
+    b.clearRect(0, 0, bw, bh);
+    b.drawImage(live.terrain, -c.x, -c.y);
+    const x0 = Math.max(0, Math.floor(c.x / T)), x1 = Math.min(WD.W - 1, Math.ceil((c.x + bw) / T)), y0 = Math.max(0, Math.floor(c.y / T)), y1 = Math.min(WD.H - 1, Math.ceil((c.y + bh) / T));
+    // water sparkle (2 frames, pixel accurate)
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       if (WD.g[y][x] !== 'w') continue;
-      const ph = (t * 0.8 + WD.hash(x, y) * 6) % 3; if (ph > 1) continue;
-      const X = x * T + 6 + WD.hash(y, x) * 14, Y = y * T + 10 + WD.hash(x + 1, y) * 14;
-      ctx.globalAlpha = Math.sin(ph * Math.PI); ctx.beginPath(); ctx.moveTo(X, Y); ctx.quadraticCurveTo(X + 4, Y - 2, X + 8, Y); ctx.stroke();
+      const ph = (t * 0.9 + WD.hash(x, y) * 7) % 3; if (ph > 1.2) continue;
+      const X = x * T - c.x + 3 + Math.floor(WD.hash(y, x) * 9), Y = y * T - c.y + 4 + Math.floor(WD.hash(x + 1, y) * 9);
+      PX.R(b, X, Y, ph < 0.6 ? 3 : 2, 1, ph < 0.6 ? PX.K.foam : PX.K.waterL);
     }
-    ctx.globalAlpha = 1;
     // crops
     const gd = garden();
-    for (let i = 0; i < R.PLOTS; i++) drawPlot(ctx, i, R.normalize(gd[i], nowMs), t);
-    // characters (depth sorted)
-    const ents = [];
-    live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { ctx.save(); ctx.translate(q.px * T + 16, q.py * T + 26); if (q.flip) ctx.scale(-1, 1); ctx.font = '20px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('🐑', 0, 0); ctx.restore(); } }));
-    const person = (o, isMe) => {
-      ents.push({ y: o.petPos.y, f: () => drawPet(ctx, o.look.pet, o.petPos, o.px > o.petPos.x + 0.05, t) });
-      ents.push({ y: o.py, f: () => drawAvatar(ctx, o.px * T + 16, o.py * T + 28, o.look, o.dir, t, o.moving) });
-    };
-    for (const o of live.others.values()) person(o, false);
-    const v = V(); person({ ...live.me, look: v.look }, true);
-    ents.sort((a, b) => a.y - b.y).forEach((e) => e.f());
-    // name tags and speech bubbles
-    for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn);
-    labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn);
-    // floating text
-    live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
-    for (const f of live.floaters) {
-      const k = (pn - f.t0) / 1400;
-      if (f.ring) { ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(f.x * T + 16, f.y * T + 24, 6 + k * 8, 3 + k * 4, 0, 0, Math.PI * 2); ctx.stroke(); continue; }
-      ctx.globalAlpha = 1 - k; ctx.font = '800 11px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.lineWidth = 3; ctx.strokeStyle = '#fff'; ctx.strokeText(f.text, f.x * T + 16, f.y * T - 4 - k * 18); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x * T + 16, f.y * T - 4 - k * 18);
-      ctx.globalAlpha = 1;
+    for (let i = 0; i < R.PLOTS; i++) {
+      const p = R.normalize(gd[i], nowMs); if (!p) continue;
+      const { x, y } = WD.plots[i], X = x * T - c.x, Y = y * T - c.y;
+      if (X < -16 || Y < -16 || X > bw || Y > bh) continue;
+      PX.crop(b, X, Y, p.c, p.s, !!p.w, R.mature(p) && ((t * 1.6 + i * 0.37) % 2) < 0.35);
+      if (R.needsWater(p)) PX.drop(b, X + 11, Y - 5 + (Math.floor(t * 3 + i) % 2));
     }
-    // evening light
+    // characters, depth sorted
+    const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
+    const shadow = (X, Y) => PX.ell(b, X + 8, Y + 14, 5, 1, 'rgba(30,20,10,.25)');
+    live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { const X = Math.round(q.px * T) - c.x, Y = Math.round(q.py * T) - c.y; shadow(X, Y); blit(b, PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), X, Y + 2, q.flip); } }));
+    const person = (o) => {
+      if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const X = Math.round(o.petPos.x * T) - c.x, Y = Math.round(o.petPos.y * T) - c.y, a = PX.animal(o.look.pet, frame(o)); shadow(X - 2, Y - 1); blit(b, a, X + 2, Y + 16 - a.height, o.px > o.petPos.x + 0.05); } });
+      ents.push({ y: o.py, f: () => { const X = Math.round(o.px * T) - c.x, Y = Math.round(o.py * T) - c.y; shadow(X, Y); b.drawImage(PX.char(o.look, o.dir, frame(o)), X, Y - 12); } });
+    };
+    for (const o of live.others.values()) person(o);
+    const v = V(); person({ ...live.me, look: v.look });
+    ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
+    // evening: dark tint + stepped lantern glow
     const hr = new Date().getHours();
     if (hr >= 19 || hr < 6) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = 'rgba(16,24,70,.28)'; ctx.fillRect(0, 0, w, hh);
-      ctx.globalCompositeOperation = 'lighter';
-      for (const o of WD.objects.filter((q) => q.kind === 'lantern')) {
-        const sx = (o.x * T + 16) * scale - c.x, sy = (o.y * T - 4) * scale - c.y, rad = 70 * scale;
-        const gr = ctx.createRadialGradient(sx, sy, 0, sx, sy, rad); gr.addColorStop(0, 'rgba(255,200,90,.35)'); gr.addColorStop(1, 'rgba(255,200,90,0)');
-        ctx.fillStyle = gr; ctx.fillRect(sx - rad, sy - rad, rad * 2, rad * 2);
-      }
-      ctx.globalCompositeOperation = 'source-over';
+      b.fillStyle = 'rgba(18,22,70,.38)'; b.fillRect(0, 0, bw, bh);
+      b.globalCompositeOperation = 'lighter';
+      for (const o of WD.objects.filter((q) => q.kind === 'lantern')) { const X = o.x * T + 8 - c.x, Y = o.y * T - 6 - c.y; PX.ell(b, X, Y, 26, 20, 'rgba(255,200,110,.10)'); PX.ell(b, X, Y, 15, 12, 'rgba(255,200,110,.14)'); PX.ell(b, X, Y, 6, 5, 'rgba(255,220,140,.2)'); }
+      b.globalCompositeOperation = 'source-over';
+    }
+    // upscale with crisp pixels
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(live.buf.c, 0, 0, bw * k, bh * k);
+    // text layer (pixel font, screen space)
+    const S = (wx, wy) => [(wx - c.x) * k, (wy - c.y) * k];
+    for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
+    labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
+    live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
+    for (const f of live.floaters) {
+      const q = (pn - f.t0) / 1400, [sx, sy] = S(f.x * T + 8, f.y * T + 10);
+      if (f.ring) { ctx.strokeStyle = `rgba(255,255,255,${1 - q})`; ctx.lineWidth = Math.max(2, k); ctx.strokeRect(Math.round(sx - (4 + q * 6) * k), Math.round(sy - (2 + q * 2) * k), Math.round((8 + q * 12) * k), Math.round((4 + q * 4) * k)); continue; }
+      pixelText(ctx, f.text, sx, sy - (8 + q * 14) * k, textSize(), f.color, 1 - q);
     }
   }
-  function drawPlot(ctx, i, p, t) {
-    if (!p) return;
-    const { x, y } = WD.plots[i], X = x * T, Y = y * T, cx = X + 16, cy = Y + 20, cr = R.CROPS[p.c];
-    if (p.w && p.s < 3) { ctx.fillStyle = 'rgba(60,32,14,.32)'; ctx.fillRect(X + 1, Y + 1, T - 2, T - 2); }
-    const leaf = (lx, ly, rx, ry, rot, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(lx, ly, rx, ry, rot, 0, Math.PI * 2); ctx.fill(); };
-    const sway = Math.sin(t * 2 + i) * 0.08;
-    if (p.s === 0) [[-5, 2], [0, -2], [5, 3]].forEach(([dx, dy]) => WD.circle(ctx, cx + dx, cy + dy, 1.8, '#5A3A22'));
-    if (p.s >= 1) { ctx.strokeStyle = '#3E8E3A'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy + 5); ctx.lineTo(cx, cy - (p.s === 1 ? 2 : 6)); ctx.stroke(); }
-    if (p.s === 1) { leaf(cx - 3, cy - 2, 3.4, 1.8, -0.5 + sway, '#5DB04A'); leaf(cx + 3, cy - 2, 3.4, 1.8, 0.5 + sway, '#5DB04A'); }
-    if (p.s >= 2) { leaf(cx - 5, cy, 5, 2.4, -0.4 + sway, '#4E9F3D'); leaf(cx + 5, cy, 5, 2.4, 0.4 + sway, '#4E9F3D'); leaf(cx - 4, cy - 5, 4, 2, -0.7 + sway, '#5DB04A'); leaf(cx + 4, cy - 5, 4, 2, 0.7 + sway, '#5DB04A'); }
-    if (p.s === 2) WD.circle(ctx, cx, cy - 8, 2.4, cr.color);
-    if (p.s >= 3) {
-      const bob = Math.sin(t * 3 + i) * 1.2;
-      if (p.c === 'seabuckthorn') { ctx.strokeStyle = '#8B5A2B'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(cx, cy + 4); ctx.lineTo(cx, cy - 12); ctx.moveTo(cx, cy - 4); ctx.lineTo(cx - 7, cy - 10); ctx.moveTo(cx, cy - 6); ctx.lineTo(cx + 7, cy - 12); ctx.stroke(); [[-6, -9], [-4, -6], [5, -11], [7, -8], [1, -12], [-1, -8], [2, -5]].forEach(([dx, dy]) => WD.circle(ctx, cx + dx, cy + dy + bob * 0.3, 2.1, '#F79009')); }
-      else { ctx.font = '17px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(cr.e, cx, cy - 8 + bob); }
-      const sp = (t * 1.5 + i * 0.37) % 2; if (sp < 1) { ctx.fillStyle = `rgba(255,255,255,${Math.sin(sp * Math.PI)})`; ctx.font = '9px serif'; ctx.fillText('✨', X + 26, Y + 6); }
-    }
-    if (R.needsWater(p)) { const by = Y + 3 + Math.sin(t * 3 + i) * 1.5; WD.circle(ctx, X + 25, by, 6, 'rgba(255,255,255,.92)'); ctx.font = '8px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💧', X + 25, by + 0.5); }
+  const textSize = () => 5 * Math.max(2, live.view.k); // Tiny5 is drawn on a 5-pixel grid
+  function blit(b, img, X, Y, flip) { if (!flip) return b.drawImage(img, X, Y); b.save(); b.translate(X + img.width, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); }
+  function pixelText(ctx, text, x, y, size, color, alpha = 1, outline = '#2b1e2e') {
+    const fs = Math.max(10, Math.round(size / 5) * 5), o = Math.max(1, Math.round(fs / 10));
+    ctx.save(); ctx.globalAlpha = alpha; ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = outline; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]]) ctx.fillText(text, Math.round(x) + dx, Math.round(y) + dy);
+    ctx.fillStyle = color; ctx.fillText(text, Math.round(x), Math.round(y)); ctx.restore();
   }
-  function labels(ctx, o, name, level, isMe, pn) {
-    const x = o.px * T + 16, y = o.py * T - 21;
-    ctx.font = '800 8.5px Nunito, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const tw = ctx.measureText(name).width + 22;
-    WD.rr(ctx, x - tw / 2, y - 6.5, tw, 13, 6.5); ctx.fillStyle = isMe ? 'rgba(47,107,255,.92)' : 'rgba(20,27,45,.72)'; ctx.fill();
-    WD.circle(ctx, x - tw / 2 + 6.5, y, 5, '#FDB022'); ctx.fillStyle = '#3A2600'; ctx.font = '900 7px Nunito, sans-serif'; ctx.fillText(level, x - tw / 2 + 6.5, y + 0.3);
-    ctx.fillStyle = '#fff'; ctx.font = '800 8.5px Nunito, sans-serif'; ctx.fillText(name, x + 5, y + 0.3);
-    if (o.bubble) {
-      const age = (pn - o.bubble.t0) / 1000;
-      if (age > 4.5) { o.bubble = null; return; }
-      ctx.globalAlpha = age > 3.9 ? (4.5 - age) / 0.6 : 1;
-      ctx.font = '800 10px Nunito, sans-serif';
-      const bw = ctx.measureText(o.bubble.text).width + 16, by = y - 26;
-      ctx.fillStyle = 'rgba(20,27,45,.15)'; WD.rr(ctx, x - bw / 2, by + 1.5, bw, 18, 9); ctx.fill();
-      ctx.fillStyle = '#fff'; WD.rr(ctx, x - bw / 2, by, bw, 18, 9); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(x - 4, by + 17); ctx.lineTo(x, by + 22); ctx.lineTo(x + 4, by + 17); ctx.fill();
-      ctx.fillStyle = '#141B2D'; ctx.fillText(o.bubble.text, x, by + 9.5);
-      ctx.globalAlpha = 1;
-    }
+  function labels(ctx, o, name, level, isMe, pn, S, dpr) {
+    const [x, y] = S(o.px * T + 8, o.py * T - 16), fs = textSize(), u = Math.max(1, Math.round(fs / 10));
+    ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const text = `${level} ${name}`, tw = Math.ceil(ctx.measureText(text).width) + fs, th = fs + u * 4, X = Math.round(x - tw / 2), Y = Math.round(y - th / 2);
+    ctx.fillStyle = '#2b1e2e'; ctx.fillRect(X - u, Y - u, tw + u * 2, th + u * 2);
+    ctx.fillStyle = isMe ? '#3f76db' : '#5a3a22'; ctx.fillRect(X, Y, tw, th);
+    ctx.fillStyle = isMe ? '#7fa6ee' : '#8a5a33'; ctx.fillRect(X, Y, tw, u);
+    ctx.fillStyle = '#ffffff'; ctx.fillText(text, Math.round(x), Math.round(y + u / 2));
+    if (!o.bubble) return;
+    const age = (pn - o.bubble.t0) / 1000;
+    if (age > 4.5) { o.bubble = null; return; }
+    ctx.save(); ctx.globalAlpha = age > 3.9 ? (4.5 - age) / 0.6 : 1;
+    const bw2 = Math.ceil(ctx.measureText(o.bubble.text).width) + fs * 1.4, bh2 = fs + u * 8, BX = Math.round(x - bw2 / 2), BY = Math.round(Y - bh2 - u * 8);
+    ctx.fillStyle = '#2b1e2e'; ctx.fillRect(BX - u, BY - u, bw2 + u * 2, bh2 + u * 2); ctx.fillRect(Math.round(x - u * 3), BY + bh2, u * 6, u * 3); ctx.fillRect(Math.round(x - u), BY + bh2 + u * 3, u * 2, u * 2);
+    ctx.fillStyle = '#fff8e6'; ctx.fillRect(BX, BY, bw2, bh2); ctx.fillRect(Math.round(x - u * 2), BY + bh2, u * 4, u * 2);
+    ctx.fillStyle = '#2b1e2e'; ctx.fillText(o.bubble.text, Math.round(x), Math.round(BY + bh2 / 2 + u / 2));
+    ctx.restore();
   }
-  function floatAt(p, text, color) { if (live) live.floaters.push({ x: p.x !== undefined ? (p.px !== undefined ? p.px : p.x) : 0, y: p.py !== undefined ? p.py : p.y, text, color, t0: performance.now() }); }
+  function floatAt(p, text, color) { if (live) live.floaters.push({ x: p.px !== undefined ? p.px : p.x, y: p.py !== undefined ? p.py : p.y, text, color, t0: performance.now() }); }
 
   // ================================================================ panels
-  const icon = (e) => h('span', { class: 'v-ic' }, e);
-  function factCard(e, title, fact, head) {
-    const close = TG.modal(h('div', { class: 'center v-fact' }, h('div', { class: 'v-fact-e' }, e), head ? h('div', { class: 'eyebrow' }, head) : null, h('h2', null, title),
+  const icon = (k) => h('span', { class: 'v-ic' }, String(k).includes(':') ? pic(k, 32) : k);
+  function factCard(key, title, fact, head) {
+    const close = TG.modal(h('div', { class: 'center v-fact' }, h('div', { class: 'v-fact-e' }, pic(key, 72)), head ? h('div', { class: 'eyebrow' }, head) : null, h('h2', null, title),
       h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, fact)),
       h('button', { class: 'btn primary block', style: { marginTop: '14px' }, onclick: () => close() }, L('Гайхалтай!', 'Cool!'))));
   }
   function seedPicker(i) {
     const v = V(), owned = Object.entries(R.CROPS).filter(([k]) => v.seeds[k] > 0);
     const close = TG.modal(h('div', null,
-      h('h2', null, '🌱 ', L('Юу тарих вэ?', 'What to plant?')),
+      h('h2', null, L('Юу тарих вэ?', 'What to plant?')),
       h('p', { class: 'muted' }, L('Тарьсан ургамлаа 3 удаа услах хэрэгтэй. Найзууд чинь ч усалж туслах боломжтой!', 'Plants need water 3 times. Your friends can help water too!')),
       owned.length ? h('div', { class: 'v-grid' }, owned.map(([k, c]) => h('button', { class: 'v-card', onclick: () => { close(); act('plant', i, k); } },
-        h('span', { class: 'v-card-e' }, c.e), h('b', null, tx(c.name)), h('small', null, `×${v.seeds[k]} · ${c.stage * 3}${L('с', 's')}`))))
+        h('span', { class: 'v-card-e' }, pic('crop:' + k, 40)), h('b', null, tx(c.name)), h('small', null, `×${v.seeds[k]} · ${c.stage * 3}${L('с', 's')}`))))
         : h('div', { class: 'empty-memory' }, h('p', null, L('Танд үр алга. Дэлгүүрээс аваарай!', "You don't have seeds. Get some at the shop!")),
           h('button', { class: 'btn primary', onclick: () => { close(); shopModal('seeds'); } }, '🛒 ', L('Дэлгүүр', 'Shop')))));
   }
@@ -533,7 +514,7 @@
   function shopModal(start) {
     const v = V(); let cur = start || 'seeds';
     const body = h('div', { class: 'v-shop' });
-    const TABS = [['seeds', '🌱', L('Үр', 'Seeds')], ['wear', '👕', L('Хувцас', 'Clothes')], ['pet', '🐾', L('Тэжээвэр', 'Pets')], ['tool', '🛠️', L('Багаж', 'Tools')], ['sell', '💰', L('Зарах', 'Sell')]];
+    const TABS = [['seeds', 'ui:seed', L('Үр', 'Seeds')], ['wear', 'deel:red', L('Хувцас', 'Clothes')], ['pet', 'pet:lamb', L('Тэжээвэр', 'Pets')], ['tool', 'tool:can-2', L('Багаж', 'Tools')], ['sell', 'ui:coin', L('Зарах', 'Sell')]];
     const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
     const ownedItem = (it) => (it.cat === 'tool' ? (it.slot === 'can' ? v.can >= it.val : v.rod >= it.val) : v.owned.includes(it.id));
     const draw = () => {
@@ -541,34 +522,34 @@
       let list;
       if (cur === 'seeds') list = Object.entries(R.CROPS).map(([k, c]) => {
         const locked = level < c.lvl;
-        return h('div', { class: 'v-row' + (locked ? ' locked' : '') }, icon(c.e), h('div', { class: 'v-row-b' }, h('b', null, tx(c.name)), h('small', null, `${L('Зарах үнэ', 'Sells for')} ${c.sell} 🪙 · ${L('Танд', 'You have')} ${v.seeds[k] || 0}`)),
+        return h('div', { class: 'v-row' + (locked ? ' locked' : '') }, icon('crop:' + k), h('div', { class: 'v-row-b' }, h('b', null, tx(c.name)), h('small', null, `${L('Зарах үнэ', 'Sells for')} ${c.sell} · ${L('Танд', 'You have')} ${v.seeds[k] || 0}`)),
           locked ? h('span', { class: 'v-lock' }, '🔒 ', L('Түвшин', 'Lv'), ' ', c.lvl) : h('div', { class: 'v-buy' },
-            h('button', { class: 'btn sm', onclick: () => { if (pay(c.cost)) { v.seeds[k] = (v.seeds[k] || 0) + 1; save(); } } }, `+1 · ${c.cost}🪙`),
-            h('button', { class: 'btn sm primary', onclick: () => { if (pay(c.cost * 5)) { v.seeds[k] = (v.seeds[k] || 0) + 5; save(); } } }, `+5 · ${c.cost * 5}🪙`)));
+            h('button', { class: 'btn sm', onclick: () => { if (pay(c.cost)) { v.seeds[k] = (v.seeds[k] || 0) + 1; save(); } } }, `+1 · ${c.cost}`, pic('ui:coin', 14)),
+            h('button', { class: 'btn sm primary', onclick: () => { if (pay(c.cost * 5)) { v.seeds[k] = (v.seeds[k] || 0) + 5; save(); } } }, `+5 · ${c.cost * 5}`, pic('ui:coin', 14))));
       });
       else if (cur === 'sell') {
-        const goods = [...Object.entries(v.produce).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'produce', e: R.CROPS[k].e, name: R.CROPS[k].name, price: R.CROPS[k].sell })),
-          ...Object.entries(v.fish).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'fish', e: R.FISH[k].e, name: R.FISH[k].name, price: R.FISH[k].sell }))];
+        const goods = [...Object.entries(v.produce).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'produce', e: 'crop:' + k, name: R.CROPS[k].name, price: R.CROPS[k].sell })),
+          ...Object.entries(v.fish).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'fish', e: 'fish:' + k, name: R.FISH[k].name, price: R.FISH[k].sell }))];
         const sell = (g, n) => { v[g.kind][g.k] -= n; v.coins += g.price * n; quest('sell', n); TG.sfx.chime(); save(); };
-        list = goods.length ? [h('button', { class: 'btn primary block', onclick: () => goods.forEach((g) => sell(g, g.n)) }, `💰 ${L('Бүгдийг зарах', 'Sell everything')} · +${goods.reduce((s, g) => s + g.n * g.price, 0)}🪙`),
-          ...goods.map((g) => h('div', { class: 'v-row' }, icon(g.e), h('div', { class: 'v-row-b' }, h('b', null, `${tx(g.name)} ×${g.n}`), h('small', null, `${g.price} 🪙 ${L('ширхэг бүр', 'each')}`)),
+        list = goods.length ? [h('button', { class: 'btn primary block', onclick: () => goods.forEach((g) => sell(g, g.n)) }, `${L('Бүгдийг зарах', 'Sell everything')} · +${goods.reduce((s, g) => s + g.n * g.price, 0)}`, pic('ui:coin', 16)),
+          ...goods.map((g) => h('div', { class: 'v-row' }, icon(g.e), h('div', { class: 'v-row-b' }, h('b', null, `${tx(g.name)} ×${g.n}`), h('small', null, `${g.price} ${L('зоос, ширхэг бүр', 'coins each')}`)),
             h('button', { class: 'btn sm', onclick: () => sell(g, 1) }, `${L('Зарах', 'Sell')} 1`)))]
           : [h('div', { class: 'empty-memory' }, h('p', null, L('Зарах зүйл алга. Ургац хурааж, загас бариарай!', 'Nothing to sell yet. Harvest crops or catch fish!')))];
       } else list = R.ITEMS.filter((it) => it.cat === cur).map((it) => {
         const owned = ownedItem(it), locked = level < it.lvl, worn = it.cat !== 'tool' && v.look[it.slot] === it.val;
-        return h('div', { class: 'v-row' + (locked && !owned ? ' locked' : '') }, icon(it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name)), h('small', null, owned ? (worn ? L('Өмссөн', 'Wearing') : L('Танд байгаа', 'Owned')) : `${it.price} 🪙`)),
+        return h('div', { class: 'v-row' + (locked && !owned ? ' locked' : '') }, icon(itemKey(it)), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name)), h('small', null, owned ? (worn ? L('Өмссөн', 'Wearing') : L('Танд байгаа', 'Owned')) : `${it.price} ${L('зоос', 'coins')}`)),
           owned ? (it.cat === 'tool' ? h('span', { class: 'v-owned' }, '✓') : h('button', { class: 'btn sm' + (worn ? ' done' : ''), onclick: () => equip(it.slot, worn && it.slot !== 'deel' ? null : it.val, draw) }, worn ? (it.slot === 'deel' ? '✓' : L('Тайлах', 'Remove')) : L('Өмсөх', 'Wear')))
             : locked ? h('span', { class: 'v-lock' }, '🔒 ', L('Түвшин', 'Lv'), ' ', it.lvl)
               : h('button', { class: 'btn sm primary', onclick: () => {
                 if (!pay(it.price)) return;
                 if (it.cat === 'tool') { if (it.slot === 'can') { v.can = it.val; v.water = it.val; } else v.rod = it.val; }
                 else { v.owned.push(it.id); v.look[it.slot] = it.val; sendLook(); }
-                TG.toast(`${it.e} ${tx(it.name)}: ${L('худалдаж авлаа!', 'purchased!')}`); save();
-              } }, `${it.price} 🪙`));
+                TG.toast(`${tx(it.name)}: ${L('худалдаж авлаа!', 'purchased!')}`); save();
+              } }, `${it.price}`, pic('ui:coin', 14)));
       });
       body.replaceChildren(
-        h('div', { class: 'v-shop-head' }, h('h2', null, '🛒 ', L('Наадмын дэлгүүр', 'Naadam Shop')), h('span', { class: 'v-pill dark' }, `🪙 ${v.coins}`)),
-        h('div', { class: 'chips v-tabs' }, TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, e, ' ', t))),
+        h('div', { class: 'v-shop-head' }, h('h2', null, L('Наадмын дэлгүүр', 'Naadam Shop')), h('span', { class: 'v-pill dark' }, pic('ui:coin', 18), ` ${v.coins}`)),
+        h('div', { class: 'chips v-tabs' }, TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, pic(e, 18), ' ', t))),
         h('div', { class: 'v-list' }, list));
     };
     const save = () => { S.save(); hud(); draw(); };
@@ -580,21 +561,23 @@
 
   function wardrobe() {
     const v = V(), body = h('div', { class: 'v-wardrobe' });
-    const cv = h('canvas', { class: 'v-preview', width: 240, height: 240 });
+    const cv = h('canvas', { class: 'v-preview', width: 160, height: 160 });
     let raf = 0;
     const paint = (ts) => {
-      const ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, 240, 240);
-      const gr = ctx.createRadialGradient(120, 130, 10, 120, 130, 120); gr.addColorStop(0, '#EEF3FF'); gr.addColorStop(1, '#FFFFFF'); ctx.fillStyle = gr; ctx.fillRect(0, 0, 240, 240);
-      ctx.setTransform(4, 0, 0, 4, 0, 0); drawAvatar(ctx, 30, 50, v.look, 0, ts / 1000, false);
-      if (v.look.pet) { ctx.font = '14px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(PET_E[v.look.pet], 47, 52); }
+      const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, 160, 160);
+      ctx.fillStyle = '#94d260'; ctx.fillRect(0, 112, 160, 48); ctx.fillStyle = '#9fd8f7'; ctx.fillRect(0, 0, 160, 112);
+      const f = Math.floor(ts / 600) % 4, dir = [0, 2, 3, 1][f];
+      ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(48, 140, 40, 8);
+      ctx.drawImage(PX.char(v.look, dir, 0), 36, 20, 64, 112);
+      if (v.look.pet) { const a = PX.animal(v.look.pet, Math.floor(ts / 300) % 2); ctx.drawImage(a, 104, 148 - a.height * 3, a.width * 3, a.height * 3); }
       raf = requestAnimationFrame(paint);
     };
     const slot = (title, s, items) => h('div', { class: 'v-slot' }, h('div', { class: 'label' }, title), h('div', { class: 'v-chips' },
       s !== 'deel' ? h('button', { class: 'v-chip' + (!v.look[s] ? ' active' : ''), onclick: () => equip(s, null, draw) }, '∅') : null,
-      items.map((it) => h('button', { class: 'v-chip' + (v.look[s] === it.val ? ' active' : ''), title: tx(it.name), onclick: () => equip(s, it.val, draw) }, it.e))));
+      items.map((it) => h('button', { class: 'v-chip' + (v.look[s] === it.val ? ' active' : ''), title: tx(it.name), onclick: () => equip(s, it.val, draw) }, pic(itemKey(it), 30)))));
     const draw = () => {
       const mine = (s) => R.ITEMS.filter((it) => it.slot === s && v.owned.includes(it.id));
-      body.replaceChildren(h('h2', null, '👗 ', L('Миний хувцас', 'My wardrobe')), cv,
+      body.replaceChildren(h('h2', null, L('Миний хувцас', 'My wardrobe')), cv,
         h('div', { class: 'v-slot' }, h('div', { class: 'label' }, L('Арьсны өнгө', 'Skin tone')), h('div', { class: 'v-chips' }, R.SKINS.map((sk) => h('button', { class: 'v-chip v-skin' + (v.look.skin === sk ? ' active' : ''), style: { background: sk }, 'aria-label': 'skin', onclick: () => equip('skin', sk, draw) })))),
         slot(L('Дээл', 'Deel'), 'deel', mine('deel')), slot(L('Малгай', 'Hat'), 'hat', mine('hat')), slot(L('Нүүр', 'Face'), 'face', mine('face')),
         slot(L('Хүзүү', 'Neck'), 'neck', mine('neck')), slot(L('Тэжээвэр', 'Pet'), 'pet', mine('pet')),
@@ -607,9 +590,9 @@
 
   function bag() {
     const v = V();
-    const sec = (title, obj, src) => { const items = Object.entries(obj).filter(([k, n]) => n > 0 && src[k]); return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, title), items.length ? h('div', { class: 'v-chips' }, items.map(([k, n]) => h('span', { class: 'v-chip wide' }, src[k].e, ` ${tx(src[k].name)} ×${n}`))) : h('p', { class: 'muted' }, '—')); };
+    const sec = (title, obj, src) => { const items = Object.entries(obj).filter(([k, n]) => n > 0 && src[k]); return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, title), items.length ? h('div', { class: 'v-chips' }, items.map(([k, n]) => h('span', { class: 'v-chip wide' }, pic((src === R.FISH ? 'fish:' : 'crop:') + k, 24), ` ${tx(src[k].name)} ×${n}`))) : h('p', { class: 'muted' }, '—')); };
     const L1 = R.level(v.xp);
-    const close = TG.modal(h('div', null, h('h2', null, '🎒 ', L('Цүнх', 'Bag')),
+    const close = TG.modal(h('div', null, h('h2', null, L('Цүнх', 'Bag')),
       h('div', { class: 'stat-cards' }, h('div', { class: 'stat' }, h('small', null, L('Түвшин', 'Level')), h('b', null, L1.l)), h('div', { class: 'stat' }, h('small', null, 'XP'), h('b', null, `${L1.cur}/${L1.need}`)), h('div', { class: 'stat' }, h('small', null, L('Зоос', 'Coins')), h('b', null, v.coins))),
       sec(L('Үр', 'Seeds'), v.seeds, R.CROPS), sec(L('Ургац', 'Harvest'), v.produce, R.CROPS), sec(L('Загас', 'Fish'), v.fish, R.FISH),
       h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, '👗 ', L('Хувцас', 'Wardrobe')), h('button', { class: 'btn primary', onclick: () => { close(); shopModal('sell'); } }, '💰 ', L('Зарах', 'Sell')))), { cls: 'v-modal' });
@@ -617,15 +600,15 @@
 
   function questModal() {
     const v = V(), body = h('div');
-    const draw = () => body.replaceChildren(h('h2', null, '📜 ', L('Өнөөдрийн даалгавар', "Today's quests")),
+    const draw = () => body.replaceChildren(h('h2', null, L('Өнөөдрийн даалгавар', "Today's quests")),
       h('p', { class: 'muted' }, L('Даалгавар өдөр бүр шинэчлэгдэнэ.', 'Quests refresh every day.')),
       h('div', { class: 'v-list' }, quests().map((q) => {
         const d = QUESTS[q.k], ready = q.p >= d.n && !q.done;
-        return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? '✅' : q.k === 'help' ? '🤝' : '📌'),
-          h('div', { class: 'v-row-b' }, h('b', null, tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c}🪙 +${d.x} XP`)),
+        return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? 'ui:star' : q.k === 'help' ? 'ui:heart' : 'ui:scroll'),
+          h('div', { class: 'v-row-b' }, h('b', null, tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
           ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; reward(d.c, d.x); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
       })),
-      h('button', { class: 'btn block', onclick: () => { close(); TG.go('missions'); } }, '🤝 ', L('Гэр бүлийн бодит даалгавар', 'Real-life family missions'), ' (+15🪙)'));
+      h('button', { class: 'btn block', onclick: () => { close(); TG.go('missions'); } }, L('Гэр бүлийн бодит даалгавар', 'Real-life family missions'), ' +15 ', pic('ui:coin', 14)));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
@@ -633,7 +616,7 @@
   function arcade() {
     const prof = S.active(), ag = S.ageGroupOf(prof.age);
     const games = TG.gameOrder.map((id) => TG.games[id]).filter((g) => g.ages.includes(ag)).slice(0, 8);
-    const close = TG.modal(h('div', null, h('h2', null, '🎮 ', L('Тоглоомын гэр', 'Game ger')),
+    const close = TG.modal(h('div', null, h('h2', null, L('Тоглоомын гэр', 'Game ger')),
       h('p', { class: 'muted' }, L('Тоглоом бүрээр зоос, XP цуглуулна. Гэр бүлтэйгээ хамт тогловол 1.5 дахин их!', 'Every game earns coins and XP. Play with family for 1.5× more!')),
       h('div', { class: 'v-grid' }, games.map((g) => h('button', { class: 'v-card', onclick: () => { close(); TG.launchGame(g); } }, h('span', { class: 'v-card-e' }, g.icon), h('b', null, tx(g.title))))),
       h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: () => { close(); TG.go('satis'); } }, '✨ ', L('Цэгцлэе! оньсого', 'Make it perfect! puzzles'))), { cls: 'v-modal' });
@@ -645,14 +628,14 @@
       else live.me.bubble = { text: k === 'e' ? R.EMOTES[i] : tx(R.PHRASES[i]), t0: performance.now() };
       close();
     };
-    const close = TG.modal(h('div', null, h('h2', null, '💬 ', L('Хэлэх үг', 'Say something')),
+    const close = TG.modal(h('div', null, h('h2', null, L('Хэлэх үг', 'Say something')),
       h('p', { class: 'muted' }, '🛡️ ', L('Хүүхдийн аюулгүй байдлын үүднээс зөвхөн бэлэн үг, эможи ашиглана.', 'For child safety, only friendly preset phrases and emoji are allowed.')),
       h('div', { class: 'v-phrases' }, R.PHRASES.map((p, i) => h('button', { class: 'v-chip wide', onclick: () => say('p', i) }, tx(p)))),
       h('div', { class: 'v-chips v-emotes' }, R.EMOTES.map((e, i) => h('button', { class: 'v-chip', onclick: () => say('e', i) }, e)))));
   }
 
   function playerCard(o) {
-    const close = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, PET_E[o.look.pet] || '🧑'), h('h2', null, o.name), h('p', { class: 'muted' }, `${L('Түвшин', 'Level')} ${o.lvl}`),
+    const close = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, portrait(o.look, 64)), h('h2', null, o.name), h('p', { class: 'muted' }, `${L('Түвшин', 'Level')} ${o.lvl}`),
       h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { net.send({ t: 'say', k: 'p', i: 0 }); close(); } }, '👋 ', L('Мэндлэх', 'Say hi')),
         h('button', { class: 'btn primary', onclick: () => { net.send({ t: 'say', k: 'p', i: 1 }); close(); } }, '🎮 ', L('Хамт тоглоё', "Let's play")))));
   }
@@ -667,10 +650,10 @@
       if (live.status !== 'solo') net.rejoin(); else TG.toast(L('Сервертэй холбогдоогүй тул ганцаараа горимд байна.', 'No server connection, so you are in solo mode.'));
     };
     const others = live ? [...live.others.values()] : [];
-    body.append(h('h2', null, '🏘️ ', L('Хамт тоглох өрөө', 'Play-together room')),
+    body.append(h('h2', null, L('Хамт тоглох өрөө', 'Play-together room')),
       live.status === 'online'
         ? h('div', null, h('p', { class: 'muted' }, L(`"${live.room}" өрөөнд ${others.length + 1} хүн байна. Ижил кодтой хүмүүс нэг нутагт тоглож, нэг цэцэрлэгт тарина.`, `${others.length + 1} people in room "${live.room}". Everyone with the same code shares one village and garden.`)),
-          h('div', { class: 'v-chips' }, h('span', { class: 'v-chip wide active' }, '⭐ ', live.name, ` (${L('та', 'you')})`), others.map((o) => h('span', { class: 'v-chip wide' }, PET_E[o.look.pet] || '🧑', ' ', o.name, ` · ${o.lvl}`))))
+          h('div', { class: 'v-chips' }, h('span', { class: 'v-chip wide active' }, portrait(V().look, 22), ' ', live.name, ` (${L('та', 'you')})`), others.map((o) => h('span', { class: 'v-chip wide' }, portrait(o.look, 22), ' ', o.name, ` · ${o.lvl}`))))
         : h('div', { class: 'hint' }, live.status === 'solo'
           ? L('Одоо ганцаараа горимд байна. Найзуудтайгаа хамт тоглохын тулд багш эсвэл эцэг эх компьютер дээр "node server.js" ажиллуулж, бүгд нэг Wi-Fi-аас тэр хаягаар нэвтэрнэ.', 'You are in solo mode. To play with friends, a teacher or parent runs "node server.js" on a computer and everyone on the same Wi-Fi opens its address.')
           : L('Холбогдож байна…', 'Connecting…')),
@@ -685,7 +668,7 @@
   function petSheep(s) {
     const m = live.me;
     if (Math.abs(s.x - m.x) > 1 || Math.abs(s.y - m.y) > 1) return TG.toast(L('Хонь холдчихлоо 🐑', 'The sheep wandered off 🐑'));
-    const v = V(); TG.sfx.chime(); floatAt({ x: s.px, y: s.py }, '❤️', '#F04438');
+    const v = V(); TG.sfx.chime(); floatAt({ x: s.px, y: s.py }, '♥', '#f492ba');
     const k = 'sheep' + s.i;
     if (!v.pets[k]) { v.pets[k] = 1; quest('pet'); reward(0, 2); TG.toast('🐑 ' + L('Хонь баярлалаа! +2 XP', 'The sheep is happy! +2 XP')); }
   }
@@ -697,9 +680,9 @@
     for (let i = 0; i < keys.length; i++) { r -= weights[i]; if (r <= 0) { key = keys[i]; break; } }
     const f = R.FISH[key], zoneH = v.rod > 1 ? 0.32 : 0.25, speed = [0, 0.32, 0.46, 0.6, 0.75][f.diff];
     let zone = 0.5 - zoneH / 2, vel = 0, fish = 0.5, target = 0.5, retarget = 1, prog = 0.4, holding = false, raf = 0, last = performance.now(), over = false, grace = 1.2;
-    const zoneEl = h('div', { class: 'fz' }), fishEl = h('div', { class: 'ff' }, '🐟'), progEl = h('span'), bar = h('div', { class: 'fbar' }, zoneEl, fishEl);
+    const zoneEl = h('div', { class: 'fz' }), fishEl = h('div', { class: 'ff' }, pic('ui:fish', 28)), progEl = h('span'), bar = h('div', { class: 'fbar' }, zoneEl, fishEl);
     const holdBtn = h('button', { class: 'btn primary big block' }, L('Дарж барь', 'Press & hold'));
-    const wrap = h('div', { class: 'fishing' }, h('h2', null, '🎣 ', L('Загасчлах', 'Fishing')),
+    const wrap = h('div', { class: 'fishing' }, h('h2', null, L('Загасчлах', 'Fishing')),
       h('p', { class: 'muted' }, L('Загасыг ногоон хэсэг дотор байлга. Дарж байхад ногоон хэсэг дээшилнэ.', 'Keep the fish inside the green zone. Hold to lift the zone.')),
       h('div', { class: 'frow' }, bar, h('div', { class: 'fprog' }, progEl)), holdBtn);
     const down = (e) => { e.preventDefault(); holding = true; }, up = () => { holding = false; };
@@ -709,14 +692,14 @@
     const cleanup = () => { over = true; cancelAnimationFrame(raf); window.removeEventListener('keydown', key2); window.removeEventListener('keyup', key2); };
     const end = (win) => {
       cleanup();
-      if (!win) { TG.sfx.bad(); wrap.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, '💨'), h('h2', null, L('Загас зугтлаа!', 'The fish got away!')), h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); fishing(); } }, '🎣 ', L('Дахин', 'Again'))))); return; }
+      if (!win) { TG.sfx.bad(); wrap.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, '💨'), h('h2', null, L('Загас зугтлаа!', 'The fish got away!')), h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); fishing(); } }, L('Дахин', 'Again'))))); return; }
       quest('fish'); TG.sfx.win();
       if (f.release) reward(f.coins, f.xp); else { v.fish[key] = (v.fish[key] || 0) + 1; reward(0, f.xp); }
       S.save(); hud();
-      wrap.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, f.e), h('div', { class: 'eyebrow' }, L('Барьлаа!', 'Caught!')), h('h2', null, tx(f.name)),
+      wrap.replaceChildren(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('fish:' + key, 72)), h('div', { class: 'eyebrow' }, L('Барьлаа!', 'Caught!')), h('h2', null, tx(f.name)),
         h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(f.fact))),
-        h('p', { class: 'muted', style: { marginTop: '10px' } }, f.release ? `🌊 ${L('Буцааж тавилаа. Байгаль хамгаалсны шагнал', 'Released! Nature-protector reward')} +${f.coins}🪙 +${f.xp} XP` : `+${f.xp} XP · ${L('Дэлгүүрт', 'Sells for')} ${f.sell}🪙`),
-        h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); fishing(); } }, '🎣 ', L('Дахин', 'Again')))));
+        h('p', { class: 'muted', style: { marginTop: '10px' } }, f.release ? `${L('Буцааж тавилаа. Байгаль хамгаалсны шагнал', 'Released! Nature-protector reward')}: +${f.coins} ${L('зоос', 'coins')}, +${f.xp} XP` : `+${f.xp} XP · ${L('Дэлгүүрт', 'Sells for')} ${f.sell} ${L('зоос', 'coins')}`),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); fishing(); } }, L('Дахин', 'Again')))));
     };
     const loop = (ts) => {
       if (over) return;
@@ -740,12 +723,12 @@
   }
 
   function tips() {
-    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, '🏡'), h('h2', null, L('Нутагт тавтай морил!', 'Welcome to the village!')),
+    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, pic('ui:logo', 72)), h('h2', null, L('Нутагт тавтай морил!', 'Welcome to the village!')),
       h('div', { class: 'v-list' }, [
-        ['👆', L('Газар дээр дарж алх. Компьютер дээр сум эсвэл WASD товч.', 'Tap the ground to walk. On a computer use arrows or WASD.')],
-        ['🌱', L('Цэцэрлэгт үр тарьж, 3 удаа усалж, ургацаа хураа. Худгаас ус аваарай.', 'Plant seeds in the garden, water 3 times, then harvest. Refill water at the well.')],
-        ['🎮', L('Тоглоомын гэрт тоглож зоос, XP цуглуул. Дэлгүүрээс хувцас, тэжээвэр ав.', 'Play in the game ger to earn coins and XP. Buy clothes and pets at the shop.')],
-        ['🤝', L('Нэг өрөөний найзууд нэг цэцэрлэгт хамт тарьж, бие биеийнхээ ургамлыг усална.', 'Friends in the same room share one garden and can water each other\'s plants.')],
+        ['ui:star', L('Газар дээр дарж алх. Компьютер дээр сум эсвэл WASD товч.', 'Tap the ground to walk. On a computer use arrows or WASD.')],
+        ['crop:carrot', L('Цэцэрлэгт үр тарьж, 3 удаа усалж, ургацаа хураа. Худгаас ус аваарай.', 'Plant seeds in the garden, water 3 times, then harvest. Refill water at the well.')],
+        ['ui:play', L('Тоглоомын гэрт тоглож зоос, XP цуглуул. Дэлгүүрээс хувцас, тэжээвэр ав.', 'Play in the game ger to earn coins and XP. Buy clothes and pets at the shop.')],
+        ['ui:heart', L('Нэг өрөөний найзууд нэг цэцэрлэгт хамт тарьж, бие биеийнхээ ургамлыг усална.', 'Friends in the same room share one garden and can water each other\'s plants.')],
       ].map(([e, t]) => h('div', { class: 'v-row' }, icon(e), h('div', { class: 'v-row-b' }, t)))),
       h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => close() }, L('Эхлэх', "Let's go"))), { cls: 'v-modal', onClose: () => { const v = V(); if (v) { v.tips = true; S.save(); } } });
   }
