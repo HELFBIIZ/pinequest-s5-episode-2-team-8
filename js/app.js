@@ -1,13 +1,12 @@
-/* Naadamy — screens, navigation, family features */
+/* Naadamy — Mongolian heritage, learned together. Screens: login/register -> Нутаг (home) -> heritage school, Basar, family. */
 (function (TG) {
   const { h, L, tx } = TG;
   const S = TG.store;
   const SCREENS = {};
-  let cleanupGame = null, screen = 'home', params = {}, homeAge = null, homePillar = 'all', parentUntil = 0;
+  let cleanup = null, screen = 'village', params = {}, parentUntil = 0;
 
   // ---------------- navigation ----------------
-  // smooth, direction-aware transitions between screens (View Transitions API with a CSS fallback)
-  const NAV_ORDER = ['home', 'village', 'satis', 'memories', 'parents'];
+  const NAV_ORDER = ['village', 'learn', 'achievements', 'family', 'memories'];
   const calm = () => S.state.settings.reduceMotion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function transition(kind, update) {
     document.documentElement.dataset.vt = kind;
@@ -28,342 +27,219 @@
     if (el) { el.classList.remove('screen-in'); void el.offsetWidth; el.classList.add('screen-in'); }
   }
   TG.go = function (name, p = {}) {
-    if (cleanupGame) { try { cleanupGame(); } catch (e) { console.error(e); } cleanupGame = null; }
+    if (cleanup) { try { cleanup(); } catch (e) { console.error(e); } cleanup = null; }
+    if (name === 'home') name = 'village';
     const a = NAV_ORDER.indexOf(screen), b = NAV_ORDER.indexOf(name);
     screen = name; params = p;
     transition(a >= 0 && b >= 0 && a !== b ? (b > a ? 'left' : 'right') : 'up', () => { render(); window.scrollTo(0, 0); });
   };
-  const soft = () => transition('fade', render); // tab / filter switches inside a screen
+  const setCleanup = (fn) => { cleanup = fn; };
+  const loggedIn = () => S.state.profiles.length && S.state.loggedIn && S.active();
   function render() {
     const root = document.documentElement, st = S.state.settings;
     root.classList.toggle('big', !!st.bigText);
     root.classList.toggle('rm', !!st.reduceMotion);
     root.lang = S.state.lang;
-    if (!S.state.profiles.length && !['onboard', 'about'].includes(screen)) screen = 'onboard';
+    if (!loggedIn() && !['auth', 'about'].includes(screen)) screen = 'auth';
     const app = document.getElementById('app');
-    app.replaceChildren((SCREENS[screen] || SCREENS.home)(params));
+    app.replaceChildren((SCREENS[screen] || SCREENS.village)(params));
   }
-  const currentAge = () => homeAge || (S.active() ? S.ageGroupOf(S.active().age) : '7-10');
   const famName = (f) => tx(f.name);
+  function toggleLang() { S.state.lang = S.state.lang === 'mn' ? 'en' : 'mn'; S.save(); render(); }
 
   // ---------------- shared pieces ----------------
   const LOGO = '<svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#2F6BFF"/><circle cx="48" cy="15" r="5" fill="#FDB022"/><path d="M12 44 V34 Q32 16 52 34 V44 Z" fill="#fff"/><path d="M16 33 Q32 19 48 33" stroke="#F04438" stroke-width="3" fill="none"/><rect x="27.5" y="35" width="9" height="9" rx="1.5" fill="#F04438"/><rect x="10" y="44" width="44" height="4" rx="2" fill="#FDB022"/></svg>';
-
-  function toggleLang() { S.state.lang = S.state.lang === 'mn' ? 'en' : 'mn'; S.save(); render(); }
-
   function topbar() {
     const p = S.active();
     return h('header', { class: 'topbar' },
-      h('button', { class: 'brand', onclick: () => TG.go('home'), 'aria-label': 'home' }, h('span', { class: 'logo', html: LOGO }), h('span', null, 'Naadamy')),
+      h('button', { class: 'brand', onclick: () => TG.go('village'), 'aria-label': 'Нутаг' }, h('span', { class: 'logo', html: LOGO }), h('span', null, 'Naadamy')),
       h('div', { class: 'top-actions' },
         h('button', { class: 'lang-btn', onclick: toggleLang, 'aria-label': 'language' }, TG.icon('globe'), S.state.lang === 'mn' ? 'EN' : 'МН'),
-        p && h('button', { class: 'profile-chip', onclick: profileSwitcher }, h('span', { class: 'av' }, p.avatar), h('span', { class: 'pn' }, p.name))));
+        p && h('button', { class: 'profile-chip', onclick: () => TG.openMenu() }, h('span', { class: 'av' }, p.avatar), h('span', { class: 'pn' }, p.name))));
   }
-  const NAV = [
-    ['home', 'gamepad', 'Тоглоом', 'Play'], ['village', 'sprout', 'Нутаг', 'Village'], ['satis', 'sparkles', 'Цэгцлэе', 'Puzzles'],
-    ['memories', 'book', 'Дурсамж', 'Memories'], ['parents', 'users', 'Эцэг эх', 'Parents'],
-  ];
+  const NAV = [['village', 'sprout', 'Нутаг', 'Nutag'], ['learn', 'book', 'Сурах', 'Learn'], ['basar', 'heart', 'Басар', 'Basar'], ['achievements', 'sparkles', 'Амжилт', 'Badges'], ['family', 'users', 'Гэр бүл', 'Family']];
   function bottomNav() {
     return h('nav', { class: 'bottom-nav' }, NAV.map(([id, icon, mn, en]) => h('button', {
-      class: 'nav-btn' + (screen === id ? ' active' : ''),
-      onclick: () => (id === 'parents' ? openParents() : TG.go(id)),
-    }, TG.icon(icon, 'ni'), h('span', null, L(mn, en)))));
+      class: 'nav-btn' + (screen === id || (id === 'learn' && screen === 'lesson') ? ' active' : ''),
+      onclick: () => (id === 'family' ? openFamily() : id === 'basar' ? TG.basar.open() : TG.go(id)),
+    }, id === 'basar' ? TG.basar.face(0, 26) : TG.icon(icon, 'ni'), h('span', null, L(mn, en)))));
   }
-  function openParents() {
-    if (Date.now() < parentUntil) return TG.go('parents');
-    TG.parentGate(() => { parentUntil = Date.now() + 10 * 60 * 1000; TG.go('parents'); });
+  function openFamily() {
+    if (Date.now() < parentUntil) return TG.go('family');
+    TG.parentGate(() => { parentUntil = Date.now() + 10 * 60 * 1000; TG.go('family'); });
   }
   const shell = (children) => h('div', { class: 'shell' }, topbar(), h('main', { class: 'page' }, children), bottomNav());
 
-  function ageTabs(active, onPick) {
-    return h('div', { class: 'tabs', role: 'tablist' }, TG.AGE_GROUPS.map((a) => h('button', {
-      class: 'tab' + (a.id === active ? ' active' : ''), role: 'tab', 'aria-selected': a.id === active ? 'true' : 'false',
-      onclick: () => onPick(a.id),
-    }, h('span', { class: 'te' }, a.emoji), h('span', { class: 'tt' }, tx(a.range)))));
-  }
-
-  // ---------------- family sky ----------------
-  function familySky(n) {
-    const W = 320, H = 150; let seed = 11;
-    const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-    const dipper = [[34, 34], [62, 40], [88, 50], [112, 64], [148, 58], [156, 86], [120, 92]];
-    const extra = Array.from({ length: 40 }, () => [12 + rnd() * 296, 10 + rnd() * 96]).filter(([x, y]) => !(x < 170 && y < 100));
-    const total = dipper.length + extra.length, lit = Math.min(n, total);
-    let s = `<svg viewBox="0 0 ${W} ${H}" class="sky-svg" role="img" aria-label="${L('Гэр бүлийн тэнгэр', 'Family sky')}">`
-      + `<defs><linearGradient id="skyg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#101B45"/><stop offset="1" stop-color="#2E57B0"/></linearGradient></defs>`
-      + `<rect width="${W}" height="${H}" rx="20" fill="url(#skyg)"/>`;
-    if (lit >= 7) s += `<polyline points="${dipper.map((p) => p.join(',')).join(' ')} ${dipper[3].join(',')}" fill="none" stroke="#FFE27A" stroke-opacity=".55" stroke-width="1.2"/>`;
-    [...dipper, ...extra].forEach(([x, y], i) => {
-      const on = i < lit;
-      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${on ? 3 : 1.4}" fill="${on ? '#FFE27A' : '#ffffff'}" fill-opacity="${on ? 1 : 0.3}"${on ? ` class="tw" style="animation-delay:${(i % 7) * 0.4}s"` : ''}/>`;
-    });
-    s += `<circle cx="280" cy="30" r="13" fill="#FFF3C4"/><circle cx="286" cy="26" r="11" fill="#1A2A63"/>`
-      + `<path d="M0 128 Q80 104 160 122 T320 116 V150 H0 Z" fill="#1E7A52"/>`
-      + `<g transform="translate(206 92)"><path d="M0 34 V20 Q28 0 56 20 V34 Z" fill="#fff"/><path d="M4 19 Q28 3 52 19" stroke="#F04438" stroke-width="2.5" fill="none"/><rect x="23" y="21" width="10" height="13" rx="1.5" fill="#F04438"/><rect x="25.5" y="23" width="5" height="5" fill="#FDB022"/><path d="M28 5 v-6" stroke="#ccc" stroke-width="2"/></g>`
-      + `</svg>`;
-    const next = n < 7 ? L(`Хамтдаа тоглож ${7 - n} од цуглуулаад Долоон бурханыг гэрэлтүүл!`, `Earn ${7 - n} more stars together to light up the Big Dipper!`)
-      : n < total ? L(`Бүх тэнгэрийг гэрэлтүүлэхэд ${total - n} од дутуу байна.`, `${total - n} stars until the whole sky shines.`)
-        : L('Тэнгэр бүхэлдээ гэрэлтлээ! Та бол жинхэнэ хамтын гэр бүл 🎉', 'The whole sky is shining! What a family 🎉');
-    return h('div', { class: 'sky-wrap' }, h('div', { html: s }),
-      h('div', { class: 'sky-cap' }, h('b', null, `⭐ ${n} `, L('гэр бүлийн од', 'family stars')), h('span', null, next)));
-  }
-
-  // ---------------- onboarding ----------------
-  function profileForm(onDone, submitLabel) {
-    let age = 6, avatar = TG.AVATARS[0];
-    const name = h('input', { class: 'input', placeholder: L('Хүүхдийн нэр', "Child's name"), maxlength: 20, 'aria-label': 'name' });
-    const ageGrid = h('div', { class: 'age-grid' });
-    const avGrid = h('div', { class: 'avatar-grid' });
-    const drawAges = () => ageGrid.replaceChildren(...Array.from({ length: 16 }, (_, k) => k + 3).map((a) => h('button', { class: 'age-btn' + (a === age ? ' active' : ''), onclick: () => { age = a; drawAges(); } }, a)));
-    const drawAv = () => avGrid.replaceChildren(...TG.AVATARS.map((e) => h('button', { class: 'av-btn' + (e === avatar ? ' active' : ''), onclick: () => { avatar = e; drawAv(); } }, e)));
-    drawAges(); drawAv();
-    const err = h('div', { class: 'err' });
-    return h('div', { class: 'form' },
-      h('label', null, L('Нэр', 'Name')), name,
-      h('label', null, L('Нас', 'Age')), ageGrid,
-      h('label', null, L('Дүрээ сонго', 'Pick an avatar')), avGrid, err,
-      h('button', { class: 'btn primary big block', onclick: () => {
-        const n = name.value.trim();
-        if (!n) { err.textContent = L('Нэрээ бичээрэй 🙂', 'Please enter a name 🙂'); name.focus(); return; }
-        onDone(S.addProfile({ name: n, age, avatar }));
-      } }, submitLabel || L('Эхлэх 🚀', "Let's go 🚀")));
-  }
-
-  SCREENS.onboard = () => {
-    let step = params.step || 0;
-    if (step === 0) {
-      return h('div', { class: 'onboard' },
-        h('button', { class: 'lang-btn corner', onclick: toggleLang }, S.state.lang === 'mn' ? 'EN' : 'МН'),
-        h('div', { class: 'ob-hero' },
-          h('div', { class: 'ob-logo', html: LOGO }),
-          h('div', { class: 'badge-pill' }, 'Fine-Tune for the Future · Pinequest'),
-          h('h1', null, 'Naadamy'),
-          h('p', { class: 'tagline' }, L('Хамтдаа тоглож, хамтдаа өсье.', 'Play together. Grow together.')),
-          h('p', { class: 'ob-sub' }, L('Хүүхэд бүр, гэр бүл бүрт зориулсан, офлайн ажилладаг, монгол хэл дээрх суралцах тоглоомууд.', 'Learning games in Mongolian for every child and every family. Works offline.')),
-          h('div', { class: 'pillars-mini' }, Object.values(TG.PILLARS).map((p) => h('div', { class: 'pm', style: { '--c': p.color } }, h('span', null, p.icon), tx(p.name))))),
-        h('div', { class: 'ob-actions' },
-          h('button', { class: 'btn primary big block', onclick: () => TG.go('onboard', { step: 1 }) }, L('Эхлэх', 'Get started')),
-          h('button', { class: 'btn ghost block', onclick: () => TG.go('about') }, L('Төслийн тухай', 'About the project'))));
-    }
-    return h('div', { class: 'onboard' },
-      h('div', { class: 'ob-card' },
-        h('h2', null, L('Хэн тоглох вэ? 👋', "Who's playing? 👋")),
-        h('p', { class: 'muted' }, L('Нас тань тохирох тоглоомуудыг санал болгоход тусална.', 'Age helps us suggest the right games.')),
-        profileForm(() => { homeAge = null; TG.go('home'); TG.toast(L('Тавтай морил! 🎉', 'Welcome! 🎉')); })));
-  };
-
-  function profileSwitcher() {
+  /** Main menu (village ☰ button and the profile chip). */
+  TG.openMenu = () => {
+    const p = S.active(); if (!p) return;
+    const m = TG.MASCOTS.find((x) => x.e === p.avatar);
+    const item = (icon, label, fn) => h('button', { class: 'menu-item', onclick: () => { close(); fn(); } }, h('span', { class: 'mi-i' }, icon), h('span', null, label), TG.icon('chevronRight'));
     const close = TG.modal(h('div', null,
-      h('h2', null, L('Хэн тоглож байна?', "Who's playing?")),
-      h('div', { class: 'profile-list' }, S.state.profiles.map((p) => h('button', {
-        class: 'profile-row' + (S.active() && p.id === S.active().id ? ' active' : ''),
-        onclick: () => { S.state.activeId = p.id; S.save(); homeAge = null; close(); render(); },
-      }, h('span', { class: 'av big' }, p.avatar), h('span', null, h('b', null, p.name), h('small', null, `${p.age} ${L('настай', 'years old')}`))))),
-      h('button', { class: 'btn ghost block', onclick: () => { close(); addChildModal(); } }, '+ ', L('Хүүхэд нэмэх', 'Add a child'))));
-  }
-  function addChildModal() {
-    const close = TG.modal(h('div', null, h('h2', null, L('Шинэ хүүхэд', 'New child')),
-      profileForm(() => { close(); homeAge = null; render(); }, L('Нэмэх', 'Add'))));
-  }
-
-  // ---------------- home ----------------
-  SCREENS.home = () => {
-    const p = S.active(), ag = currentAge();
-    const games = TG.gameOrder.map((id) => TG.games[id]).filter((g) => g.ages.includes(ag) && (homePillar === 'all' || g.pillar === homePillar));
-    games.sort((a, b) => (b.flagship ? 1 : 0) - (a.flagship ? 1 : 0));
-    const dm = TG.dailyMission(ag), done = S.missionDoneToday(dm.id);
-    return shell([
-      h('section', { class: 'hero' },
-        h('div', { class: 'eyebrow' }, TG.fmtDate(new Date(), true)),
-        h('div', { class: 'hello' }, L(`Сайн уу, ${p.name}`, `Hi, ${p.name}`), ' 👋'),
-        h('p', { class: 'muted' }, L('Өнөөдөр хэнтэй хамт тоглох вэ?', 'Who will you play with today?')),
-        familySky(S.state.familyStars)),
-      h('section', { class: 'daily' + (done ? ' done' : '') },
-        h('div', { class: 'daily-e' }, dm.emoji),
-        h('div', { class: 'daily-body' },
-          h('small', null, L('Өнөөдрийн гэр бүлийн даалгавар', "Today's family mission")),
-          h('b', null, tx(dm.title)), h('p', null, tx(dm.desc)),
-          h('button', { class: 'daily-link', onclick: () => TG.go('missions') }, L('Бүх даалгавар', 'All missions'), ' →')),
-        h('button', { class: 'btn ' + (done ? 'done' : 'primary'), disabled: done, onclick: () => completeMission(dm) }, done ? '✓' : L('Хийлээ!', 'Done!'))),
-      villageBanner(),
-      satisBanner(ag),
-      h('div', { class: 'section-head' }, h('h3', null, L('Тоглоомууд', 'Games')), h('span', { class: 'count' }, games.length)),
-      ageTabs(ag, (a) => { homeAge = a; soft(); }),
-      h('div', { class: 'chips' }, [['all', '✨', { mn: 'Бүгд', en: 'All' }], ...Object.entries(TG.PILLARS).map(([k, v]) => [k, v.icon, v.name])].map(([k, icon, name]) =>
-        h('button', { class: 'chip' + (homePillar === k ? ' active' : ''), onclick: () => { homePillar = k; soft(); } }, icon, ' ', tx(name)))),
-      h('div', { class: 'grid' }, games.map(gameCard)),
-      games.length ? null : h('p', { class: 'empty' }, L('Энэ ангилалд тоглоом алга. Өөр ангилал сонгоорой.', 'No games here yet. Try another filter.')),
-    ]);
+      h('div', { class: 'menu-me' }, h('span', { class: 'av big' }, p.avatar), h('div', null, h('b', null, p.name), h('small', null, `${p.age} ${L('настай', 'years old')}${m ? ' · ' + tx(m.name) : ''}`))),
+      h('div', { class: 'menu-list' },
+        item('⛺', L('Нутаг', 'Nutag'), () => TG.go('village')),
+        item('📚', L('Өв соёлын сургууль', 'Heritage school'), () => TG.go('learn')),
+        item('🐕', L('Басартай ярилцах', 'Talk with Basar'), () => TG.basar.open()),
+        item('🏅', L('Миний амжилтууд', 'My achievements'), () => TG.go('achievements')),
+        item('🎙️', L('Гэр бүлийн дурсамж', 'Family memory book'), () => TG.go('memories')),
+        item('👨‍👩‍👧', L('Эцэг эхийн самбар', 'Parent dashboard'), openFamily),
+        item('🌐', S.state.lang === 'mn' ? 'English' : 'Монгол хэл', toggleLang),
+        item('ℹ️', L('Төслийн тухай', 'About the project'), () => TG.go('about'))),
+      h('button', { class: 'btn ghost block', onclick: () => { close(); S.state.loggedIn = false; S.save(); TG.go('auth', { tab: 'login' }); } }, '🚪 ', L('Гарах / Профайл солих', 'Log out / switch profile'))), { cls: 'v-modal' });
   };
 
-  function gameCard(g) {
-    const P = TG.PILLARS[g.pillar];
-    return h('button', { class: 'game-card' + (g.flagship ? ' flagship' : ''), style: { '--gc': P.color }, onclick: () => launch(g) },
-      g.flagship ? h('span', { class: 'ribbon' }, '★ ', L('Уламжлалт', 'Tradition')) : null,
-      h('div', { class: 'gc-icon' }, g.icon),
-      h('div', { class: 'gc-body' },
-        h('div', { class: 'gc-title' }, tx(g.title)),
-        h('div', { class: 'gc-desc' }, tx(g.desc)),
-        h('div', { class: 'gc-tags' }, h('span', { class: 'tag' }, P.icon, ' ', tx(P.name)), h('span', { class: 'tag fam' }, '👨‍👩‍👧 ', L('Хамтдаа', 'Together')))));
-  }
-
-  // ---------------- "Нутаг" shared village ----------------
-  SCREENS.village = () => TG.villageScreen({ setCleanup: (fn) => { cleanupGame = fn; } });
-  function villageBanner() {
-    const vi = TG.villageInfo ? TG.villageInfo() : null;
-    return h('button', { class: 'village-banner', onclick: () => TG.go('village') },
-      h('div', { class: 'vb-scene', 'aria-hidden': 'true' }, TG.pixel.icon('ui:logo', 48)),
-      h('div', { class: 'vb-body' },
-        h('div', { class: 'eyebrow' }, L('Шинэ · Хамт тоглох', 'New · Play together')),
-        h('b', null, L('Нутаг: хамтын цэцэрлэг', 'Village: grow together')),
-        h('span', null, L('Найзуудтайгаа тарьж, загасчилж, хувцас, тэжээвэр аваарай', 'Plant, fish and dress up with friends')),
-        vi ? h('div', { class: 'vb-stats' }, h('span', null, `⭐ ${L('Түвшин', 'Level')} ${vi.l}`), h('span', null, `🪙 ${vi.coins}`)) : null),
-      h('span', { class: 'sb-go' }, TG.icon('chevronRight')));
-  }
-
-  // ---------------- "Цэгцлэе!" satisfying puzzles ----------------
-  SCREENS.satis = () => TG.satisMap({ shell, ageTabs, ag: currentAge(), setAge: (a) => { homeAge = a; soft(); }, rerender: render });
-  SCREENS.satisLevel = (p) => TG.satisLevel({ ...p, setCleanup: (fn) => { cleanupGame = fn; } });
-  function satisBanner(ag) {
-    const pr = TG.satisProgress(ag);
-    return h('button', { class: 'satis-banner', onclick: () => TG.go('satis') },
-      h('div', { class: 'sb-bubbles', 'aria-hidden': 'true' }, ['🫧', '🧩', '🧽', '🥛'].map((e, k) => h('span', { style: { animationDelay: k * 0.4 + 's' } }, e))),
-      h('div', { class: 'sb-body' },
-        h('b', null, '✨ ', L('Цэгцлэе!', 'Make it perfect!')),
-        h('span', null, L(`${pr.n} тайван, сэтгэл ханамжтай түвшин`, `${pr.n} calming, satisfying levels`)),
-        h('div', { class: 'meter' }, h('span', { style: { width: (pr.stars / pr.max) * 100 + '%' } }))),
-      h('span', { class: 'sb-go' }, TG.icon('chevronRight')));
-  }
-
-  // ---------------- launcher ----------------
-  function launch(g) {
-    const p = S.active(), max = (g.maxPlayers || 4) - 1;
-    let together = true; const picked = [];
-    const body = h('div');
-    const draw = () => {
-      body.replaceChildren(
-        h('div', { class: 'launch-head' }, h('div', { class: 'launch-icon' }, g.icon), h('div', null, h('h2', null, tx(g.title)), h('p', { class: 'muted' }, tx(g.desc)))),
-        h('div', { class: 'mode-row' },
-          h('button', { class: 'mode' + (together ? ' active' : ''), onclick: () => { together = true; draw(); } }, h('span', null, '👨‍👩‍👧'), h('b', null, L('Хамтдаа', 'Together')), h('small', null, L('+ гэр бүлийн од', '+ family stars'))),
-          h('button', { class: 'mode' + (!together ? ' active' : ''), onclick: () => { together = false; draw(); } }, h('span', null, '🙋'), h('b', null, L('Ганцаараа', 'Solo')), h('small', null, L('Өөрөө дасгалжих', 'Practice alone')))),
-        together ? h('div', null,
-          h('p', { class: 'label' }, L(`Хэнтэй тоглох вэ? (${max} хүртэл)`, `Play with whom? (up to ${max})`)),
-          h('div', { class: 'fam-chips' }, S.state.family.map((f) => {
-            const on = picked.includes(f.id);
-            return h('button', { class: 'fam-chip' + (on ? ' active' : ''), onclick: () => {
-              if (on) picked.splice(picked.indexOf(f.id), 1);
-              else { if (picked.length >= max) picked.shift(); picked.push(f.id); }
-              draw();
-            } }, f.emoji, ' ', famName(f));
-          })),
-          g.id === 'mathduel' ? h('p', { class: 'hint' }, '📱 ', L('Утсаа ширээн дээр тавиад, хоёулаа эсрэг талаас нь тоглоорой!', 'Lay the phone flat and sit facing each other!')) : null) : null,
-        h('button', { class: 'btn primary big block', disabled: together && !picked.length, onclick: start },
-          together && !picked.length ? L('Хамт тоглох хүнээ сонго', 'Pick who you play with') : L('Тоглох ▶', 'Play ▶')));
+  // ---------------- login & register ----------------
+  /** Animated steppe behind the login screen: gers, galloping foals, sheep and Basar running along. */
+  function authScene() {
+    const c = h('canvas', { class: 'auth-bg', width: 160, height: 90, 'aria-hidden': 'true' });
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    const PX = TG.pixel, t0 = performance.now();
+    const g1 = PX.gerSprite('#3f76db', '#e14b3d'), g2 = PX.gerSprite('#e14b3d', '#e9a91f');
+    const loop = () => {
+      if (!c.isConnected) return;
+      const t = (performance.now() - t0) / 1000;
+      x.save(); x.scale(160 / 120, 90 / 80); TG.scenes.bg(x, t); x.restore();
+      x.drawImage(g1, 0, 0, 48, 50, 18, 50, 26, 27); x.drawImage(g2, 0, 0, 48, 50, 112, 54, 22, 23);
+      [[60, 74], [76, 78], [92, 72]].forEach(([sx, sy], i) => x.drawImage(PX.animal('sheep', Math.floor(t * 2 + i) % 2), sx, sy));
+      const run = (t * 22) % 220 - 30, f = 1 + Math.floor(t * 8) % 2;
+      x.drawImage(PX.animal('foal', f), run, 64); x.drawImage(PX.animal('foal', 3 - f), run - 18, 67);
+      x.drawImage(PX.bankhar(f), run - 42, 66);
+      requestAnimationFrame(loop);
     };
-    const start = () => {
-      const players = [{ name: p.name, emoji: p.avatar, color: TG.PCOLORS[0] }];
-      if (together) picked.forEach((id, i) => { const f = S.state.family.find((x) => x.id === id); players.push({ name: famName(f), emoji: f.emoji, color: TG.PCOLORS[i + 1] }); });
-      close(); TG.go('play', { g, players, together });
-    };
-    draw();
-    const close = TG.modal(body, { cls: 'launch' });
+    requestAnimationFrame(loop);
+    return c;
   }
 
-  TG.launchGame = launch;
-
-  // ---------------- play / result ----------------
-  SCREENS.play = ({ g, players, together }) => {
-    const hud = h('div', { class: 'hud' }), stage = h('div', { class: 'stage' });
-    const t0 = Date.now(); let done = false;
-    const ctx = {
-      ageGroup: currentAge(), players, together, hud, root: stage, game: g,
-      finish(res) {
-        if (done) return; done = true;
-        const stars = Math.max(1, Math.min(3, res.stars || 1));
-        const reward = S.record({ gameId: g.id, pillar: g.pillar, stars, together, seconds: (Date.now() - t0) / 1000 });
-        TG.go('result', { g, players: res.players || players, together, res: { ...res, stars, reward } });
-      },
-    };
-    const el = h('div', { class: 'play-screen' },
-      h('div', { class: 'play-top' },
-        h('button', { class: 'icon-btn', 'aria-label': 'back', onclick: () => confirmLeave() }, TG.icon('arrowLeft')),
-        h('div', { class: 'play-title' }, g.icon, ' ', tx(g.title)), hud),
-      stage);
-    setTimeout(() => { if (screen === 'play' && params.g === g) cleanupGame = g.start(ctx) || null; }, 0);
-    return el;
-  };
-  function confirmLeave() {
-    const close = TG.modal(h('div', { class: 'center' },
-      h('div', { class: 'big-emoji' }, '🤔'), h('h2', null, L('Тоглоомоос гарах уу?', 'Leave the game?')),
-      h('div', { class: 'row-btns' },
-        h('button', { class: 'btn ghost', onclick: () => close() }, L('Үгүй, үргэлжлүүлье', 'No, keep playing')),
-        h('button', { class: 'btn primary', onclick: () => { close(); TG.go('home'); } }, L('Тийм', 'Yes')))));
+  function picPad(onPick, len = 3) {
+    const sel = [], dotsEl = h('div', { class: 'pic-dots' });
+    const drawDots = () => dotsEl.replaceChildren(...Array.from({ length: len }, (_, k) => h('i', { class: k < sel.length ? 'on' : '' }, sel[k] || '')));
+    drawDots();
+    const pad = h('div', { class: 'pic-pad' }, TG.PIC_KEYS.map((k) => h('button', { class: 'pic-key', onclick: () => {
+      if (sel.length >= len) return; sel.push(k); TG.sfx.tap(); drawDots();
+      if (sel.length === len) setTimeout(() => { onPick(sel.join(''), () => { sel.length = 0; drawDots(); }); }, 150);
+    } }, k)));
+    return h('div', null, dotsEl, pad);
   }
 
-  SCREENS.result = ({ g, players, together, res }) => {
-    setTimeout(() => { TG.sfx.win(); TG.confetti(); }, 100);
-    let winner = null;
-    if (res.scores && players.length > 1) {
-      const max = Math.max(...res.scores), ws = players.filter((_, i) => res.scores[i] === max);
-      winner = ws.length > 1 ? L('Тэнцлээ! Та нар бүгдээрээ ялагчид 🤝', "It's a tie! Everyone wins 🤝") : `🏆 ${ws[0].name} ${L('түрүүллээ!', 'wins!')}`;
+  SCREENS.auth = () => {
+    const tab = params.tab || (S.state.profiles.length ? 'login' : 'register');
+    const card = h('div', { class: 'auth-card px-card' });
+    const tabs = h('div', { class: 'auth-tabs' },
+      h('button', { class: tab === 'login' ? 'on' : '', disabled: !S.state.profiles.length, onclick: () => TG.go('auth', { tab: 'login' }) }, L('Нэвтрэх', 'Log in')),
+      h('button', { class: tab === 'register' ? 'on' : '', onclick: () => TG.go('auth', { tab: 'register' }) }, L('Бүртгүүлэх', 'Register')));
+    const enter = (p) => {
+      S.state.activeId = p.id; S.state.loggedIn = true; S.save();
+      TG.sfx.win(); TG.toast(L(`Тавтай морил, ${p.name}! 🐕`, `Welcome, ${p.name}! 🐕`)); TG.go('village');
+    };
+
+    function login() {
+      const list = h('div', { class: 'auth-profiles' }, S.state.profiles.map((p) => h('button', { class: 'auth-prof', onclick: () => {
+        if (!p.code) return enter(p);
+        card.replaceChildren(h('h2', null, `${p.avatar} ${p.name}`), h('p', { class: 'muted' }, L('Нууц 3 зургаа дарааллаар нь дар', 'Tap your 3 secret pictures in order')),
+          picPad((code, reset) => { if (code === p.code) enter(p); else { TG.sfx.bad(); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); reset(); } }),
+          h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost sm', onclick: () => TG.go('auth', { tab: 'login' }) }, L('Буцах', 'Back')),
+            h('button', { class: 'btn ghost sm', onclick: () => TG.parentGate(() => { p.code = null; S.save(); enter(p); }) }, L('Мартсан? (том хүн)', 'Forgot? (grown-up)'))));
+      } }, h('span', { class: 'av big' }, p.avatar), h('b', null, p.name), h('small', null, `${p.age} ${L('нас', 'yrs')}${p.code ? ' · 🔒' : ''}`))));
+      card.replaceChildren(h('h2', null, L('Хэн тоглох вэ?', 'Who’s playing?')), list);
     }
-    let claimed = false;
-    const rlBtn = h('button', { class: 'btn success', onclick: () => {
-      if (claimed) return; claimed = true; S.addFamilyStars(2); TG.sfx.chime();
-      rlBtn.textContent = L('✓ Бодит амьдрал дээр хийлээ! +2 ⭐', '✓ Done in real life! +2 ⭐'); rlBtn.disabled = true;
-    } }, L('Хийлээ! +2 ⭐', 'We did it! +2 ⭐'));
-    return h('div', { class: 'result' },
-      h('div', { class: 'res-icon' }, g.icon),
-      h('div', { class: 'res-stars', 'aria-label': `${res.stars} stars` }, [1, 2, 3].map((k) => h('span', { class: k <= res.stars ? 'on' : '', style: { animationDelay: k * 0.18 + 's' } }, '★'))),
-      h('h1', null, res.stars === 3 ? L('Гайхалтай!', 'Amazing!') : res.stars === 2 ? L('Сайн байна!', 'Well done!') : L('Сайн оролдлого!', 'Nice try!')),
-      winner ? h('div', { class: 'winner' }, winner) : null,
-      res.summary ? h('p', { class: 'muted' }, res.summary) : null,
-      players.length > 1
-        ? (res.scores ? TG.scoreboard(players, res.scores, -1)
-          : h('div', { class: 'together-row' }, players.map((p) => h('span', { class: 'tp', style: { '--pc': p.color } },
-            h('span', { class: 'sb-e' }, p.emoji), ' ', p.name))))
-        : null,
-      res.reward ? rewardChip(res.reward) : null,
-      h('p', { class: 'res-msg' }, together
-        ? L(`Хамтдаа өнгөрүүлсэн мөч хамгийн том шагнал. Гэр бүлийн тэнгэрт +${res.stars} од гэрэлтлээ! ✨`, `Time together is the greatest prize. +${res.stars} stars now shine in your family sky! ✨`)
-        : L('Дараагийн удаа гэр бүлтэйгээ хамт тоглоорой. Тэгвэл гэр бүлийн тэнгэрт од нэмэгдэнэ ✨', 'Next time play with your family to add stars to your family sky ✨')),
-      g.realLife ? h('div', { class: 'real-life' },
-        h('div', { class: 'rl-head' }, '🌍 ', L('Одоо бодит амьдрал дээр', 'Now, in real life')),
-        h('p', null, tx(g.realLife)), rlBtn) : null,
-      h('div', { class: 'row-btns' },
-        h('button', { class: 'btn ghost', onclick: () => TG.go('home') }, '🏠 ', L('Нүүр', 'Home')),
-        h('button', { class: 'btn primary', onclick: () => TG.go('play', { g, players: players.filter((x) => !x.bot), together }) }, '↻ ', L('Дахин', 'Again'))));
+
+    function register() {
+      const d = { name: '', age: 8, avatar: TG.MASCOTS[0].e, code: null };
+      let step = 0;
+      const draw = () => {
+        const prog = h('div', { class: 'auth-prog' }, [0, 1, 2, 3].map((k) => h('i', { class: k <= step ? 'on' : '' })));
+        const basar = (txt) => h('div', { class: 'auth-basar' }, TG.basar.face(1, 44), h('p', null, txt));
+        if (step === 0) {
+          const name = h('input', { class: 'input big-input', value: d.name, maxlength: 20, placeholder: L('Нэрээ бич…', 'Type your name…'), 'aria-label': L('Нэр', 'Name'), onkeydown: (e) => { if (e.key === 'Enter') go(); } });
+          const err = h('div', { class: 'err' });
+          const go = () => { const n = name.value.trim(); if (!n) { err.textContent = L('Нэрээ бичээрэй 🙂', 'Please write your name 🙂'); name.focus(); return; } d.name = n; step = 1; draw(); };
+          card.replaceChildren(prog, basar(L('Вуф! Би Басар. Чиний нэрийг хэн гэдэг вэ?', 'Woof! I’m Basar. What’s your name?')), name, err, h('button', { class: 'btn primary big block', onclick: go }, L('Цааш →', 'Next →')));
+          setTimeout(() => name.focus(), 200);
+        } else if (step === 1) {
+          const grid = h('div', { class: 'age-grid' }, Array.from({ length: 16 }, (_, k) => k + 3).map((a) => h('button', { class: 'age-btn' + (a === d.age ? ' active' : ''), onclick: () => { d.age = a; TG.sfx.tap(); draw(); } }, a)));
+          card.replaceChildren(prog, basar(L(`Сайн уу, ${d.name}! Хэдэн настай вэ?`, `Hi ${d.name}! How old are you?`)), grid,
+            h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => { step = 0; draw(); } }, '←'), h('button', { class: 'btn primary', onclick: () => { step = 2; draw(); } }, L('Цааш →', 'Next →'))));
+        } else if (step === 2) {
+          const m = TG.MASCOTS.find((x) => x.e === d.avatar);
+          const grid = h('div', { class: 'mascot-grid' }, TG.MASCOTS.map((x) => h('button', { class: 'mascot' + (x.e === d.avatar ? ' active' : ''), onclick: () => { d.avatar = x.e; TG.sfx.pop && TG.sfx.pop(); draw(); } }, h('span', { class: 'm-e' }, x.e), h('small', null, tx(x.name)))));
+          card.replaceChildren(prog, basar(L('Өөрийн сахиус амьтнаа сонго! ', 'Pick your mascot animal! ') + tx(m.fact)), grid,
+            h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => { step = 1; draw(); } }, '←'), h('button', { class: 'btn primary', onclick: () => { step = 3; draw(); } }, L('Цааш →', 'Next →'))));
+        } else {
+          const finish = () => enter(S.addProfile(d));
+          card.replaceChildren(prog, basar(L('Сүүлийнх нь: 3 нууц зураг сонгоод профайлаа хамгаал. Дараалал нь чухал шүү!', 'Last one: choose 3 secret pictures to protect your profile. The order matters!')),
+            picPad((code) => { d.code = code; finish(); }),
+            h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => { step = 2; draw(); } }, '←'), h('button', { class: 'btn ghost', onclick: finish }, L('Алгасах', 'Skip'))));
+        }
+      };
+      draw();
+    }
+    tab === 'login' && S.state.profiles.length ? login() : register();
+    return h('div', { class: 'auth' }, authScene(),
+      h('button', { class: 'lang-btn corner', onclick: toggleLang }, S.state.lang === 'mn' ? 'EN' : 'МН'),
+      h('div', { class: 'auth-wrap' },
+        h('div', { class: 'auth-brand' }, h('div', { class: 'ob-logo', html: LOGO }), h('h1', null, 'Naadamy'),
+          h('p', null, L('Монгол өв соёлоо гэр бүл, найзуудтайгаа хамт сурцгаая', 'Learn Mongolian heritage together with family and friends'))),
+        tabs, card,
+        h('button', { class: 'link-btn auth-about', onclick: () => TG.go('about') }, L('Төслийн тухай', 'About the project'))));
   };
 
-  function rewardChip(r) {
-    return h('button', { class: 'reward-chip', onclick: () => TG.go('village') },
-      h('span', null, `🪙 +${r.coins}`), h('span', null, `⭐ +${r.xp} XP`), h('small', null, L('Нутагт ашиглах', 'Spend in the village'), ' →'));
-  }
-  TG.rewardChip = rewardChip;
+  // ---------------- Нутаг (home), heritage school ----------------
+  SCREENS.village = () => TG.villageScreen({ setCleanup });
+  SCREENS.learn = () => TG.learn.hub({ shell });
+  SCREENS.lesson = (p) => TG.learn.lesson({ ...p, shell, setCleanup });
 
-  // ---------------- missions ----------------
-  function completeMission(m) {
-    if (S.missionDoneToday(m.id)) return;
-    const r = S.completeMission(m.id); TG.sfx.win(); TG.confetti(50);
-    TG.toast(L('Гайхалтай! Гэр бүлийн тэнгэрт +3 од ⭐', 'Wonderful! +3 stars in your family sky ⭐') + (r ? ` · 🪙 +${r.coins}` : ''));
-    render();
+  // ---------------- achievements ----------------
+  const fmtDay = (ts) => TG.fmtDate ? TG.fmtDate(ts) : new Date(ts).toLocaleDateString();
+  function badgeGrid(p, opts = {}) {
+    const AC = TG.achievements, got = p.ach || {};
+    return Object.entries(AC.CATS).map(([cat, name]) => {
+      const list = AC.LIST.filter((a) => a.cat === cat);
+      return h('section', { class: 'ach-cat' }, h('h3', null, tx(name), h('small', null, ` ${list.filter((a) => got[a.id]).length}/${list.length}`)),
+        h('div', { class: 'ach-grid' }, list.map((a) => {
+          const on = !!got[a.id], pr = !on && AC.progress(a, p);
+          return h('div', { class: 'ach' + (on ? ' on' : ''), title: tx(a.desc) },
+            h('span', { class: 'ach-i' }, on ? a.icon : '🔒'), h('b', null, tx(a.name)), h('small', null, tx(a.desc)),
+            on ? h('small', { class: 'ach-date' }, '✓ ', fmtDay(got[a.id])) : pr ? h('div', { class: 'meter' }, h('span', { style: { width: Math.min(100, (pr[0] / pr[1]) * 100) + '%' } })) : null);
+        })));
+    });
   }
-  SCREENS.missions = () => {
-    const ag = currentAge();
-    const list = TG.MISSIONS.filter((m) => m.ages.includes(ag));
+  SCREENS.achievements = () => {
+    const p = S.active(); TG.achievements.check(true);
+    const n = Object.keys(p.ach || {}).length, total = TG.achievements.LIST.length;
     return shell([
-      h('h1', { class: 'page-title' }, L('Гэр бүлийн даалгавар', 'Family missions')),
-      h('p', { class: 'lead' }, L('Дэлгэцээ унтраагаад, хамтдаа хий. Даалгавар бүр гэр бүлийн тэнгэрт +3 од нэмнэ.', 'Turn off the screen and do these together. Each mission adds +3 stars to your family sky.')),
-      ageTabs(ag, (a) => { homeAge = a; soft(); }),
-      h('div', { class: 'mission-list' }, list.map((m) => {
-        const done = S.missionDoneToday(m.id), P = TG.PILLARS[m.pillar];
-        return h('div', { class: 'mission-card' + (done ? ' done' : ''), style: { '--gc': P.color } },
-          h('div', { class: 'mc-e' }, m.emoji),
-          h('div', { class: 'mc-body' }, h('b', null, tx(m.title)), h('p', null, tx(m.desc)), h('span', { class: 'tag' }, P.icon, ' ', tx(P.name))),
-          h('button', { class: 'btn ' + (done ? 'done' : 'primary'), disabled: done, onclick: () => completeMission(m) }, done ? '✓' : L('Хийлээ', 'Done')));
-      })),
+      h('section', { class: 'l-hero px-card' }, h('div', { class: 'ach-big' }, '🏅'),
+        h('div', null, h('div', { class: 'eyebrow' }, L('Миний амжилтууд', 'My achievements')), h('h1', null, `${n} / ${total}`),
+          h('p', null, L('Сурч, гэр бүлтэйгээ хамт хийж, Нутагт тоглож амжилт цуглуулаарай. Ээж, аав чинь ч харж байгаа шүү!', 'Learn, do things with your family and play in Nutag to collect badges. Your parents can see them too!')))),
+      h('div', { class: 'ach-wrap' }, badgeGrid(p)),
     ]);
   };
+  /** Parent view: what the child earned and learned. */
+  function learnedReport(child) {
+    const learn = child.learn || {}, bs = child.basar || {}, topics = bs.topics || {};
+    const done = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].done);
+    const got = Object.entries(child.ach || {}).sort((a, b) => b[1] - a[1]);
+    const logs = S.state.log.filter((x) => x.pid === child.id && x.k).slice(-12).reverse();
+    const withTxt = (w) => !w ? '' : [w.family ? L(`гэр бүлтэйгээ ${w.family}`, `with family ${w.family}×`) : '', w.friends ? L(`найзуудтайгаа ${w.friends}`, `with friends ${w.friends}×`) : '', w.solo ? L(`ганцаараа ${w.solo}`, `alone ${w.solo}×`) : ''].filter(Boolean).join(', ');
+    const logLine = (x) => {
+      if (x.k === 'lesson') { const l = TG.learn.byId(x.id); return ['📚', L(`“${l ? tx(l.title) : x.id}” хичээлийг дуусгасан`, `Finished “${l ? tx(l.title) : x.id}”`)]; }
+      if (x.k === 'ach') { const a = TG.achievements.byId(x.id); return ['🏅', L('Амжилт: ', 'Badge: ') + (a ? `${a.icon} ${tx(a.name)}` : x.id)]; }
+      if (x.k === 'race') return ['🐎', L(`Морин уралдаанд ${x.id}-р байр`, `Horse race: place ${x.id}`)];
+      if (x.k === 'together') { const [what, mode, who] = x.id.split('|'); const l = TG.learn.byId(what); return [mode === 'family' ? '👨‍👩‍👧' : '🤝', `${l ? tx(l.title) : L('Асуулт хариулт', 'Quiz')} · ${who}`]; }
+      return ['•', x.k];
+    };
+    return h('section', { class: 'card' },
+      h('h3', null, '🏅 ', L('Амжилт ба сурсан зүйлс', 'Achievements & what they learned')),
+      h('p', { class: 'muted' }, L(`${child.name} ${got.length}/${TG.achievements.LIST.length} амжилт авсан.`, `${child.name} has ${got.length}/${TG.achievements.LIST.length} badges.`)),
+      got.length ? h('div', { class: 'ach-earned' }, got.map(([id, ts]) => { const a = TG.achievements.byId(id); return a ? h('span', { class: 'ach-chip', title: tx(a.desc) }, a.icon, ' ', tx(a.name), h('small', null, fmtDay(ts))) : null; })) : h('p', { class: 'muted' }, L('Одоохондоо амжилт алга.', 'No badges yet.')),
+      h('h4', null, L('Сурсан зүйлс', 'What they learned')),
+      done.length ? done.map((l) => h('div', { class: 'learned' }, h('b', null, l.icon, ' ', tx(l.title)), withTxt(learn[l.id].with) ? h('small', null, ' · ', withTxt(learn[l.id].with)) : null,
+        h('ul', null, (l.learned || []).map((t) => h('li', null, tx(t)))))) : h('p', { class: 'muted' }, L('Хичээл дуусгаагүй байна.', 'No lessons finished yet.')),
+      Object.keys(topics).length ? h('div', null, h('h4', null, L('Басарын асуултын сэдвүүд', 'Basar quiz topics')),
+        Object.entries(TG.BASAR.TOPICS).map(([k, t]) => { const x = topics[k] || { right: 0, total: 0 }; return h('div', { class: 'topic-row' }, h('span', null, t.icon, ' ', tx(t.name)), h('div', { class: 'bar' }, h('span', { style: { width: (x.total ? (x.right / x.total) * 100 : 0) + '%' } })), h('b', null, `${x.right}/${x.total}`)); })) : null,
+      logs.length ? h('div', null, h('h4', null, L('Сүүлийн үйл ажиллагаа', 'Recent activity')), h('ul', { class: 'activity' }, logs.map((x) => { const [i, t] = logLine(x); return h('li', null, h('span', null, i, ' ', t), h('small', null, x.d)); }))) : null);
+  }
+
 
   // ---------------- memory book (IndexedDB, audio stays on device) ----------------
   const DB = {
@@ -446,7 +322,7 @@
       if (!text.value.trim() && !blob) { TG.toast(L('Бичвэр эсвэл дуу хоолой нэмээрэй.', 'Add text or a voice recording.')); return; }
       try {
         await DB.put({ id: 'm' + Date.now(), ts: Date.now(), prompt: tx(TG.STORY_PROMPTS[pi]), who: famName(who), whoEmoji: who.emoji, text: text.value.trim(), audio: blob });
-        S.addFamilyStars(5); close(); TG.sfx.win(); TG.confetti(40);
+        S.state.memCount = (S.state.memCount || 0) + 1; S.addFamilyStars(5); close(); TG.sfx.win(); TG.confetti(40); TG.achievements && TG.achievements.check();
         TG.toast(L('Дурсамж хадгалагдлаа! +5 ⭐', 'Memory saved! +5 ⭐')); render();
       } catch (e) { TG.toast(L('Хадгалж чадсангүй.', 'Could not save.')); }
     };
@@ -461,67 +337,47 @@
       h('button', { class: 'btn primary big block', onclick: save }, L('Хадгалах (+5 ⭐)', 'Save (+5 ⭐)'))), { onClose: () => { stopRec(); stopStream(); } });
   }
 
-  // ---------------- parents dashboard ----------------
+  // ---------------- family / parent dashboard ----------------
   let parentChild = null;
-  SCREENS.parents = () => {
-    if (Date.now() >= parentUntil) { setTimeout(openParents, 0); return shell([h('p', { class: 'muted' }, '🔒')]); }
+  SCREENS.family = () => {
+    if (Date.now() >= parentUntil) { setTimeout(openFamily, 0); return shell([h('p', { class: 'muted' }, '🔒')]); }
     const st = S.state, profiles = st.profiles;
     const child = profiles.find((p) => p.id === parentChild) || S.active();
-    const weekAgo = Date.now() - 7 * 864e5;
-    const logs = st.log.filter((l) => l.pid === child.id);
-    const week = logs.filter((l) => l.ts >= weekAgo);
-    const togetherMin = Math.round(week.filter((l) => l.t).reduce((s, l) => s + l.sec, 0) / 60);
-    const soloMin = Math.round(week.filter((l) => !l.t).reduce((s, l) => s + l.sec, 0) / 60);
-    const pct = togetherMin + soloMin ? Math.round((togetherMin / (togetherMin + soloMin)) * 100) : 0;
-    const usedMin = Math.round(S.usageToday() / 60), limit = st.settings.screenLimit;
-    const maxStar = Math.max(1, ...Object.values(child.stars));
-
+    const learn = child.learn || {}, bs = child.basar || {};
+    const lessonsDone = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].done).length;
+    const together = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].family).length;
     const toggle = (key, label) => h('label', { class: 'switch-row' }, h('span', null, label),
       h('input', { type: 'checkbox', class: 'switch', checked: !!st.settings[key], onchange: (e) => { st.settings[key] = e.target.checked; S.save(); render(); } }));
-    const limitLabel = h('b', null, `${limit} ${L('мин', 'min')}`);
-
     const famName2 = h('input', { class: 'input', placeholder: L('Нэр (ж: Нагац эгч)', 'Name (e.g. Auntie)'), maxlength: 16 });
     let famEmoji = TG.FAMILY_EMOJIS[0];
     const emojiRow = h('div', { class: 'emoji-row' });
     const drawEmoji = () => emojiRow.replaceChildren(...TG.FAMILY_EMOJIS.map((e) => h('button', { class: 'av-btn sm' + (e === famEmoji ? ' active' : ''), onclick: () => { famEmoji = e; drawEmoji(); } }, e)));
     drawEmoji();
+    const next = TG.learn.LESSONS.find((l) => !(learn[l.id] && learn[l.id].family));
 
     return shell([
       h('h1', { class: 'page-title' }, L('Эцэг эхийн самбар', 'Parent dashboard')),
       profiles.length > 1 ? h('div', { class: 'chips' }, profiles.map((p) => h('button', { class: 'chip' + (p.id === child.id ? ' active' : ''), onclick: () => { parentChild = p.id; render(); } }, p.avatar, ' ', p.name))) : null,
-
       h('section', { class: 'card highlight' },
-        h('div', { class: 'ring-stat', style: { '--p': pct } }, h('b', null, pct + '%')),
+        h('div', { class: 'ring-stat', style: { '--p': Math.round((together / TG.learn.LESSONS.length) * 100) } }, h('b', null, `${together}/${TG.learn.LESSONS.length}`)),
         h('div', null,
-          h('h3', null, L('Энэ 7 хоногийн хамтын цаг', 'Together time this week')),
-          h('p', null, L(`Гэр бүлтэйгээ ${togetherMin} мин, ганцаараа ${soloMin} мин тоглосон.`, `${togetherMin} min with family, ${soloMin} min solo.`)),
-          h('p', { class: 'muted' }, pct >= 50 ? L('Гайхалтай! Дэлгэц таны гэр бүлийг холбох гүүр болж байна 💛', 'Wonderful! The screen is a bridge that brings your family together 💛')
-            : L('Зөвлөгөө: Энэ долоо хоногт 2 тоглоомыг хүүхэдтэйгээ хамт тоглоорой.', 'Tip: play 2 games together with your child this week.')))),
-
+          h('h3', null, L('Хамтдаа хийсэн бодит ажил', 'Real-life activities done together')),
+          h('p', null, next ? L(`Дараагийнх: “${tx(next.family.what)}”. Хүүхэд тань “${tx(next.title)}” хичээлээр бэлтгэнэ.`, `Next up: “${tx(next.family.what)}”. Your child prepares in the “${tx(next.title)}” lesson.`)
+            : L('Бүх гэр бүлийн ажлыг хамт хийжээ. Гайхалтай! 💛', 'You have done every family activity together. Wonderful! 💛')),
+          h('p', { class: 'muted' }, L('Хүүхэд “Тоглохоо боль” гэхэд “Ээж ээ, хамтдаа гэр барьцгаая!” гэж хариулдаг болох нь бидний зорилго.', 'Our goal: when you say “stop playing”, your child answers “Mom, let’s build a ger together!”')))),
       h('div', { class: 'stat-cards' },
-        h('div', { class: 'stat' }, h('small', null, L('Нийт тоглолт', 'Games played')), h('b', null, logs.length)),
-        h('div', { class: 'stat' }, h('small', null, L('Өнөөдрийн дэлгэц', 'Screen today')), h('b', null, `${usedMin}/${limit}`), h('small', null, L('мин', 'min'))),
-        h('div', { class: 'stat' }, h('small', null, L('Гэр бүлийн од', 'Family stars')), h('b', null, '⭐ ' + st.familyStars))),
-
+        h('div', { class: 'stat' }, h('small', null, L('Сурсан хичээл', 'Lessons learned')), h('b', null, `${lessonsDone}/${TG.learn.LESSONS.length}`)),
+        h('div', { class: 'stat' }, h('small', null, L('Басарын асуулт', 'Basar quiz')), h('b', null, `${bs.right || 0}/${bs.total || 0}`)),
+        h('div', { class: 'stat' }, h('small', null, L('Амжилт', 'Badges')), h('b', null, `${Object.keys(child.ach || {}).length}/${TG.achievements.LIST.length}`))),
       h('section', { class: 'card' },
-        h('h3', null, `${child.avatar} ${child.name}: `, L('3 тулгуурын ахиц', 'progress in 3 pillars')),
-        Object.entries(TG.PILLARS).map(([k, P]) => h('div', { class: 'bar-row' },
-          h('span', { class: 'bar-l' }, P.icon, ' ', tx(P.name)),
-          h('div', { class: 'bar' }, h('span', { style: { width: (child.stars[k] / maxStar) * 100 + '%', background: P.color } })),
-          h('b', null, child.stars[k] || 0))),
-        h('h4', null, L('Сүүлийн тоглолтууд', 'Recent activity')),
-        logs.length ? h('ul', { class: 'activity' }, logs.slice(-8).reverse().map((l) => {
-          const g = TG.games[l.g];
-          return h('li', null, h('span', null, g ? g.icon : '🎮', ' ', g ? tx(g.title) : l.g), h('span', { class: 'stars-sm' }, TG.starsText(l.s)), l.t ? h('span', { class: 'tag fam' }, '🤝') : null, h('small', null, l.d));
-        })) : h('p', { class: 'muted' }, L('Одоохондоо тоглоогүй байна.', 'No games yet.'))),
-
-      h('section', { class: 'card' },
-        h('h3', null, '⏱️ ', L('Эрүүл дэлгэцийн цаг', 'Healthy screen time')),
-        h('p', { class: 'muted' }, L('Хязгаарт хүрэхэд апп гэр бүлийн бодит даалгавар санал болгож, амрахыг сануулна.', 'When the limit is reached, the app suggests a real-life family mission and a break.')),
-        h('div', { class: 'range-row' }, h('input', { type: 'range', min: 15, max: 120, step: 15, value: limit, 'aria-label': 'limit',
-          oninput: (e) => (limitLabel.textContent = `${e.target.value} ${L('мин', 'min')}`),
-          onchange: (e) => { st.settings.screenLimit = +e.target.value; S.save(); render(); } }), limitLabel)),
-
+        h('h3', null, `${child.avatar} ${child.name}: `, L('хичээлүүд', 'lessons')),
+        TG.learn.LESSONS.map((l) => { const pr = learn[l.id] || {}; return h('div', { class: 'fam-lesson' },
+          h('span', { class: 'fl-name' }, l.icon, ' ', tx(l.title)),
+          h('span', { class: 'tag' + (pr.done ? ' ok' : '') }, pr.done ? '✓ ' + L('Сурсан', 'Learned') : L('Эхлээгүй', 'Not yet')),
+          pr.family ? h('span', { class: 'tag fam' }, '👨‍👩‍👧') : null); }),
+        h('p', { class: 'muted', style: { marginTop: '10px' } }, L(`Басараас ${bs.asked || 0} асуулт асуусан.`, `Asked Basar ${bs.asked || 0} questions.`), ' ',
+          TG.basar.ai ? L('Басар AI (Claude) ухаантай ажиллаж байна.', 'Basar is running with AI (Claude).') : L('Басар офлайн мэдлэгээр ажиллаж байна.', 'Basar is using offline knowledge.'))),
+      learnedReport(child),
       h('section', { class: 'card' },
         h('h3', null, '⚙️ ', L('Тохиргоо, хүртээмж', 'Settings & accessibility')),
         toggle('sound', L('🔊 Дуу', '🔊 Sound')),
@@ -532,7 +388,6 @@
         toggle('bigText', L('🔠 Том үсэг', '🔠 Large text')),
         toggle('reduceMotion', L('🐢 Хөдөлгөөн багасгах', '🐢 Reduce motion')),
         h('label', { class: 'switch-row' }, h('span', null, '🌐 ', L('Хэл', 'Language')), h('button', { class: 'btn ghost sm', onclick: toggleLang }, S.state.lang === 'mn' ? 'Монгол → English' : 'English → Монгол'))),
-
       h('section', { class: 'card' },
         h('h3', null, '👨‍👩‍👧‍👦 ', L('Гэр бүлийн гишүүд', 'Family members')),
         h('div', { class: 'fam-chips' }, st.family.map((f) => h('span', { class: 'fam-chip static' }, f.emoji, ' ', famName(f),
@@ -541,25 +396,25 @@
           const n = famName2.value.trim(); if (!n) return;
           st.family.push({ id: 'f' + Date.now(), name: n, emoji: famEmoji }); S.save(); render();
         } }, '+')))),
-
       h('section', { class: 'card' },
         h('h3', null, '🧒 ', L('Хүүхдүүд', 'Children')),
-        profiles.map((p) => h('div', { class: 'child-row' }, h('span', null, p.avatar, ' ', h('b', null, p.name), ` · ${p.age} ${L('нас', 'yrs')}`),
-          profiles.length > 1 ? h('button', { class: 'link-btn danger', onclick: () => { S.removeProfile(p.id); render(); } }, L('Хасах', 'Remove')) : null)),
-        h('button', { class: 'btn ghost block', onclick: addChildModal }, '+ ', L('Хүүхэд нэмэх', 'Add a child'))),
-
+        profiles.map((p) => h('div', { class: 'child-row' }, h('span', null, p.avatar, ' ', h('b', null, p.name), ` · ${p.age} ${L('нас', 'yrs')}`, p.code ? ' · 🔒' : ''),
+          h('span', null, p.code ? h('button', { class: 'link-btn', onclick: () => { p.code = null; S.save(); render(); TG.toast(L('Нууц зураг арилгалаа', 'Picture password removed')); } }, L('Нууц зураг арилгах', 'Remove password')) : null,
+            profiles.length > 1 ? h('button', { class: 'link-btn danger', onclick: () => { S.removeProfile(p.id); render(); } }, L('Хасах', 'Remove')) : null))),
+        h('button', { class: 'btn ghost block', onclick: () => { S.state.loggedIn = false; S.save(); TG.go('auth', { tab: 'register' }); } }, '+ ', L('Хүүхэд нэмэх', 'Add a child'))),
       h('button', { class: 'about-link', onclick: () => TG.go('about') }, h('span', null, L('Бидний зорилго, шударга үнэ', 'Our mission & fair pricing')), TG.icon('chevronRight')),
       h('button', { class: 'link-btn danger center-block', onclick: () => {
-        const close = TG.modal(h('div', { class: 'center' }, h('h2', null, L('Бүх өгөгдлийг устгах уу?', 'Erase all data?')), h('p', { class: 'muted' }, L('Профайл, од, тохиргоо устна.', 'Profiles, stars and settings will be erased.')),
+        const close = TG.modal(h('div', { class: 'center' }, h('h2', null, L('Бүх өгөгдлийг устгах уу?', 'Erase all data?')), h('p', { class: 'muted' }, L('Профайл, ахиц, тохиргоо устна.', 'Profiles, progress and settings will be erased.')),
           h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => close() }, L('Болих', 'Cancel')),
             h('button', { class: 'btn danger', onclick: () => { localStorage.removeItem(S.KEY); localStorage.removeItem('togloom.v1'); location.reload(); } }, L('Устгах', 'Erase')))));
       } }, L('Бүх өгөгдлийг устгах', 'Erase all data')),
     ]);
   };
+  SCREENS.parents = SCREENS.family;
 
   // ---------------- about / pitch ----------------
   SCREENS.about = () => {
-    const back = S.state.profiles.length ? () => TG.go('home') : () => TG.go('onboard');
+    const back = loggedIn() ? () => TG.go('village') : () => TG.go('auth');
     const P = (icon, color, title, items) => h('div', { class: 'pillar-card', style: { '--c': color } }, h('div', { class: 'pc-icon' }, icon), h('h3', null, title), h('ul', null, items.map((i) => h('li', null, i))));
     const price = (name, amount, per, items, cls, note) => h('div', { class: 'price-card ' + (cls || '') }, h('h3', null, name), h('div', { class: 'amount' }, amount, h('small', null, per)), h('ul', null, items.map((i) => h('li', null, '✓ ', i))), note ? h('p', { class: 'pnote' }, note) : null);
     return h('div', { class: 'about' },
@@ -567,103 +422,66 @@
       h('header', { class: 'about-hero' },
         h('div', { class: 'badge-pill light' }, 'Pinequest · Fine-Tune for the Future'),
         h('h1', null, 'Naadamy'),
-        h('p', { class: 'big-quote' }, L('“Дэлгэц бол гүүр. Зорилго нь гэр бүл.”', '“The screen is a bridge. The destination is family.”')),
-        h('p', null, L('Эрүүл мэнд, боловсрол, ур чадварт хүүхэд бүр тэгш хүртээмжтэй байх ёстой. Хамгийн сайн багш нь хайртай хүмүүс нь гэдэгт бид итгэдэг.', 'Every child deserves equal access to health, education and skills. We believe the best teachers are the people who love them.'))),
-
+        h('p', { class: 'big-quote' }, L('“Ээж ээ, тоглохоо больё. Хамтдаа монгол гэр барьцгаая!”', '“Mom, let’s stop playing — let’s build a Mongol ger together!”')),
+        h('p', null, L('Naadamy бол хүүхэд, гэр бүл, найзууд Монголын өв соёлыг хамтдаа сурдаг тоглоом. Дэлгэц дээр сурсан зүйлээ бодит амьдрал дээр гэр бүлээрээ хийдэг.', 'Naadamy is a game where children, families and friends learn Mongolian heritage together, then do it for real at home.'))),
       h('section', null,
         h('h2', null, L('Асуудал', 'The problem')),
         h('div', { class: 'problem-grid' },
-          h('div', null, '📱', h('b', null, L('Ганцаардмал дэлгэц', 'Lonely screens')), h('p', null, L('Хүүхдүүд дэлгэцийн өмнө ганцаараа өнгөрүүлэх цаг ихэсч, гэр бүлийн харилцаа багасч байна.', 'Children spend more time alone on screens and less time talking with family.'))),
-          h('div', null, '🏔️', h('b', null, L('Тэгш бус хүртээмж', 'Unequal access')), h('p', null, L('Хөдөө орон нутагт интернэт сул, чанартай монгол хэл дээрх сургалтын хэрэглэгдэхүүн ховор.', 'Rural areas have weak internet and few quality learning tools in Mongolian.'))),
-          h('div', null, '💸', h('b', null, L('Үнэтэй, гадаад', 'Expensive, foreign')), h('p', null, L('Ихэнх суралцах апп үнэтэй, гадаад хэл дээр, монгол соёлгүй.', 'Most learning apps are costly, in foreign languages, and lack Mongolian culture.'))))),
-
+          h('div', null, '📱', h('b', null, L('Ганцаардмал дэлгэц', 'Lonely screens')), h('p', null, L('Хүүхдүүд дэлгэцийн өмнө ганцаараа өнгөрүүлэх цаг ихэсч, гэр бүлийн харилцаа багасч байна.', 'Children spend more time alone on screens and less with family.'))),
+          h('div', null, '🏙️', h('b', null, L('Мартагдаж буй өв', 'Fading heritage')), h('p', null, L('Хотын олон хүүхэд гэр барих, цагаан идээ хийх, Нууц товчоог мэддэггүй болж байна.', 'Many city children no longer know how to build a ger, make dairy foods or the Secret History.'))),
+          h('div', null, '💸', h('b', null, L('Үнэтэй, гадаад', 'Expensive, foreign')), h('p', null, L('Ихэнх суралцах апп үнэтэй, гадаад хэл дээр, монгол соёлгүй.', 'Most learning apps are costly, foreign and lack Mongolian culture.'))))),
       h('section', null,
-        h('h2', null, L('Шийдэл: 3 тулгуур', 'Our solution: 3 pillars')),
+        h('h2', null, L('Шийдэл', 'Our solution')),
         h('div', { class: 'pillar-grid' },
-          P('💚', '#12B76A', L('Эрүүл мэнд', 'Health'), [L('Эрүүл зуршил, анхны тусламж (хөлдөлт, утааны хордлого)', 'Healthy habits, first aid (frostbite, stove smoke)'), L('Сэтгэлийн эрүүл мэнд, тайван амьсгал', 'Mental health and calm breathing'), L('Эрүүл дэлгэцийн цагийн хамгаалагч', 'Built-in healthy screen-time guardian')]),
-          P('📘', '#2F6BFF', L('Боловсрол', 'Education'), [L('Цагаан толгой, тоо, санах ой', 'Alphabet, numbers, memory'), L('Монгол нутаг, түүх, соёл', 'Mongolian geography, history, culture'), L('Шагай зэрэг уламжлалт тоглоом', 'Traditional games like shagai')]),
-          P('🛠️', '#F08A24', L('Ур чадвар', 'Skills'), [L('Програмчлалын анхан шат', 'First steps in programming'), L('Санхүүгийн боловсрол, төсөв', 'Financial literacy and budgeting'), L('Дижитал аюулгүй байдал', 'Digital safety')]))),
-
+          P('⛺', '#2F6BFF', L('Нутаг', 'Nutag'), [L('Найзуудтайгаа хамт тоглох пиксел тосгон', 'A pixel village to play in with friends'), L('Өөрийн монгол гэрээ барих, бөх барилдах', 'Build your own ger, wrestle at Naadam'), L('Нэг Wi-Fi-д олуулаа тоглоно', 'Play together on the same Wi-Fi')]),
+          P('🐕', '#C8483C', L('Басар — AI найз', 'Basar, the AI buddy'), [L('Монгол банхар нохой үргэлж хажууд чинь', 'A Mongolian Bankhar dog always by your side'), L('Түүх, Нууц товчоо, ёс заншлыг асуухад хариулна', 'Answers questions on history, the Secret History and customs'), L('Асуулт хариулт өгнө, интернэтгүй ч ажиллана', 'Gives quizzes and works offline too')]),
+          P('📚', '#E9A91F', L('Өв соёлын сургууль', 'Heritage school'), [L('Гэр барих, цагаан идээ хийх, гэрийн ёс', 'Building a ger, dairy foods, ger manners'), L('Нууц товчооны үлгэрүүд', 'Tales from the Secret History'), L('Хичээл бүр гэр бүлийн бодит ажлаар төгсөнө', 'Every lesson ends with a real family activity')]))),
       h('section', { class: 'why-human' },
         h('h2', null, L('Яагаад хиймэл оюун үүнийг орлож чадахгүй вэ?', "Why AI can't replace this")),
         h('div', { class: 'human-grid' },
-          h('div', null, h('span', null, '👨‍👩‍👧'), h('b', null, L('Нэг утас, олон зүрх', 'One phone, many hearts')), h('p', null, L('Тоглоом бүр 2–4 хүн нэг төхөөрөмж дээр хамт тоглохоор бүтээгдсэн. Тооны тулаанд хоёр тал нүүр тулж тоглоно.', 'Every game is built for 2–4 people on one device. In Math Duel, players sit face to face.'))),
-          h('div', null, h('span', null, '🌍'), h('b', null, L('Тоглоом дэлгэцээс гадна дуусна', 'Every game ends off-screen')), h('p', null, L('Тоглолт бүрийн төгсгөлд гэр бүлээрээ бодит амьдрал дээр хийх даалгавар өгнө.', 'Each game ends with a real-life challenge to do together.'))),
-          h('div', null, h('span', null, '🎙️'), h('b', null, L('Эмээгийн дуу хоолой', "Grandma's voice")), h('p', null, L('Дурсамжийн номонд өвөө, эмээгийн түүх, дууг бичиж үеийн үед хадгална.', 'The memory book records grandparents\' stories and songs for generations.'))),
-          h('div', null, h('span', null, '🗣️'), h('b', null, L('"Гэр бүлээсээ асуу"', '"Ask your family"')), h('p', null, L('Асуултын тусламж зөвхөн жинхэнэ хүнтэй ярилцсаны дараа нээгдэнэ.', 'Quiz help unlocks only after talking with a real person.'))))),
-
+          h('div', null, h('span', null, '👨‍👩‍👧'), h('b', null, L('Басар заана, гэр бүл хийнэ', 'Basar teaches, family does')), h('p', null, L('AI нохой мэдлэг өгдөг ч гэрээ ээж аавтайгаа хамт барина.', 'The AI dog shares knowledge, but you build the ger with Mom and Dad.'))),
+          h('div', null, h('span', null, '🌍'), h('b', null, L('Тоглоом дэлгэцээс гадна дуусна', 'Every lesson ends off-screen')), h('p', null, L('Бяцхан гэр барих, тараг исгэх, таван сумны туршилт — гэр бүлээрээ.', 'A mini ger, homemade yogurt, the five arrows test — all as a family.'))),
+          h('div', null, h('span', null, '🎙️'), h('b', null, L('Эмээгийн дуу хоолой', "Grandma's voice")), h('p', null, L('Ахмадуудын ярьсан ёс заншил, түүхийг Дурсамжийн номонд хадгална.', 'Customs and stories from elders are saved in the memory book.'))),
+          h('div', null, h('span', null, '🗣️'), h('b', null, L('Басар “эмээгээсээ асуу” гэдэг', 'Basar says “ask Grandma”')), h('p', null, L('Мэдэхгүй зүйлээ Басар ахмадуудаас асуухыг урамшуулдаг.', 'When unsure, Basar encourages asking the elders.'))))),
       h('section', null,
         h('h2', null, L('Хүн бүрт тэгш хүртээмж', 'Equal access for everyone')),
         h('div', { class: 'access-grid' }, [
-          ['📶', L('Офлайн ажиллана: нэг ачаалсны дараа интернэтгүй тоглоно', 'Works offline: after the first load, no internet needed')],
-          ['📱', L('Хуучин, хямд утсан дээр ажиллана. Хэмжээ нь маш бага', 'Runs on old, low-cost phones. Tiny download')],
+          ['📶', L('Офлайн ажиллана: Басар интернэтгүй ч мэдлэгээ хуваалцана', 'Works offline: Basar shares his knowledge even without internet')],
+          ['📱', L('Хуучин, хямд утсан дээр ажиллана', 'Runs on old, low-cost phones')],
           ['🇲🇳', L('Монгол хэл, монгол соёл дээр суурилсан', 'Built on Mongolian language and culture')],
           ['🚫', L('Зар сурталчилгаагүй, өгөгдөл худалдахгүй', 'No ads, no selling data')],
-          ['🔒', L('Бүх мэдээлэл зөвхөн таны төхөөрөмж дээр', 'All data stays on your device')],
-          ['🔠', L('Том үсэг, хөдөлгөөн багасгах, эможи тулгуурласан дизайн', 'Large text, reduced motion, emoji-first design')],
+          ['🔒', L('Профайл зөвхөн таны төхөөрөмж дээр, AI-д нэр хадгалагдахгүй', 'Profiles stay on your device; the AI keeps no names')],
+          ['🧒', L('Хүүхдэд аюулгүй AI: хувийн мэдээлэл асуудаггүй', 'Kid-safe AI: never asks for personal details')],
         ].map(([i, t]) => h('div', { class: 'access-item' }, h('span', null, i), t)))),
-
       h('section', null,
         h('h2', null, L('Шударга үнэ', 'Fair pricing')),
         h('div', { class: 'price-grid' },
-          price(L('Үнэгүй', 'Free'), '0₮', L(' / үүрд', ' / forever'), [L('Бүх үндсэн тоглоом', 'All core games'), L('Офлайн горим', 'Offline mode'), L('Гэр бүлийн даалгавар', 'Family missions'), L('Дурсамжийн ном', 'Memory book')]),
-          price(L('Гэр бүл', 'Family'), '3,900₮', L(' / сар', ' / month'), [L('Сар бүр шинэ тоглоом', 'New games every month'), L('Хэвлэх даалгаврын карт', 'Printable mission cards'), L('Дурсамжийн номоо хэвлэх', 'Print your memory book'), L('Дэлгэрэнгүй ахицын тайлан', 'Detailed progress reports')], 'featured',
+          price(L('Үнэгүй', 'Free'), '0₮', L(' / үүрд', ' / forever'), [L('Нутаг, бүх хичээл', 'Nutag and every lesson'), L('Басарын офлайн мэдлэг', 'Basar’s offline knowledge'), L('Дурсамжийн ном', 'Memory book')]),
+          price(L('Гэр бүл', 'Family'), '3,900₮', L(' / сар', ' / month'), [L('Басар AI ухаалаг горим', 'Basar smart AI mode'), L('Сар бүр шинэ өв соёлын хичээл', 'New heritage lessons every month'), L('Хэвлэх гэр бүлийн картууд', 'Printable family activity cards')], 'featured',
             L('💛 Нэг гэр бүлийн төлбөр = хөдөөгийн нэг хүүхдэд үнэгүй эрх', '💛 One family plan = free access for one rural child')),
-          price(L('Сургууль, сум', 'Schools & soums'), '0₮', L(' / үнэгүй', ' / free'), [L('Төрийн сургууль, цэцэрлэг', 'Public schools & kindergartens'), L('Сумын номын сан', 'Soum libraries'), L('Багшийн хяналтын самбар', 'Teacher dashboard')])),
-        h('p', { class: 'center muted' }, L('Орлого багатай өрхөд Гэр бүл багцыг хүсэлтээр үнэгүй олгоно.', 'Low-income families can get the Family plan free on request.'))),
-
+          price(L('Сургууль, сум', 'Schools & soums'), '0₮', L(' / үнэгүй', ' / free'), [L('Төрийн сургууль, цэцэрлэг', 'Public schools & kindergartens'), L('Багшийн самбар', 'Teacher dashboard'), L('Ангиараа Нутагт хамт тоглох', 'Whole class plays together in Nutag')]))),
       h('section', null,
         h('h2', null, L('Цаашдын төлөвлөгөө', 'Roadmap')),
         h('ol', { class: 'roadmap' },
-          h('li', null, h('b', null, L('Одоо', 'Now')), L('Прототип: 15 тоглоом, 48 түвшний "Цэгцлэе!" оньсого, олон тоглогчтой "Нутаг" тосгон, офлайн PWA', 'Prototype: 15 games, 48 puzzle levels, the multiplayer "Village", offline PWA')),
-          h('li', null, h('b', null, L('Дараа', 'Next')), L('Жинхэнэ багш, өвөө эмээгийн бичсэн монгол дуу хоолой; Монгол бичгийн модуль', 'Mongolian voice-over by real teachers and grandparents; traditional Mongol script module')),
-          h('li', null, h('b', null, L('Удахгүй', 'Soon')), L('Казах хэл (Баян-Өлгий), дохионы хэл, хоёр утсаар холбогдон тоглох', 'Kazakh language (Bayan-Ölgii), sign language, two-phone local play')),
-          h('li', null, h('b', null, L('Ирээдүй', 'Future')), L('Сургууль, сумтай хамтран ажиллах, QPay төлбөр', 'School and soum partnerships, QPay payments')))),
-
+          h('li', null, h('b', null, L('Одоо', 'Now')), L('Нутаг, Басар AI нохой, 4 өв соёлын хичээл, офлайн PWA', 'Nutag, Basar the AI dog, 4 heritage lessons, offline PWA')),
+          h('li', null, h('b', null, L('Дараа', 'Next')), L('Монгол бичиг, морин хуур, айраг бүлэх, Цагаан сарын хичээлүүд', 'Lessons on Mongol script, morin khuur, airag and Tsagaan Sar')),
+          h('li', null, h('b', null, L('Удахгүй', 'Soon')), L('Басарын дуу хоолой, өвөө эмээгийн бичсэн үлгэрүүд', 'Basar’s voice and stories recorded by grandparents')),
+          h('li', null, h('b', null, L('Ирээдүй', 'Future')), L('Сургууль, сум, музейтэй хамтран ажиллах', 'Partnerships with schools, soums and museums')))),
       TG.music && TG.music.credits().length ? h('section', null,
         h('h2', null, L('Хөгжмийн зохиогчид', 'Music credits')),
-        h('p', { class: 'center muted' }, L('Арын хөгжим бүгд CC0 (нийтийн өмч) лицензтэй, OpenGameArt.org-оос. Зохиогчдод баярлалаа!', 'All background music is CC0 (public domain) from OpenGameArt.org. Thank you to the composers!')),
+        h('p', { class: 'center muted' }, L('Арын хөгжим бүгд CC0 (нийтийн өмч) лицензтэй, OpenGameArt.org-оос.', 'All background music is CC0 (public domain) from OpenGameArt.org.')),
         h('ul', { class: 'credits' }, TG.music.credits().map((c) => h('li', null, h('b', null, c.title), ' — ', c.artist, ' · ', c.license, c.source ? [' · ', h('a', { href: c.source, target: '_blank', rel: 'noopener' }, 'OpenGameArt')] : null)))) : null,
       h('footer', { class: 'about-foot' }, L('Монгол хүүхэд бүрт ❤️ · Pinecone Academy · Pinequest', 'For every Mongolian child ❤️ · Pinecone Academy · Pinequest'),
-        h('div', null, h('button', { class: 'btn primary', onclick: back }, L('Тоглож эхлэх ▶', 'Start playing ▶')))));
+        h('div', null, h('button', { class: 'btn primary', onclick: back }, L('Эхлэх ▶', 'Start ▶')))));
   };
-
-  // ---------------- healthy screen-time guardian ----------------
-  let lastNudge = 0;
-  function showTimeout() {
-    if (document.querySelector('.timeout-back')) return;
-    const ag = currentAge(), m = TG.dailyMission(ag);
-    const el = h('div', { class: 'timeout-back' }, h('div', { class: 'timeout' },
-      h('div', { class: 'big-emoji' }, '🌞'),
-      h('h2', null, L('Дэлгэцээ амраах цаг боллоо!', 'Time for a screen break!')),
-      h('p', null, L(`Өнөөдөр ${Math.round(S.usageToday() / 60)} минут тогллоо. Одоо нүдээ амрааж, гэр бүлтэйгээ бодит амьдрал дээр хамт юм хийцгээе.`, `You played ${Math.round(S.usageToday() / 60)} minutes today. Rest your eyes and do something real with your family.`)),
-      h('div', { class: 'daily' }, h('div', { class: 'daily-e' }, m.emoji), h('div', { class: 'daily-body' }, h('b', null, tx(m.title)), h('p', null, tx(m.desc)))),
-      h('button', { class: 'btn ghost block', onclick: () => TG.parentGate(() => {
-        S.state.extend = { d: S.dkey(), sec: S.extraToday() + 15 * 60 }; S.save(); el.remove(); TG.toast(L('+15 минут нэмэгдлээ', '+15 minutes added'));
-      }) }, '🔒 ', L('Том хүн: +15 минут', 'Grown-up: +15 minutes'))));
-    document.body.appendChild(el);
-  }
-  setInterval(() => {
-    if (document.visibilityState !== 'visible' || !S.state.profiles.length || document.querySelector('.timeout-back')) return;
-    S.tick(5);
-    const used = S.usageToday();
-    if (used >= S.state.settings.screenLimit * 60 + S.extraToday()) return showTimeout();
-    if (used - lastNudge >= 20 * 60 && used > 60) {
-      lastNudge = used;
-      TG.toast(L('👀 20 минут боллоо. 20 секунд цонхоор хол харж нүдээ амраагаарай!', '👀 20 minutes! Look out the window for 20 seconds to rest your eyes.'));
-    }
-  }, 5000);
-  lastNudge = S.usageToday();
 
   // ---------------- boot ----------------
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    // When a new version takes over, reload once so the player sees it right away.
     const hadController = !!navigator.serviceWorker.controller;
     let reloaded = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {}));
   }
+  TG.basar.check();
   render();
-  // a shared invite link (…?room=CODE) opens the village directly once a child profile exists
-  if (new URLSearchParams(location.search).get('room') && S.state.profiles.length) TG.go('village');
 })(window.TG);

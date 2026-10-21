@@ -13,6 +13,7 @@ const crypto = require('crypto');
 const os = require('os');
 const R = require('./js/village/rules.js');
 const QR = require('./js/qr.js');
+const basar = require('./basar-ai.js')(__dirname);
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || process.argv[2] || 8000);
@@ -23,7 +24,7 @@ const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png',
   '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
-const BLOCKED = [/^\/data(\/|$)/, /^\/\.git/, /^\/server\.js$/, /^\/node_modules/];
+const BLOCKED = [/^\/data(\/|$)/, /^\/\.git/, /^\/\.env/, /^\/server\.js$/, /^\/basar-ai\.js$/, /^\/node_modules/];
 
 // ---------------------------------------------------------------- static files
 function serveStatic(req, res) {
@@ -32,6 +33,7 @@ function serveStatic(req, res) {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify({ naadamy: true, rooms: rooms.size, players: [...rooms.values()].reduce((n, r) => n + r.players.size, 0), urls: lanIPs().map((ip) => `http://${ip}:${actualPort}/`) }));
   }
+  if (url.pathname === '/api/basar') return basar.handle(req, res);
   let p = decodeURIComponent(url.pathname);
   if (BLOCKED.some((re) => re.test(p))) { res.writeHead(404); return res.end(); }
   if (p.endsWith('/')) p += 'index.html';
@@ -251,7 +253,7 @@ function onMessage(conn, text) {
 function armMatch(r, match) {
   clearTimeout(match.timer);
   match.timer = setTimeout(() => {          // a player who never answers gets a weak random move
-    for (const side of ['a', 'b']) if (!match.moves[side]) match.moves[side] = { m: R.MOVES[Math.floor(Math.random() * 3)].id, p: 0.15 };
+    for (const side of ['a', 'b']) if (!match.moves[side]) match.moves[side] = { m: R.MOVES[Math.floor(Math.random() * R.MOVES.length)].id, p: 0.15 };
     resolveMatch(r, match);
   }, 25000);
   match.timer.unref && match.timer.unref();
@@ -299,6 +301,7 @@ server.on('listening', () => {
   console.log(`\n  \x1b[1mNaadamy is running!\x1b[0m\n\n  On this computer:  http://localhost:${port}`);
   ips.forEach((ip) => console.log(`  Same Wi-Fi:        \x1b[1mhttp://${ip}:${port}\x1b[0m`));
   if (ips.length && process.stdout.isTTY) { console.log('\n  Friends on the same Wi-Fi can scan this with their phone camera:\n'); console.log(QR.toTerminal(`http://${ips[0]}:${port}/`).split('\n').map((l) => '  ' + l).join('\n')); }
+  console.log(basar.enabled ? `\n  Basar AI: on (${basar.model})` : '\n  Basar AI: offline mode (add ANTHROPIC_API_KEY to a .env file to turn on the AI buddy)');
   console.log('\n  If friends cannot connect: some school/guest Wi-Fi blocks devices from');
   console.log('  seeing each other. Use a phone hotspot or a home router instead.');
   console.log('\n  Press Ctrl+C to stop.\n');

@@ -33,6 +33,13 @@ window.TG = { games: {}, gameOrder: [] };
     return el;
   };
   const h = TG.h;
+  // Optional pieces of UI are often written as `cond ? el : null`. The browser's replaceChildren would
+  // print those as the text "null", so skip empty values everywhere (arrays are flattened too).
+  if (typeof Element !== 'undefined' && !Element.prototype.__safeReplace) {
+    const native = Element.prototype.replaceChildren;
+    Element.prototype.replaceChildren = function (...kids) { return native.apply(this, kids.flat(Infinity).filter((k) => k != null && k !== false)); };
+    Element.prototype.__safeReplace = true;
+  }
 
 
   // ---------- line icons (Lucide-style) for app chrome ----------

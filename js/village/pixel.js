@@ -232,45 +232,68 @@
     if (has('or')) { R(x, 18, H2 / 2 - 8, 22, 40, K.out); R(x, 19, H2 / 2 - 7, 20, 38, K.wood); R(x, 21, H2 / 2 - 5, 16, 34, K.white); R(x, 21, H2 / 2 - 5, 16, 8, K.light); R(x, W2 - 40, H2 / 2 - 8, 22, 40, K.out); R(x, W2 - 39, H2 / 2 - 7, 20, 38, K.wood); R(x, W2 - 37, H2 / 2 - 5, 16, 34, K.white); R(x, W2 - 37, H2 / 2 - 5, 16, 8, K.pink); }
     if (has('shagai')) { blob(x, cx + 34, H2 - 26, 5, 4, K.woodL); P(x, cx + 32, H2 - 27, K.white); P(x, cx + 35, H2 - 25, K.white); }
   }
-  /** Wrestler facing right in zodog (short open-chest jacket with sleeves), shuudag (tight briefs) and gutal (tall boots with curled toes). pose: grip | push | fall | dance */
+  /** Mongolian wrestler (32×48, facing right): open-front zodog jacket with long sleeves, back panel and waist cord,
+      tight shuudag briefs, knee-high gutal boots with upturned toes, wrestling hat for the eagle dance.
+      pose: idle | grip | push | dance | fall */
   function wrestler(col, skin, pose, frame) {
-    const key = ['w', col, skin, pose, frame].join(); if (cache.has(key)) return cache.get(key);
-    const { c, x } = mk(28, 32), D = shade(col, -0.3);
-    if (pose === 'fall') {
-      R(x, 2, 24, 24, 6, K.out); R(x, 3, 25, 6, 4, skin); R(x, 9, 25, 6, 4, col); R(x, 15, 25, 6, 4, skin); R(x, 21, 24, 5, 5, K.boot); blob(x, 4, 23, 3, 3, skin); P(x, 3, 22, K.hair);
-      cache.set(key, c); return c;
+    const key = ['w2', col, skin, pose, frame].join(); if (cache.has(key)) return cache.get(key);
+    if (pose === 'fall') {                                   // lying on the back: rotate the standing figure
+      const s = wrestler(col, skin, 'lie', 0), m = mk(48, 32);
+      m.x.translate(0, 32); m.x.rotate(-Math.PI / 2); m.x.drawImage(s, 0, 0);
+      cache.set(key, m.c); return m.c;
     }
-    const l = pose === 'push' ? 3 : pose === 'grip' ? 1 : 0, up = pose === 'dance' ? (frame ? -3 : 1) : 0;
-    const skinD = shade(skin, -0.14), skinL = shade(skin, 0.2), colL = shade(col, 0.28), shuu = shade(col, -0.38), boot = '#8a4a22', bootD = '#5e3012', bootL = '#b06a36';
-    // gutal: tall boots with a gold top band, a little stitched pattern and a curled toe
-    for (const [bx, bw] of [[7, 6], [15, 7]]) {
-      R(x, bx, 24, bw, 8, K.out); R(x, bx + 1, 25, bw - 2, 6, boot); R(x, bx + 1, 25, bw - 2, 1, K.gold); R(x, bx + 1, 26, 1, 4, bootL); R(x, bx + bw - 2, 26, 1, 4, bootD);
-      P(x, bx + 2, 28, K.gold); P(x, bx + 3, 28, K.gold);
-      R(x, bx + bw, 28, 3, 4, K.out); R(x, bx + bw, 29, 2, 2, boot); P(x, bx + bw + 2, 27, K.out); P(x, bx + bw + 1, 28, bootL);
+    const { c, x } = mk(32, 48);
+    const D = shade(col, -0.32), Lt = shade(col, 0.22), sk = skin, skD = shade(skin, -0.16), skL = shade(skin, 0.14), leather = '#5a3420', leatherD = '#3a2012';
+    const lean = pose === 'push' ? 3 : pose === 'grip' ? 1 : 0, dance = pose === 'dance', lift = dance && frame === 1;
+    // ---- gutal boots: bulky knee-high leather, thick sole, ornament stripe, strongly upturned toe
+    const boot = (bx, top) => {
+      R(x, bx, top, 8, 46 - top, K.out); R(x, bx + 1, top + 1, 6, 44 - top, leather); R(x, bx + 6, top + 1, 1, 44 - top, leatherD);
+      R(x, bx + 1, top + 1, 6, 1, K.gold); R(x, bx + 1, top + 2, 6, 1, K.red); R(x, bx + 3, top + 3, 2, 42 - top, K.goldD); P(x, bx + 3, top + 5, K.red); P(x, bx + 4, top + 8, K.red);
+      R(x, bx + 6, 42, 3, 3, K.out); R(x, bx + 6, 43, 2, 1, leather); P(x, bx + 9, 41, K.out); P(x, bx + 9, 40, K.out); P(x, bx + 8, 42, leather); P(x, bx + 8, 41, K.out); // upturned toe
+      R(x, bx, 45, 9, 2, '#24120a'); P(x, bx + 1, 45, '#4a2a18');                                           // thick felt sole
+    };
+    // ---- legs: bare, muscular thighs and knees (shuudag leaves them uncovered)
+    const backTop = 36, frontTop = lift ? 33 : 36;
+    R(x, 8, 28, 7, backTop - 28 + 1, K.out); R(x, 9, 28, 5, backTop - 28, sk); R(x, 13, 29, 1, backTop - 30, skD); P(x, 10, 31, skL); P(x, 10, 34, skD); P(x, 11, 34, skD);
+    if (lift) { R(x, 16, 28, 8, 6, K.out); R(x, 17, 28, 6, 5, sk); R(x, 17, 32, 6, 1, skD); P(x, 18, 29, skL); }
+    else { R(x, 16, 28, 7, frontTop - 28 + 1, K.out); R(x, 17, 28, 5, frontTop - 28, sk); R(x, 21, 29, 1, frontTop - 30, skD); P(x, 18, 31, skL); P(x, 18, 34, skD); P(x, 19, 34, skD); }
+    boot(7, backTop); boot(15, frontTop);
+    // ---- shuudag: very short, tight, high-cut briefs
+    R(x, 8, 25, 16, 1, K.out); R(x, 8, 26, 16, 1, K.out); R(x, 9, 26, 14, 1, D);
+    R(x, 8, 27, 1, 1, K.out); R(x, 23, 27, 1, 1, K.out); R(x, 9, 27, 14, 1, col); P(x, 11, 27, Lt);
+    R(x, 9, 28, 2, 1, K.out); R(x, 21, 28, 2, 1, K.out); R(x, 11, 28, 10, 1, col); P(x, 15, 28, D);
+    R(x, 11, 29, 10, 1, K.out); R(x, 13, 29, 6, 1, col); R(x, 13, 30, 6, 1, K.out);
+    // ---- back arm (drawn behind the torso)
+    const arm = (pts, cuffAt) => { pts.forEach(([ax, ay, w, h2]) => { R(x, ax - 1, ay - 1, w + 2, h2 + 2, K.out); }); pts.forEach(([ax, ay, w, h2]) => { R(x, ax, ay, w, h2, col); R(x, ax, ay + h2 - 1, w, 1, D); }); const [fx, fy] = cuffAt; R(x, fx - 1, fy - 1, 4, 4, K.out); R(x, fx, fy, 2, 2, sk); R(x, fx - 1, fy, 1, 2, K.gold); };
+    if (dance) arm(frame ? [[1, 17, 9, 3]] : [[1, 13, 4, 3], [5, 14, 5, 3]], frame ? [0, 17] : [0, 12]);
+    else if (pose === 'idle' || pose === 'lie') arm([[9, 16, 3, 8]], [10, 24]);
+    else arm([[11 + lean, 19, 15, 3]], [26 + lean, 19]);
+    // ---- zodog back panel (covers back and shoulders; the front is open)
+    R(x, 6 + lean, 14, 7, 12, K.out); R(x, 7 + lean, 15, 5, 10, col); R(x, 7 + lean, 15, 1, 10, D); R(x, 7 + lean, 24, 5, 1, K.gold); R(x, 11 + lean, 16, 1, 9, K.gold);
+    // ---- bare torso: chest and belly with muscle shading
+    R(x, 11 + lean, 15, 12, 11, K.out); R(x, 12 + lean, 15, 10, 10, sk);
+    R(x, 13 + lean, 19, 3, 1, skD); R(x, 17 + lean, 19, 3, 1, skD); P(x, 16 + lean, 18, skD);           // pectorals
+    R(x, 16 + lean, 21, 1, 4, skD); P(x, 14 + lean, 22, skD); P(x, 18 + lean, 22, skD); P(x, 16 + lean, 25, skD); // abs + navel
+    P(x, 14 + lean, 16, skL); P(x, 13 + lean, 17, skL); R(x, 21 + lean, 16, 1, 8, skD);
+    // ---- shoulder yoke + open-front strap of the zodog, tied with a cord at the belly
+    R(x, 7 + lean, 12, 17, 4, K.out); R(x, 8 + lean, 13, 15, 2, col); R(x, 8 + lean, 15, 15, 1, D); R(x, 8 + lean, 12, 15, 1, Lt);
+    for (let i = 0; i < 9; i++) { const sx = 20 + lean - Math.round(i * 0.35); R(x, sx, 15 + i, 2, 1, col); P(x, sx - 1, 15 + i, K.gold); }
+    R(x, 12 + lean, 23, 10, 1, D); P(x, 18 + lean, 23, K.gold); P(x, 18 + lean, 24, D); P(x, 19 + lean, 25, D);       // cord + knot
+    // ---- front arm (over the torso)
+    if (dance) arm(frame ? [[21 + lean, 17, 10, 3]] : [[21, 14, 5, 3], [26, 13, 5, 3]], frame ? [30, 17] : [30, 12]);
+    else if (pose === 'idle' || pose === 'lie') arm([[20, 16, 3, 9]], [21, 25]);
+    else arm([[20 + lean, 16, 9, 3], [27 + lean, 16, 2, 3]], [29 + lean > 29 ? 29 : 29 + lean, 16]);
+    // ---- head: short hair, ear, eye, determined brow
+    const hx = 16 + lean, hy = 9;
+    blob(x, hx, hy, 4, 4, sk);
+    R(x, hx - 4, hy - 4, 8, 3, K.hair); R(x, hx - 4, hy - 2, 3, 4, K.hair); P(x, hx - 1, hy - 4, K.hairL);
+    P(x, hx - 1, hy + 1, skD); P(x, hx + 2, hy, K.eye); R(x, hx + 1, hy - 1, 3, 1, K.hair); P(x, hx + 3, hy + 3, skD); P(x, hx + 4, hy + 1, skD);
+    // ---- wrestling hat (worn for the eagle dance): red dome, gold knot, dark brim with upturned points
+    if (dance) {
+      R(x, hx - 6, hy - 4, 13, 2, K.out); R(x, hx - 5, hy - 4, 11, 1, '#24307a'); P(x, hx - 6, hy - 5, '#24307a'); P(x, hx + 6, hy - 5, '#24307a');
+      for (let r = 0; r < 4; r++) { const w = 4 - r; R(x, hx - w - 1, hy - 5 - r, w * 2 + 3, 1, K.out); R(x, hx - w, hy - 5 - r, w * 2 + 1, 1, r === 3 ? '#e35a4c' : K.red); }
+      R(x, hx - 1, hy - 10, 2, 2, K.gold); P(x, hx, hy - 11, K.goldD);
     }
-    R(x, 8, 22, 4, 2, skin); R(x, 16, 22, 4, 2, skin); R(x, 8, 22, 1, 2, skinD); R(x, 16, 22, 1, 2, skinD); // thighs between shuudag and boots
-    // arm behind the body (shaded sleeve)
-    if (pose !== 'dance') { R(x, 5 + l, 12, 5, 5, K.out); R(x, 6 + l, 13, 4, 3, shade(col, -0.3)); }
-    // shuudag: snug briefs in a deep tone with a gold hem and a centre seam
-    R(x, 7 + l, 17, 13, 5, K.out); R(x, 8 + l, 18, 11, 3, shuu); R(x, 8 + l, 20, 11, 1, K.gold); P(x, 13 + l, 18, shade(shuu, -0.25)); P(x, 13 + l, 19, shade(shuu, -0.25)); R(x, 9 + l, 18, 2, 1, shade(shuu, 0.2));
-    // zodog: jacket over the back and shoulders, open at the chest (skin shows in a V), light collar edge and gold sash
-    R(x, 8 + l, 11, 12, 7, K.out); R(x, 9 + l, 12, 10, 5, col); R(x, 9 + l, 12, 4, 1, colL); R(x, 9 + l, 13, 2, 3, shade(col, -0.2));
-    R(x, 14 + l, 12, 4, 2, skin); R(x, 15 + l, 14, 3, 1, skin); R(x, 16 + l, 15, 2, 1, skin); P(x, 14 + l, 12, skinD); P(x, 15 + l, 14, skinD); P(x, 16 + l, 15, skinD);
-    P(x, 13 + l, 12, colL); P(x, 13 + l, 13, colL); P(x, 14 + l, 14, colL); P(x, 15 + l, 15, colL);
-    R(x, 9 + l, 16, 10, 1, K.gold); P(x, 12 + l, 16, K.red); P(x, 13 + l, 16, K.red);
-    // sleeves with gold cuffs, bare hands
-    if (pose === 'dance') {
-      R(x, 3, 11 + up, 6, 3, K.out); R(x, 4, 12 + up, 5, 1, col); R(x, 2, 11 + up, 1, 3, K.gold); R(x, 0, 12 + up, 2, 2, skin);
-      R(x, 19, 11 + up, 6, 3, K.out); R(x, 19, 12 + up, 5, 1, col); R(x, 25, 11 + up, 1, 3, K.gold); R(x, 26, 12 + up, 2, 2, skin);
-    } else { const ax = 17 + l; R(x, ax, 11, 7, 4, K.out); R(x, ax, 12, 6, 2, col); R(x, ax, 12, 6, 1, colL); R(x, ax + 6, 11, 1, 4, K.gold); R(x, Math.min(ax + 7, 25), 12, 3, 3, skin); P(x, Math.min(ax + 9, 27), 12, skinL); }
-    // head: hair, brows, eye with a glint, blush, nose, mouth, ear
-    R(x, 9 + l, 1, 10, 10, K.out); R(x, 10 + l, 2, 8, 8, skin); R(x, 10 + l, 2, 8, 2, K.hair); R(x, 10 + l, 4, 1, 2, K.hair); R(x, 17 + l, 3, 1, 1, K.hair);
-    R(x, 11 + l, 9, 6, 1, skinD); R(x, 11 + l, 10, 4, 1, skinD); // chin shadow + neck
-    P(x, 14 + l, 5, K.hair); P(x, 15 + l, 5, K.hair); P(x, 17 + l, 5, K.hair);
-    R(x, 14 + l, 6, 2, 2, K.white); P(x, 15 + l, 6, K.eye); P(x, 15 + l, 7, K.eye); R(x, 17 + l, 6, 1, 2, K.eye); P(x, 14 + l, 6, skinD);
-    P(x, 16 + l, 8, '#f19a96'); P(x, 14 + l, 8, '#f19a96'); P(x, 17 + l, 7, skinD); P(x, 16 + l, 9, '#b5524a');
-    P(x, 10 + l, 6, skinD); P(x, 10 + l, 7, skinD);
-    if (pose === 'dance') { R(x, 10, 0, 8, 1, K.out); R(x, 11, 0, 6, 3, K.red); R(x, 10, 3, 8, 1, K.gold); P(x, 13, -1, K.gold); P(x, 14, -1, K.gold); }
     cache.set(key, c); return c;
   }
 
@@ -292,7 +315,7 @@
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => o.kind !== 'npc').map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => o.kind !== 'npc').map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
@@ -382,6 +405,89 @@
     const A = ANIMALS[kind]; const { c, x } = mk(A.w, A.h); A.draw(x, frame); cache.set(key, c); return c;
   }
 
+  // Mongolian horse for riding and racing (28×22, facing right). frame 0 stands, 1–4 gallop. saddle: draw a saddle.
+  const COATS = { bay: ['#8a5a33', '#6b4220', '#2b1e14'], black: ['#3a2c2c', '#241a1a', '#120c0c'], white: ['#ece4d4', '#c9bda6', '#8a7a64'], chestnut: ['#b5652e', '#8a4a1e', '#5a2a10'], gray: ['#a0a0aa', '#7a7a86', '#3a3a44'] };
+  function horse(coat, frame, saddle) {
+    const key = ['h', coat, frame, saddle].join(); if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(28, 22), [B, BD, MN] = COATS[coat] || COATS.bay, bob = frame === 2 || frame === 4 ? 1 : 0;
+    const legs = [[[7, 0], [9, 0], [17, 0], [19, 0]], [[5, -2], [8, 1], [18, 2], [21, -1]], [[7, 1], [10, -1], [16, -1], [19, 1]], [[9, -1], [6, 2], [20, 1], [17, -2]], [[8, 2], [10, 0], [18, -2], [16, 1]]][frame] || [];
+    legs.forEach(([lx, sw], i) => { const top = 13 + bob, len = 7 - (sw < 0 ? 1 : 0); line(x, lx, top, lx + sw, top + len, K.out); line(x, lx + 1, top, lx + 1 + sw, top + len, i % 2 ? BD : B); P(x, lx + sw, top + len, MN); P(x, lx + 1 + sw, top + len, MN); });
+    const sw = frame ? (frame % 2 ? 1 : -1) : 0; // tail swish
+    line(x, 6, 9 + bob, 2 + sw, 15 + bob, K.out); line(x, 5, 9 + bob, 1 + sw, 14 + bob, MN); line(x, 6, 10 + bob, 3 + sw, 16 + bob, MN);
+    blob(x, 13, 10 + bob, 8, 4, B, K.out); ell(x, 12, 9 + bob, 6, 1, shade(B, 0.15));
+    for (let r = 0; r < 7; r++) R(x, 18 + Math.round(r * 0.7), 9 + bob - r, 4, 3, B); // neck
+    line(x, 18, 8 + bob, 22, 2 + bob, MN); line(x, 19, 8 + bob, 23, 2 + bob, MN); // mane
+    blob(x, 24, 3 + bob, 3, 2, B, K.out); R(x, 25, 4 + bob, 3, 2, BD); P(x, 27, 4 + bob, K.out); P(x, 23, 2 + bob, K.eye); P(x, 22, 0 + bob, B); P(x, 22, 1 + bob, K.out);
+    if (saddle) { R(x, 10, 5 + bob, 8, 3, K.out); R(x, 11, 5 + bob, 6, 2, K.red); R(x, 11, 7 + bob, 6, 1, K.gold); R(x, 13, 8 + bob, 1, 4, K.woodD); P(x, 13, 12 + bob, K.gold); }
+    cache.set(key, c); return c;
+  }
+  /** Race checkpoint flag (8×16). */
+  function raceFlag(col, frame) {
+    const key = 'rf:' + col + frame; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(10, 16); R(x, 1, 1, 1, 15, K.woodD); R(x, 0, 15, 3, 1, K.out);
+    for (let r = 0; r < 5; r++) R(x, 2, 1 + r, 7 - Math.abs(r - 2) - (frame && r % 2 ? 1 : 0), 1, col);
+    blob(x, 1, 1, 1, 1, K.gold, K.goldD); cache.set(key, c); return c;
+  }
+  // уяа: the hitching line where race horses wait
+  function uya(x, o) {
+    const X = o.x * 16, Y = o.y * 16, w = o.w * 16;
+    R(x, X + 2, Y + 2, 3, 14, K.out); R(x, X + 3, Y + 3, 1, 13, K.wood); R(x, X + w - 5, Y + 2, 3, 14, K.out); R(x, X + w - 4, Y + 3, 1, 13, K.wood);
+    R(x, X + 3, Y + 4, w - 6, 1, K.woodD); [K.blue, K.red, K.gold, K.white].forEach((col, i) => R(x, X + 8 + i * Math.floor((w - 16) / 3), Y + 4, 3, 2, col));
+    x.drawImage(horse('bay', 0, true), X + 3, Y - 10); x.drawImage(horse('white', 0, true), X + w - 31, Y - 9);
+  }
+
+  // Басар: a Mongolian Bankhar dog. Big, fluffy, black coat with tan "four-eye" spots above the eyes,
+  // tan muzzle, chest and paws, and a bushy tail curled over the back. Faces right; frames 0–2 walk, 3 sit.
+  const BK = { out: '#1a1418', coat: '#2a2326', coatL: '#4a3f44', tan: '#c98a4b', tanL: '#e2ab6c', tongue: '#e8687a' };
+  function bankhar(frame) {
+    const key = 'bk:' + frame; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(22, 18);
+    const sit = frame === 3;
+    // tail: a fluffy curl over the back
+    blob(x, 4, sit ? 9 : 5, 3, 2, BK.coat, BK.out); P(x, 2, sit ? 8 : 4, BK.coatL); P(x, 6, sit ? 8 : 4, BK.tanL);
+    if (sit) {
+      blob(x, 9, 11, 5, 4, BK.coat, BK.out);                 // haunch
+      R(x, 4, 15, 9, 2, BK.out); R(x, 5, 15, 7, 1, BK.tan);  // folded back leg
+      blob(x, 14, 8, 3, 5, BK.coat, BK.out);                  // upright chest
+      R(x, 15, 9, 2, 4, BK.tan);
+      [13, 16].forEach((lx) => { R(x, lx, 12, 2, 5, BK.out); R(x, lx, 12, 1, 4, BK.coat); R(x, lx, 15, 2, 2, BK.tan); });
+    } else {
+      const b = frame === 2 ? 1 : 0;
+      [[5, 0], [7, 1], [12, 1], [14, 0]].forEach(([lx, ph]) => {
+        const lift = frame && (ph ^ (frame - 1)) ? 1 : 0;
+        R(x, lx, 11, 2, 6 - lift, BK.out); R(x, lx, 11, 1, 4 - lift, BK.coat); R(x, lx, 15 - lift, 2, 1, BK.tan);
+      });
+      blob(x, 10, 9 - b, 6, 3, BK.coat, BK.out);              // fluffy body
+      ell(x, 9, 8 - b, 4, 1, BK.coatL);
+      blob(x, 15, 8 - b, 3, 4, BK.coat, BK.out);              // thick mane around the neck
+      R(x, 16, 10 - b, 2, 2, BK.tan);                          // tan chest
+    }
+    const hy = sit ? 0 : (frame === 2 ? 1 : 2);
+    blob(x, 17, hy + 4, 3, 3, BK.coat, BK.out);               // head
+    R(x, 14, hy + 2, 2, 5, BK.out); R(x, 15, hy + 3, 1, 3, BK.coatL); // floppy ear
+    R(x, 19, hy + 5, 3, 2, BK.out); R(x, 19, hy + 5, 2, 2, BK.tan); P(x, 21, hy + 5, BK.out); // muzzle + nose
+    P(x, 18, hy + 4, BK.out); P(x, 18, hy + 3, BK.tanL);       // eye + the tan "second eye" above it
+    if (sit || frame === 0) P(x, 20, hy + 7, BK.tongue);
+    cache.set(key, c); return c;
+  }
+  /** Basar's face for the chat window (24×22). mood: 0 happy, 1 talking, 2 thinking. */
+  function bankharFace(mood) {
+    const key = 'bkf:' + mood; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(24, 22);
+    blob(x, 12, 12, 8, 7, BK.coat, BK.out);                   // head + fluffy cheeks
+    ell(x, 12, 9, 5, 3, BK.coatL);
+    [[2, 0], [18, 1]].forEach(([ex, i]) => { R(x, ex + (i ? 0 : 1), 6, 3, 9, BK.out); R(x, ex + (i ? 1 : 0), 8, 3, 8, BK.out); R(x, ex + 1, 7, 2, 8, i ? BK.coatL : BK.coat); P(x, ex + (i ? 1 : 2), 15, BK.out); }); // floppy ears hanging down
+    R(x, 8, 8, 2, 1, BK.tanL); R(x, 14, 8, 2, 1, BK.tanL);   // the tan "four eyes"
+    if (mood === 2) { R(x, 8, 10, 2, 1, BK.out); R(x, 14, 10, 2, 1, BK.out); }
+    else { R(x, 8, 10, 2, 2, BK.out); R(x, 14, 10, 2, 2, BK.out); P(x, 8, 10, '#fff'); P(x, 14, 10, '#fff'); }
+    blob(x, 12, 15, 4, 3, BK.tan, BK.out);                     // muzzle
+    R(x, 11, 13, 3, 2, BK.out);                                // nose
+    if (mood === 1) { R(x, 10, 17, 5, 2, BK.out); R(x, 11, 18, 3, 1, BK.tongue); }
+    else { P(x, 10, 17, BK.out); P(x, 14, 17, BK.out); R(x, 11, 17, 3, 1, BK.out); }
+    if (mood === 0) R(x, 12, 18, 2, 2, BK.tongue);
+    cache.set(key, c); return c;
+  }
+
   // ------------------------------------------------------------ UI icons (16×16) for shop, bag, HUD
   const iconCache = new Map();
   function iconCanvas(key) {
@@ -443,8 +549,13 @@
         fish: () => { const f = iconCanvas('fish:perch'); x.drawImage(f, 0, 0); },
         lock: () => { R(x, 4, 7, 8, 7, K.out); R(x, 5, 8, 6, 5, K.gold); R(x, 5, 3, 6, 5, K.out); R(x, 6, 4, 4, 4, 'rgba(0,0,0,0)'); x.clearRect(6, 4, 4, 3); P(x, 8, 10, K.out); },
         ger: () => { const g = gerSprite(K.blue, K.red); x.drawImage(g, 0, 0, 48, 50, 0, 0, 16, 17); },
-        wrestle: () => { const w = wrestler('#e14b3d', '#edbb93', 'dance', 0); x.drawImage(w, 0, 0, 28, 32, 0, 1, 14, 16); const w2 = wrestler('#3f76db', '#d9a06e', 'grip', 0); x.save(); x.translate(16, 1); x.scale(-1, 1); x.drawImage(w2, 0, 0, 28, 32, 0, 0, 10, 12); x.restore(); },
+        wrestle: () => { const w = wrestler('#d8342b', '#edbb93', 'dance', 0); x.drawImage(w, 0, 0, 32, 48, 2, 0, 11, 16); },
         ovoo: () => { for (let r = 0; r < 5; r++) for (let i = -r; i <= r; i++) R(x, 7 + i * 1.5 | 0, 7 + r * 2, 2, 2, [K.rock, K.rockL, K.rockD][(i + r + 6) % 3]); R(x, 7, 1, 1, 7, K.woodD); line(x, 7, 2, 3, 7, K.light); line(x, 8, 2, 12, 6, K.blue); },
+        dog: () => { const f = bankharFace(0); x.drawImage(f, 0, 0, 24, 22, 0, 1, 16, 15); },
+        book: () => { R(x, 1, 3, 14, 11, K.out); R(x, 2, 4, 6, 9, K.paper); R(x, 8, 4, 6, 9, '#fff3d6'); R(x, 7, 3, 2, 11, K.redD); [6, 8, 10].forEach((ly) => { R(x, 3, ly, 4, 1, K.woodL); R(x, 9, ly, 4, 1, K.woodL); }); },
+        menu: () => { [4, 8, 12].forEach((ly) => { R(x, 2, ly - 1, 12, 3, K.out); R(x, 3, ly, 10, 1, K.paper); }); },
+        horse: () => { const hs = horse('bay', 0, true); x.drawImage(hs, 0, 0, 28, 22, 0, 2, 16, 13); },
+        trophy: () => { R(x, 4, 2, 8, 6, K.out); R(x, 5, 3, 6, 5, K.gold); R(x, 2, 3, 2, 3, K.goldD); R(x, 12, 3, 2, 3, K.goldD); R(x, 7, 8, 2, 3, K.goldD); R(x, 5, 11, 6, 3, K.out); R(x, 6, 12, 4, 1, K.woodL); P(x, 6, 4, K.white); },
         logo: () => { ell(x, 8, 15, 8, 3, K.grass); blob(x, 12, 3, 2, 2, K.gold, K.goldD); for (let c2 = 2; c2 < 14; c2++) { const dx = (c2 - 8) / 6; const top = 9 - Math.round(4 * Math.sqrt(Math.max(0, 1 - dx * dx))); R(x, c2, top, 1, 10 - top, K.white); P(x, c2, top - 1, K.out); } R(x, 3, 9, 10, 4, K.out); R(x, 4, 9, 8, 3, K.felt); R(x, 4, 9, 8, 1, K.blue); R(x, 7, 10, 2, 3, K.red); },
       })[id]();
     }
@@ -457,5 +568,5 @@
     return img;
   }
 
-  TG.pixel = { K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
 })(window.TG);

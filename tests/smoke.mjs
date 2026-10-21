@@ -1,6 +1,6 @@
-// Headless browser smoke test: opens every screen, every game (solo and
-// together) and every "Цэгцлэе!" level, and fails on any JavaScript error or
-// any request to an outside server. Needs puppeteer-core and Chrome.
+// Headless browser smoke test: registers a child, walks through Нутаг, Basar the AI
+// dog (offline mode), every heritage lesson and the family screens. Fails on any
+// JavaScript error or any request to an outside server. Needs puppeteer-core and Chrome.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname, dirname, resolve, normalize } from 'node:path';
@@ -35,26 +35,35 @@ page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.te
 const check = async (label, selector) => {
   step = label;
   if (selector && !(await page.$(selector))) errors.push(`${label}: expected "${selector}" to render`);
+  // no screen may ever show "null", "undefined" or "NaN" to a child
+  const junk = await page.evaluate(() => { const out = []; const w = (n) => { for (const c of n.childNodes) { if (c.nodeType === 3 && /\bnull\b|\bundefined\b|\bNaN\b|\[object /.test(c.textContent)) out.push(c.textContent.trim().slice(0, 60)); else if (c.nodeType === 1 && c.tagName !== 'SCRIPT') w(c); } }; w(document.body); return out; });
+  junk.forEach((t) => errors.push(`${label}: shows broken text "${t}"`));
 };
 
 try {
   await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
-  await check('welcome screen', '.onboard');
+  await check('register screen', '.auth .big-input');
 
-  const ages = { '3-6': 5, '7-10': 8, '11-14': 12, '15-18': 16 };
-  await page.evaluate(() => { TG.store.addProfile({ name: 'Тест', age: 8, avatar: '🐎' }); TG.store.state.settings.screenLimit = 999; TG.store.state.settings.sound = false; });
-
-  for (const screen of ['home', 'satis', 'missions', 'memories', 'about']) {
-    await page.evaluate((s) => TG.go(s), screen); await sleep(250);
-    await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
-  }
+  // register through the real screens: name -> age -> mascot -> picture password
+  step = 'register';
+  await page.type('.big-input', 'Тест');
+  const next = () => page.evaluate(() => [...document.querySelectorAll('.auth-card .btn.primary')].pop().click());
+  await next(); await sleep(200);
+  await page.evaluate(() => document.querySelectorAll('.age-btn')[5].click()); await next(); await sleep(200);
+  await check('mascot picker', '.mascot-grid');
+  await page.evaluate(() => document.querySelectorAll('.mascot')[2].click()); await next(); await sleep(200);
+  for (const k of [0, 4, 8]) await page.evaluate((k) => document.querySelectorAll('.pic-key')[k].click(), k);
+  await sleep(900);
+  await check('straight into Нутаг after register', '.village canvas');
+  const prof = await page.evaluate(() => { const p = TG.store.active(); return p && { name: p.name, age: p.age, avatar: p.avatar, code: p.code }; });
+  if (!prof || prof.name !== 'Тест' || prof.age !== 8 || !prof.code) errors.push(`register: profile not saved correctly: ${JSON.stringify(prof)}`);
+  await page.evaluate(() => { TG.store.state.settings.sound = false; document.querySelectorAll('.modal-x').forEach((x) => x.click()); });
 
   // modal accessibility: focus moves into the dialog, Escape closes it, focus returns
   step = 'modal accessibility';
-  await page.evaluate(() => TG.go('home'));
-  await sleep(200);
+  await sleep(400);
   await page.evaluate(() => {
     window.__before = document.activeElement;
     window.__close = TG.modal(TG.h('div', null, TG.h('button', { class: 'btn', id: 'inside-modal' }, 'inside')));
@@ -79,11 +88,10 @@ try {
   if (!restored) errors.push('modal accessibility: focus was not restored after closing');
 
   step = 'village (solo mode, no server)';
-  await page.evaluate(() => TG.go('village')); await sleep(900);
-  await check('village screen', '.village canvas');
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
-  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
+  if (!(await page.evaluate(() => !!TG._village.dog()))) errors.push('village: Basar the dog is not following the player');
+  await page.evaluate(() => { const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
   await sleep(300);
   if (!(await page.evaluate(() => { const p = TG.store.active().village.garden[0]; return p && p.c === 'carrot'; }))) errors.push('village: planting in solo mode did not work');
   for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(300); await check(`village ${btn} panel`, '.modal'); }
@@ -91,127 +99,145 @@ try {
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.arena(); }); await sleep(300); await check('village wrestling panel', '.v-wr-head');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.tournament(1); }); await sleep(400); await check('village wrestling match', '.v-wrestle canvas');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  step = 'ger locked before the lesson';
+  await page.evaluate(() => TG._village.lot(0)); await sleep(300);
+  if (!(await page.evaluate(() => /сур|Learn/i.test((document.querySelector('.modal h2') || {}).textContent || '')))) errors.push('village: building a ger should ask to finish the ger lesson first');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
-  const games = await page.evaluate(() => TG.gameOrder.map((id) => ({ id, ages: TG.games[id].ages })));
-  for (const g of games) {
-    for (const together of [false, true]) {
-      await page.evaluate((age) => { TG.store.active().age = age; }, ages[g.ages[0]]);
-      await page.evaluate((id, together) => {
-        document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
-        const players = [{ name: 'Тест', emoji: '🐎', color: TG.PCOLORS[0] }];
-        if (together) players.push({ name: 'Ээж', emoji: '👩', color: TG.PCOLORS[1] });
-        TG.go('play', { g: TG.games[id], players, together });
-      }, g.id, together);
-      step = `game ${g.id} (${together ? 'together' : 'solo'})`;
-      await sleep(350);
-      await check(`game ${g.id} (${together ? 'together' : 'solo'})`, '.play-screen');
-      for (let k = 0; k < 6; k++) {   // poke a few buttons to exercise game logic
-        await page.evaluate(() => { const b = [...document.querySelectorAll('.stage button:not(:disabled)')].filter((x) => x.offsetParent); if (b.length) b[Math.floor(Math.random() * b.length)].click(); });
-        await sleep(120);
+  // Basar: offline answers and a quiz (no server here, so the offline knowledge must answer)
+  step = 'Basar chat (offline)';
+  await page.evaluate(() => document.querySelector('.v-basar').click()); await sleep(300);
+  await check('Basar chat', '.basar-chat');
+  await page.evaluate(() => { const i = document.querySelector('.b-input'); i.value = 'Тараг яаж хийдэг вэ?'; [...document.querySelectorAll('.b-send .btn')].pop().click(); });
+  await sleep(500);
+  const answer = await page.evaluate(() => { const b = [...document.querySelectorAll('.b-row.basar .b-bubble')].pop(); return b ? b.textContent : ''; });
+  if (!/хөрөнгө|бүлээн/.test(answer)) errors.push(`Basar: offline answer about yogurt was "${answer.slice(0, 80)}"`);
+  await page.evaluate(() => document.querySelector('.b-tray .b-chips .chip').click()); await sleep(500);
+  await check('Basar quiz', '.b-quiz .b-opt');
+  await page.evaluate(() => document.querySelector('.b-opt').click()); await sleep(200);
+  await check('Basar quiz explanation', '.b-exp:not(.hidden)');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  // heritage school: play every lesson to the end
+  await page.evaluate(() => TG.go('learn')); await sleep(300);
+  await check('heritage school', '.l-grid .l-card');
+  const ids = await page.evaluate(() => TG.learn.LESSONS.map((l) => l.id));
+  for (const id of ids) {
+    step = `lesson ${id}`;
+    await page.evaluate((id) => TG.go('lesson', { id }), id); await sleep(300);
+    let finished = false;
+    for (let guard = 0; guard < 120 && !finished; guard++) {
+      const st = await page.evaluate(() => {
+        const panel = document.querySelector('.l-panel'); if (!panel) return 'none';
+        if (panel.querySelector('.l-done')) return 'done';
+        const solo = panel.querySelector('.with-opt'); if (solo) { solo.click(); return 'picker'; }
+        const q = panel.querySelector('.b-opt:not(:disabled)'); if (q) { q.click(); return 'quiz'; }
+        const nx = [...panel.querySelectorAll('.btn.primary')].find((b) => !b.classList.contains('hidden') && !b.disabled && !b.classList.contains('l-tap'));
+        if (nx) { nx.click(); return 'next'; }
+        const opt = panel.querySelector('.l-opt:not(:disabled)'); if (opt) { opt.click(); return 'opt'; }
+        if (panel.querySelector('.l-gauge')) return 'gauge';
+        const tap = panel.querySelector('.l-tap:not(:disabled)'); if (tap) { tap.click(); return 'tap'; }
+        if (panel.querySelector('.l-hint')) return 'zones';
+        return 'wait';
+      });
+      if (st === 'done') finished = true;
+      else if (st === 'zones') {
+        const z = await page.evaluate(() => { const t = document.querySelector('.l-panel h2').textContent; const s = TG.learn.byId('customs').steps.find((x) => TG.tx(x.title) === t); return s.zone; });
+        const [zx, zy] = { khoimor: [60, 14], hearth: [60, 40], west: [22, 40], east: [98, 40], door: [60, 72] }[z];
+        const box = await (await page.$('.l-scene')).boundingBox();
+        await page.mouse.click(box.x + (zx / 120) * box.width, box.y + (zy / 80) * box.height);
+      } else if (st === 'gauge') {
+        const hold = await page.evaluate(() => document.querySelector('.l-tap').textContent.includes('🔥'));
+        const box = await (await page.$('.l-tap')).boundingBox();
+        const zone = await page.evaluate(() => { const b = document.querySelector('.l-gauge b'); return [parseFloat(b.style.left), parseFloat(b.style.left) + parseFloat(b.style.width)]; });
+        if (hold) { await page.mouse.move(box.x + 20, box.y + 20); await page.mouse.down(); }
+        for (let k = 0; k < 500; k++) { const v = await page.evaluate(() => parseFloat(document.querySelector('.l-gauge em').style.left)); if (v > zone[0] + 2 && v < zone[1] - 2) break; await sleep(10); }
+        if (hold) await page.mouse.up(); else await page.mouse.click(box.x + 20, box.y + 20);
       }
+      await sleep(st === 'quiz' ? 250 : 60);
     }
+    if (!finished) errors.push(`lesson ${id}: could not be completed`);
+    await check(`lesson ${id} family activity`, '.l-family');
+  }
+  const learned = await page.evaluate(() => TG.learn.LESSONS.every((l) => TG.learn.done(l.id)));
+  if (!learned) errors.push('lessons: progress was not saved');
+  // learn together: a lesson with family takes turns and counts for the parent dashboard
+  step = 'lesson with family';
+  await page.evaluate(() => TG.go('lesson', { id: 'nuuts' })); await sleep(300);
+  await page.evaluate(() => [...document.querySelectorAll('.with-opt')][1].click()); await sleep(150);
+  await page.evaluate(() => document.querySelector('.with-picker .fam-chip').click()); await sleep(150);
+  await page.evaluate(() => [...document.querySelectorAll('.with-picker .btn.primary')].pop().click()); await sleep(250);
+  await check('turn badge in a family lesson', '.l-panel .turn-badge');
+  step = 'quiz party with a friend';
+  await page.evaluate(() => TG.basar.quizParty('ger')); await sleep(250);
+  await page.evaluate(() => [...document.querySelectorAll('.with-opt')][2].click()); await sleep(150);
+  await page.evaluate(() => { const i = document.querySelector('.add-friend .input'); i.value = 'Ану'; document.querySelector('.add-friend .btn').click(); }); await sleep(150);
+  await page.evaluate(() => [...document.querySelectorAll('.with-picker .btn.primary')].pop().click()); await sleep(400);
+  for (let k = 0; k < 4; k++) { await page.evaluate(() => { const o = document.querySelector('.b-opt:not(:disabled)'); if (o) o.click(); }); await sleep(120); await page.evaluate(() => { const n = [...document.querySelectorAll('.basar-modal .btn.primary')].find((x) => !x.classList.contains('hidden')); if (n) n.click(); }); await sleep(250); }
+  await check('quiz party scoreboard', '.basar-modal .l-score');
+  if (!(await page.evaluate(() => (TG.store.active().together || {}).friends >= 1))) errors.push('learn together: the friends quiz was not recorded');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  step = 'ger unlocked after the lesson';
+  await page.evaluate(() => TG.go('village')); await sleep(700);
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.lot(0); }); await sleep(300);
+  await check('ger builder unlocked', '.modal .v-gerbox + .label, .modal .v-chips');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+
+  // horse riding and the Naadam horse race
+  step = 'horse riding';
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.mount('chestnut'); }); await sleep(200);
+  if (!(await page.evaluate(() => TG.store.active().village.look.ride === 'horse'))) errors.push('horse: mounting did not work');
+  step = 'horse race';
+  await page.evaluate(() => TG._village.race()); await sleep(3300);
+  if ((await page.evaluate(() => TG._village.raceState() && TG._village.raceState().phase)) !== 'go') errors.push('horse race: the race did not start after the countdown');
+  for (let i = 1; i < 7; i++) { await page.evaluate((i) => { const L = TG._village.live(), q = TG.vworld.RACE[i]; L.me.px = q.x - 0.5; L.me.py = q.y - 0.82; }, i); await sleep(120); }
+  await sleep(300);
+  if (!(await page.evaluate(() => TG.store.active().village.horse.races === 1))) errors.push('horse race: finishing the race was not recorded');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => TG._village.dismount()); await sleep(100);
+  step = 'wrestling techniques';
+  await page.evaluate(() => TG._village.tournament(8)); await sleep(400);
+  const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
+  if (nMoves !== 7) errors.push(`wrestling: expected 7 techniques, found ${nMoves}`);
+  if (!(await page.evaluate(() => /3/.test(document.querySelector('.v-wrestle .eyebrow').textContent)))) errors.push('wrestling: late rounds should need 3 falls');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  // Basar understands English and does simple maths offline
+  step = 'Basar in English';
+  await page.evaluate(() => TG.basar.open()); await sleep(250);
+  for (const q of ['What is a ger?', '6 x 7']) { await page.evaluate((q) => { const i = document.querySelector('.b-input'); i.value = q; [...document.querySelectorAll('.b-send .btn')].pop().click(); }, q); await sleep(350); }
+  const en = await page.evaluate(() => [...document.querySelectorAll('.b-row.basar .b-bubble')].slice(-2).map((b) => b.textContent));
+  if (!/clever home|khana/.test(en[0] || '')) errors.push(`Basar: English question got "${(en[0] || '').slice(0, 60)}"`);
+  if (!/42/.test(en[1] || '')) errors.push(`Basar: offline maths answer was "${(en[1] || '').slice(0, 60)}"`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  step = 'achievements';
+  await page.evaluate(() => TG.go('achievements')); await sleep(300);
+  await check('achievements screen', '.ach-grid .ach.on');
+  const achs = await page.evaluate(() => Object.keys(TG.store.active().ach || {}));
+  for (const id of ['first_lesson', 'all_lessons', 'ger_master', 'nuuts', 'with_friends']) if (!achs.includes(id)) errors.push(`achievements: "${id}" was not awarded`);
+  step = 'parent report';
+  await page.evaluate(() => TG.go('family')); await sleep(250);
+  await page.evaluate(() => { const g = document.querySelector('.gate-q'); if (!g) return; const q = g.textContent.match(/(\d+) × (\d+)/); document.querySelector('.gate-input').value = q[1] * q[2]; [...document.querySelectorAll('.gate .btn')].pop().click(); }); await sleep(400);
+  await check('parent sees badges', '.ach-earned .ach-chip');
+  await check('parent sees what was learned', '.learned li');
+
+  for (const screen of ['memories', 'about']) {
+    await page.evaluate((s) => TG.go(s), screen); await sleep(250);
+    await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
   }
 
-  const levels = await page.evaluate(() => Object.fromEntries(Object.entries(TG.SATIS).map(([ag, l]) => [ag, l.length])));
-  let count = 0;
-  for (const [ag, n] of Object.entries(levels)) {
-    for (let i = 0; i < n; i++) {
-      step = `puzzle ${ag} #${i + 1}`;
-      await page.evaluate((ag, i) => TG.go('satisLevel', { ag, i }), ag, i); await sleep(200);
-      await check(`puzzle ${ag} #${i + 1}`, '.satis-stage > *');
-      count++;
-    }
-  }
-
-  await page.evaluate(() => TG.go('result', { g: TG.games.shagai, players: [{ name: 'A', emoji: '🐎', color: '#000' }, { name: 'B', emoji: '👩', color: '#111' }], together: true, res: { stars: 3, scores: [15, 9] } }));
-  await sleep(250); await check('result screen', '.result');
-
-  // together mode: breathing must show who is breathing with you, the move
-  // break must not pay 3 stars for skipping everything, and collaborative
-  // games must still show who took part on the result screen.
-  step = 'together mode feedback';
-  const together = await page.evaluate(async () => {
-    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
-    const players = [{ name: 'Тест', emoji: '🐎', color: TG.PCOLORS[0] }, { name: 'Ээж', emoji: '👩', color: TG.PCOLORS[1] }];
-    const out = {};
-
-    // 1. breathing keeps the group visible in the HUD
-    document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
-    TG.go('play', { g: TG.games.breathing, players, together: true });
-    await nap(300);
-    out.breathHud = (document.querySelector('.hud') || {}).textContent || '';
-    out.breathHudHasBoth = out.breathHud.includes('🐎') && out.breathHud.includes('👩');
-
-    // 2. skipping every move in the move break must not earn 3 stars
-    document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
-    TG.go('play', { g: TG.games.move, players, together: true });
-    await nap(300);
-    for (let k = 0; k < 6; k++) {
-      const skip = [...document.querySelectorAll('.stage button')].find((b) => b.textContent.includes('⏭'));
-      if (skip) skip.click();
-      await nap(120);
-    }
-    await nap(400);
-    out.skipStars = document.querySelectorAll('.res-stars .on').length;
-    out.skipSummary = (document.querySelector('.result .muted') || {}).textContent || '';
-
-    // 3. a collaborative game shows the players on the result screen
-    document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
-    TG.go('result', { g: TG.games.budget, players, together: true, res: { stars: 2, summary: 'test' } });
-    await nap(250);
-    out.participants = document.querySelectorAll('.together-row .tp').length;
-    return out;
-  });
-  if (!together.breathHudHasBoth) errors.push(`together mode feedback: the breathing HUD does not show both players (got "${together.breathHud}")`);
-  if (together.skipStars === 3) errors.push('together mode feedback: skipping every move in the move break still earned 3 stars');
-  if (!/0\//.test(together.skipSummary)) errors.push(`together mode feedback: the move break summary does not count the skipped moves (got "${together.skipSummary}")`);
-  if (together.participants !== 2) errors.push(`together mode feedback: the result screen shows ${together.participants} participants, expected 2`);
-
-  // math duel: two-player mode used to award 3 stars no matter how badly it went
-  step = 'math duel star grading';
-  await page.evaluate(() => {
-    document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
-    TG.store.active().age = 8;   // 7-10, so the questions use only + − ×
-    const players = [{ name: 'Тест', emoji: '🐎', color: TG.PCOLORS[0] }, { name: 'Ээж', emoji: '👩', color: TG.PCOLORS[1] }];
-    TG.go('play', { g: TG.games.mathduel, players, together: true });
-  });
-  await sleep(350);
-  const duel = await page.evaluate(async () => {
-    const nap = (ms) => new Promise((r) => setTimeout(r, ms));
-    const value = (t) => {
-      const m = t.replace(' = ?', '').trim().match(/^(\d+)\s*(.+?)\s*(\d+)$/);
-      if (!m) return null;
-      const a = +m[1], op = m[2], b = +m[3];
-      if (op === '+') return a + b;
-      if (op === '×') return a * b;
-      if (op === '÷') return a / b;
-      return a - b;
-    };
-    for (let q = 0; q < 10; q++) {
-      // the two panels are rendered in the opposite order to the player list,
-      // so pick them by name rather than by position
-      const panels = [...document.querySelectorAll('.duel-panel')];
-      const child = panels.find((p) => p.querySelector('.dp-head').textContent.includes('Тест'));
-      const grown = panels.find((p) => p.querySelector('.dp-head').textContent.includes('Ээж'));
-      if (!child || !grown) return { error: 'could not find the two duel panels' };
-      const answer = value(child.querySelector('.dp-q').textContent);
-      if (answer == null) return { error: 'could not read the question' };
-      const wrong = [...child.querySelectorAll('.dp-btn')].find((o) => +o.textContent !== answer);
-      const right = [...grown.querySelectorAll('.dp-btn')].find((o) => +o.textContent === answer);
-      if (!wrong || !right) return { error: 'could not find the options' };
-      wrong.click();                 // the child answers wrong
-      await nap(30);
-      right.click();                 // the grown-up answers correctly
-      await nap(1150);               // the duel moves on 1s after a correct answer
-    }
-    await nap(500);
-    return { stars: document.querySelectorAll('.res-stars .on').length, onResult: !!document.querySelector('.result') };
-  });
-  if (duel.error) errors.push(`math duel star grading: ${duel.error}`);
-  else if (!duel.onResult) errors.push('math duel star grading: the duel never reached the result screen');
-  else if (duel.stars === 3) errors.push('math duel star grading: a run with no correct answers still got 3 stars');
-
-  console.log(`Checked 5 screens, the village, ${games.length} games x 2 modes, ${count} puzzle levels.`);
+  step = 'log out and log in with the picture password';
+  await page.evaluate(() => { TG.store.state.loggedIn = false; TG.go('auth', { tab: 'login' }); }); await sleep(300);
+  await page.evaluate(() => document.querySelector('.auth-prof').click()); await sleep(200);
+  for (const k of [0, 4, 7]) await page.evaluate((k) => document.querySelectorAll('.pic-key')[k].click(), k); // wrong
+  await sleep(400);
+  if (await page.evaluate(() => !!document.querySelector('.village'))) errors.push('login: a wrong picture password let the child in');
+  for (const k of [0, 4, 8]) await page.evaluate((k) => document.querySelectorAll('.pic-key')[k].click(), k); // right
+  await sleep(700);
+  await check('village after login', '.village canvas');
+  console.log(`Checked register/login, the village, Basar, ${ids.length} lessons, the ger unlock and the family screens.`);
 } catch (e) {
   errors.push(`crashed during "${step}": ${e.message}`);
 }

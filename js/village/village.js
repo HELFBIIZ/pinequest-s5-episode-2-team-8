@@ -15,7 +15,7 @@
     const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, seeds: { carrot: 4, potato: 2 }, produce: {}, fish: {},
       owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, can: 5, water: 5, rod: 1, room: 'NUTAG',
       garden: [], quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
-      lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0 }, ovoo: '' };
+      lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
     for (const k in d) if (v[k] === undefined) v[k] = d[k];
     while (v.garden.length < R.PLOTS) v.garden.push(null);
     while (v.lots.length < R.LOTS) v.lots.push(null);
@@ -38,6 +38,7 @@
       net.send({ t: 'look', look: v.look, lvl: after });
     }
     if (live) hud();
+    setTimeout(() => TG.achievements && TG.achievements.check(), 0);
     return { coins, xp, level: after > before ? after : 0 };
   }
   const QUESTS = {
@@ -45,20 +46,21 @@
     harvest: { n: 3, c: 25, x: 30, t: Tx('3 ургац хураах', 'Harvest 3 crops') },
     plant: { n: 4, c: 15, x: 20, t: Tx('4 үр тарих', 'Plant 4 seeds') },
     fish: { n: 2, c: 25, x: 30, t: Tx('2 загас барих', 'Catch 2 fish') },
-    game: { n: 1, c: 20, x: 30, t: Tx('Naadamy-ийн 1 тоглоом тоглох', 'Play 1 Naadamy game') },
-    together: { n: 1, c: 35, x: 45, t: Tx('Гэр бүлтэйгээ хамт 1 тоглоом тоглох', 'Play 1 game with family') },
-    puzzle: { n: 2, c: 20, x: 30, t: Tx('Цэгцлэе!-ийн 2 түвшин дуусгах', 'Finish 2 puzzle levels') },
+    basar: { n: 2, c: 15, x: 25, t: Tx('Басараас 2 асуулт асуух', 'Ask Basar 2 questions') },
+    quiz: { n: 3, c: 25, x: 35, t: Tx('Басарын 3 асуултад зөв хариулах', 'Answer 3 of Basar’s questions right') },
+    lesson: { n: 1, c: 30, x: 40, t: Tx('Өв соёлын 1 хичээл дуусгах', 'Finish 1 heritage lesson') },
+    together: { n: 1, c: 40, x: 50, t: Tx('Гэр бүлтэйгээ бодит ажил хийх', 'Do a real activity with family') },
     pet: { n: 3, c: 10, x: 20, t: Tx('Хонийг 3 удаа илбэх', 'Pet the sheep 3 times') },
     sell: { n: 5, c: 15, x: 20, t: Tx('5 зүйл зарах', 'Sell 5 items') },
     help: { n: 2, c: 30, x: 40, t: Tx('Найзынхаа ургамлыг 2 удаа услах', "Water a friend's plants twice") },
   };
-  const POOL = ['water', 'harvest', 'plant', 'fish', 'game', 'together', 'puzzle', 'pet', 'sell'];
+  const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz'];
   function quests() {
     const v = V(), d = S.dkey();
-    if (v.quests.d !== d) {
+    if (v.quests.d !== d || v.quests.list.some((q) => !QUESTS[q.k])) { // new day, or quests from an older version
       let hs = 0; for (const ch of d + v.id) hs = (hs * 31 + ch.charCodeAt(0)) >>> 0;
       const pool = [...POOL], pick = [];
-      while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; pick.push(pool.splice(hs % pool.length, 1)[0]); }
+      while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; const k = pool.splice(hs % pool.length, 1)[0]; if (!pick.includes(k)) pick.push(k); }
       pick.push('help');
       v.quests = { d, list: pick.map((k) => ({ k, p: 0, done: false })) };
       v.pets = {};
@@ -74,13 +76,10 @@
     }
     S.save();
   }
-  TG.onGameRecorded = ({ stars, together, gameId }) => {
-    const m = together ? 1.5 : 1;
-    quest('game'); if (together) quest('together'); if (gameId === 'satis') quest('puzzle');
-    return reward(Math.round(stars * 6 * m), Math.round(stars * 12 * m));
-  };
-  TG.onMissionDone = () => reward(15, 25);
-  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r) }; // used by automated tests
+  TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
+  TG.villageQuest = (k, n) => quest(k, n);
+  const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
+  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), mount: (c) => mount(c), dismount: () => dismount(), race: () => raceStart(), raceState: () => live && live.race }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -212,14 +211,20 @@
       water: h('div', { class: 'v-pill px-frame' }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
       ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
       hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Үр сонгох', 'Choose seeds') }),
+      race: h('div', { class: 'v-race px-frame hidden', 'aria-live': 'polite' }),
+      horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
-        h('button', { class: 'v-back px-frame', 'aria-label': 'back', onclick: () => TG.go('home') }, TG.icon('arrowLeft')),
+        h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
         els.me, h('div', { class: 'v-pills' }, els.coins, els.water, els.net)),
+      els.race,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
+          els.horse,
+          h('button', { class: 'v-round px-frame v-basar', 'aria-label': 'basar', title: L('Басар (B)', 'Basar (B)'), onclick: () => openBasar() }, pic('ui:dog', 34)),
+          h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
@@ -232,12 +237,13 @@
   function start(root, canvas, els, setCleanup) {
     if (!root.isConnected) return;
     const v = V(), prof = S.active();
+    if (v.look.ride) { v.look.ride = null; S.save(); }
     const qRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
     if (R.ROOM_RE.test(qRoom) && v.room !== qRoom) { v.room = qRoom; S.save(); }
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
     live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
-      cam: { x: sp.x, y: sp.y }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
+      cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
       sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
       raf: 0, last: performance.now(), view: {}, terrain: WD.renderStatic(), buf: PX.mk(1, 1), ctxTimer: 0, sel: null };
     resize();
@@ -255,6 +261,7 @@
   const clearKeys = () => { if (live) live.keys.clear(); };
   function stop() {
     if (!live) return;
+    live.race = null;
     cancelAnimationFrame(live.raf);
     window.removeEventListener('resize', resize); window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
     net.close();
@@ -290,6 +297,7 @@
     e.net.className = 'v-pill px-frame v-net ' + live.status;
     e.net.textContent = live.status === 'online' ? `● ${n} · ${live.room}` : live.status === 'solo' ? `○ ${L('Ганцаараа', 'Solo')}` : `◌ ${L('Холбогдож…', 'Connecting…')}`;
     hotbar();
+    e.horse.classList.toggle('hidden', !live.ride || !!live.race);
     if (TG.music) { e.music.classList.toggle('hidden', !TG.music.available); e.music.textContent = '♪'; e.music.classList.toggle('off', !TG.music.playing); e.music.title = TG.music.title; }
   }
   function hotbar() {
@@ -300,7 +308,7 @@
       : [h('button', { class: 'v-slot-btn empty', onclick: () => shopModal('seeds') }, pic('ui:seed', 28), h('small', null, '+'))]));
   }
   function contextAction() {
-    if (!live || live.me.path.length) return null;
+    if (!live || live.me.path.length || live.race) return null;
     const m = live.me, fx = m.px + 0.5, fy = m.py + 0.82;
     const pi = WD.plotAt(m.x, m.y); if (pi >= 0) return { type: 'plot', i: pi };
     let best = null, bd = 1.05;
@@ -322,7 +330,7 @@
         return ['crop:' + p.c, fmtLeft(R.stageLeft(p, now()))];
       }
       case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
-      case 'arcade': return ['ui:play', L('Тоглох', 'Play')];
+      case 'arcade': return ['ui:book', L('Сурах', 'Learn')];
       case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
       case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
       case 'well': return ['ui:drop', L('Ус авах', 'Get water')];
@@ -331,6 +339,7 @@
       case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l ? L('Гэр авах', 'Buy ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
       case 'zasuul': case 'arena': return ['ui:wrestle', L('Барилдах', 'Wrestle')];
       case 'ovoo': return ['ui:ovoo', L('Овоо тахих', 'Visit ovoo')];
+      case 'uya': return ['ui:horse', L('Морь', 'Horses')];
     }
     return ['ui:star', ''];
   }
@@ -341,11 +350,11 @@
     if (a) { const [k, t] = labelFor(a); rc(b, pic(k, 36), h('span', null, t)); }
   }
   function doAction(a) {
-    if (!a || !live) return;
+    if (!a || !live || live.race) return; // no shops or menus in the middle of a race
     switch (a.type) {
       case 'plot': return plotAction(a.i);
       case 'home': return wardrobe();
-      case 'arcade': return arcade();
+      case 'arcade': return TG.go('learn');
       case 'shop': return shopModal();
       case 'board': return questModal();
       case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `${v.water}/${v.can}`, '#93d4f6'); hud(); return; }
@@ -354,6 +363,7 @@
       case 'lot': return lotAction(a.i);
       case 'zasuul': case 'arena': return arenaModal();
       case 'ovoo': return ovooAction();
+      case 'uya': return uyaModal();
     }
   }
 
@@ -364,6 +374,7 @@
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
     if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
@@ -390,6 +401,7 @@
   function onKey(e) {
     if (!live || document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
+    if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space is only ever the action button: it never re-presses a focused HUD button
       e.preventDefault(); e.stopPropagation();
@@ -412,16 +424,17 @@
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
   function update(dt) {
-    const m = live.me, k = live.keys;
+    const m = live.me, k = live.keys, SP = live.ride ? (live.race ? 6.6 : 7.2) : SPEED;
+    if (live.race && live.race.phase === 'count') { k.clear(); m.path = []; }
     let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), tvx = 0, tvy = 0;
-    if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SPEED; tvy = (iy / n) * SPEED; }
+    if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SP; tvy = (iy / n) * SP; }
     else if (m.path.length) {
       const wp = m.path[0], dx = wp.x - m.px, dy = wp.y - m.py, d = Math.hypot(dx, dy);
-      if (d < Math.max(0.06, SPEED * dt * 1.1)) {
+      if (d < Math.max(0.06, SP * dt * 1.1)) {
         m.px = wp.x; m.py = wp.y; m.path.shift();
         if (!m.path.length) { m.vx = m.vy = 0; const a = live.pending; live.pending = null; m.x = Math.floor(m.px + 0.5); m.y = Math.floor(m.py + 0.82); if (a) doAction(a); updateCtx(); }
       } else {
-        const sp = m.path.length === 1 && d < 0.6 ? SPEED * Math.max(0.45, d / 0.6) : SPEED;
+        const sp = m.path.length === 1 && d < 0.6 ? SP * Math.max(0.45, d / 0.6) : SP;
         tvx = (dx / d) * sp; tvy = (dy / d) * sp;
       }
     }
@@ -435,6 +448,9 @@
     const speed = Math.hypot(m.vx, m.vy);
     m.moving = speed > 0.3;
     if (speed > 0.3) m.dir = Math.abs(m.vx) > Math.abs(m.vy) * 0.9 ? (m.vx < 0 ? 1 : 2) : (m.vy < 0 ? 3 : 0);
+    if (Math.abs(m.vx) > 0.3) m.face = m.vx < 0 ? 1 : 2;
+    if (live.ride && speed > 0.3) V().horse.dist += speed * dt;
+    if (live.race) raceTick(dt);
     if (m.path.length) { m.stuck = Math.hypot(m.px - ox, m.py - oy) < 0.002 ? m.stuck + dt : 0; if (m.stuck > 0.5) { m.path = []; live.pending = null; } }
     const tx = Math.floor(m.px + 0.5), ty = Math.floor(m.py + 0.82);
     if (tx !== m.x || ty !== m.y) { m.x = tx; m.y = ty; updateCtx(); }
@@ -445,11 +461,21 @@
     // smooth camera
     const ca = Math.min(1, dt * 7); live.cam.x += (m.px - live.cam.x) * ca; live.cam.y += (m.py - live.cam.y) * ca;
     follow(m.petPos, m.px - 0.45, m.py + 0.25, dt);
+    { // Басар trots behind you and sits beside you when you stop
+      const dg = live.dog, [ddx, ddy] = DIRS[m.dir], tx2 = m.moving ? m.px - ddx * 0.95 + (ddy ? 0.6 : 0) : m.px + 1.1, ty2 = m.moving ? m.py - ddy * 0.7 + 0.15 : m.py + 0.25;
+      const ox = dg.x, oy = dg.y, q = Math.min(1, dt * 3); dg.x += (tx2 - dg.x) * q; dg.y += (ty2 - dg.y) * q;
+      if (Math.hypot(m.px - dg.x, m.py - dg.y) > 4) { dg.x = tx2; dg.y = ty2; }
+      const sp2 = Math.hypot(dg.x - ox, dg.y - oy) / Math.max(dt, 1e-3); dg.moving = sp2 > 0.4; dg.idle = dg.moving ? 0 : dg.idle + dt;
+      if (Math.abs(dg.x - ox) > 0.002) dg.flip = dg.x < ox; else if (!dg.moving) dg.flip = m.px + 0.2 < dg.x;
+      const nowP = performance.now();
+      if (nowP > dg.nextFact && !document.querySelector('.modal-back')) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const f = TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); }
+      if (dg.bubble && nowP - dg.bubble.t0 > 12000) dg.bubble = null;
+    }
     for (const o of live.others.values()) {
       const dx = o.x - o.px, dy = o.y - o.py, d = Math.hypot(dx, dy);
       if (d > 5) { o.px = o.x; o.py = o.y; }
       else { const q = Math.min(1, dt * 9); o.px += dx * q; o.py += dy * q; }
-      o.moving = d > 0.04;
+      o.moving = d > 0.04; if (Math.abs(dx) > 0.02) o.face = dx < 0 ? 1 : 2;
       follow(o.petPos, o.px - 0.45, o.py + 0.25, dt);
     }
     for (const q of live.sheep) {
@@ -496,13 +522,30 @@
     live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
     const person = (o) => {
       if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const a = PX.animal(o.look.pet, frame(o)); shadow(o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.px > o.petPos.x + 0.05); } });
-      ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, frame(o)), o.px * T, o.py * T - 12); } });
+      if (o.look.ride) ents.push({ y: o.py, f: () => drawRider(o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py) });
+      else ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, frame(o)), o.px * T, o.py * T - 12); } });
     };
+    // a rider on a Mongolian horse; face 1 = left, 2 = right
+    const drawRider = (look, face, moving, wx, wy) => {
+      const hf = moving ? 1 + (Math.floor(t * 12) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
+      const HX = wx * T - 6, HY = wy * T + 16 - hs.height;
+      ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(SX(HX + 4), SY(HY + 21), 20 * k, 2 * k);
+      sprite(PX.char({ ...look, pet: null }, left ? 1 : 2, 0), HX + 6, HY - 15);
+      sprite(hs, HX, HY, left);
+    };
+    if (live.race) for (const n of live.race.npcs) ents.push({ y: n.py, f: () => { drawRider(n.look, n.face, live.race.phase === 'go' && !n.done, n.px, n.py); const [lx, ly] = [(n.px * T + 8 - cf.x) * k, (n.py * T - 22 - cf.y) * k]; live.race.labels.push([n.name, lx, ly]); } });
     for (const o of live.others.values()) person(o);
     const v = V(); person({ ...live.me, look: v.look });
+    const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
+    ents.push({ y: dg.y + 0.05, f: () => { shadow(dg.x * T, dg.y * T + 1); sprite(PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.flip); } });
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
+    if (live.race) {
+      live.race.labels = [];
+      const RC = WD.RACE, fl = Math.floor(t * 4) % 2;
+      for (let i = Math.max(1, live.race.ci); i < RC.length; i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
+    }
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
     // 4) evening: dark tint + stepped lantern glow
     const hr = new Date().getHours();
@@ -519,6 +562,13 @@
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
     labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
+    if (live.race) {
+      if (live.race.phase === 'go') for (const [nm, lx, ly] of live.race.labels) pixelText(ctx, nm, lx, ly, textSize() * 0.8, '#ffffff');
+      const nx = WD.RACE[Math.min(live.race.ci, WD.RACE.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
+      if (live.race.phase !== 'done') { const [ax, ay] = S(live.me.px * T + 8, live.me.py * T - 36), r = 7 * k; ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(r + k, 0); ctx.lineTo(-r * 0.6, -r * 0.75); ctx.lineTo(-r * 0.6, r * 0.75); ctx.fill(); ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(r - k, 0); ctx.lineTo(-r * 0.4, -r * 0.5); ctx.lineTo(-r * 0.4, r * 0.5); ctx.fill(); ctx.restore(); }
+    }
+    { const [sx, sy] = S(dg.x * T + 8, dg.y * T - 4); pixelText(ctx, L('Басар', 'Basar'), sx, sy, textSize() * 0.8, '#f7c646');
+      if (dg.bubble) { const bob = Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2; pixelText(ctx, '!', sx + 5 * live.view.k, sy - 6 * live.view.k + bob, textSize() * 1.8, '#f7c646'); } }
     live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
     for (const f of live.floaters) {
       const q = (pn - f.t0) / 1400, [sx, sy] = S(f.x * T + 8, f.y * T + 10);
@@ -529,16 +579,19 @@
   const textSize = () => 5 * Math.max(2, live.view.k); // Tiny5 is drawn on a 5-pixel grid
   function blit(b, img, X, Y, flip) { if (!flip) return b.drawImage(img, X, Y); b.save(); b.translate(X + img.width, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); }
   function pixelText(ctx, text, x, y, size, color, alpha = 1, outline = '#2b1e2e') {
+    if (text == null || text === '') return; // never draw "null" for a missing name
     const fs = Math.max(10, Math.round(size / 5) * 5), o = Math.max(1, Math.round(fs / 10));
     ctx.save(); ctx.globalAlpha = alpha; ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = outline; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]]) ctx.fillText(text, Math.round(x) + dx, Math.round(y) + dy);
     ctx.fillStyle = color; ctx.fillText(text, Math.round(x), Math.round(y)); ctx.restore();
   }
   function labels(ctx, o, name, level, isMe, pn, S, dpr) {
-    const [x, y] = S(o.px * T + 8, o.py * T - 16), fs = textSize(), u = Math.max(1, Math.round(fs / 10));
+    const rl = (isMe ? V().look : o.look || {}).ride ? 10 : 0;
+    const [x, y] = S(o.px * T + 8, o.py * T - 16 - rl), fs = textSize(), u = Math.max(1, Math.round(fs / 10));
     ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const pad = Math.round(fs * 0.45), th = fs + u * 4, gap = u * 3;
-    const lvT = String(level), lvW = Math.ceil(ctx.measureText(lvT).width) + pad * 2, nmW = Math.ceil(ctx.measureText(name).width) + pad * 2;
+    name = name || '?';
+    const lvT = String(level || 1), lvW = Math.ceil(ctx.measureText(lvT).width) + pad * 2, nmW = Math.ceil(ctx.measureText(name).width) + pad * 2;
     const X0 = Math.round(x - (lvW + gap + nmW) / 2), Y = Math.round(y - th / 2);
     const box = (bx, w, bg, top, fg, text) => {
       ctx.fillStyle = '#2b1e2e'; ctx.fillRect(bx - u, Y - u, w + u * 2, th + u * 2);
@@ -585,7 +638,7 @@
     const v = V(); let cur = start || 'seeds';
     const body = h('div', { class: 'v-shop' });
     const TABS = [['seeds', 'ui:seed', L('Үр', 'Seeds')], ['wear', 'deel:red', L('Хувцас', 'Clothes')], ['pet', 'pet:lamb', L('Тэжээвэр', 'Pets')], ['tool', 'tool:can-2', L('Багаж', 'Tools')], ['sell', 'ui:coin', L('Зарах', 'Sell')]];
-    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
+    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Хичээл үзэж, Басарын асуултад хариулж, ургац зарж цуглуулаарай!', 'Not enough coins. Learn, answer Basar’s quizzes or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
     const ownedItem = (it) => (it.cat === 'tool' ? (it.slot === 'can' ? v.can >= it.val : v.rod >= it.val) : v.owned.includes(it.id));
     const draw = () => {
       const level = lvl();
@@ -678,18 +731,140 @@
           h('div', { class: 'v-row-b' }, h('b', null, tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
           ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; reward(d.c, d.x); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
       })),
-      h('button', { class: 'btn block', onclick: () => { close(); TG.go('missions'); } }, L('Гэр бүлийн бодит даалгавар', 'Real-life family missions'), ' +15 ', pic('ui:coin', 14)));
+      h('button', { class: 'btn block', onclick: () => { close(); TG.go('learn'); } }, '📚 ', L('Өв соёлын сургууль', 'Heritage school')));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
 
-  function arcade() {
-    const prof = S.active(), ag = S.ageGroupOf(prof.age);
-    const games = TG.gameOrder.map((id) => TG.games[id]).filter((g) => g.ages.includes(ag)).slice(0, 8);
-    const close = TG.modal(h('div', null, h('h2', null, L('Тоглоомын гэр', 'Game ger')),
-      h('p', { class: 'muted' }, L('Тоглоом бүрээр зоос, XP цуглуулна. Гэр бүлтэйгээ хамт тогловол 1.5 дахин их!', 'Every game earns coins and XP. Play with family for 1.5× more!')),
-      h('div', { class: 'v-grid' }, games.map((g) => h('button', { class: 'v-card', onclick: () => { close(); TG.launchGame(g); } }, h('span', { class: 'v-card-e' }, g.icon), h('b', null, tx(g.title))))),
-      h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: () => { close(); TG.go('satis'); } }, '✨ ', L('Цэгцлэе! оньсого', 'Make it perfect! puzzles'))), { cls: 'v-modal' });
+  // ================================================================ horse riding + Naadam horse race
+  const COAT_NAMES = { bay: Tx('Хээр', 'Bay'), black: Tx('Хар', 'Black'), white: Tx('Цагаан', 'White'), chestnut: Tx('Зээрд', 'Chestnut'), gray: Tx('Саарал', 'Gray') };
+  const HORSE_FACTS = [
+    Tx('Монгол адуу намхан ч маш тэсвэртэй. Өвлийн хүйтэнд ч гадаа бэлчдэг.', 'Mongolian horses are short but incredibly tough. They graze outside even in winter.'),
+    Tx('Наадамд түрүүлсэн морийг “түрүү морь”, эхний тавд орсныг “айргийн тав” гэдэг.', 'At Naadam the winning horse is the “türüü mori”, and the top five are the “airgiin tav”.'),
+    Tx('Хамгийн сүүлд ирсэн даага “баян ходоод” гэж магтуулж, ирэх жил сайн давхина гэж ерөөдөг.', 'The last young horse is praised as “bayan khodood” (full belly) and wished a better race next year.'),
+    Tx('Наадмын морь уралдаанд 5–12 насны хүүхэд унаач 10–30 км давхидаг.', 'In Naadam races, child jockeys aged 5–12 ride 10–30 km.'),
+    Tx('Монголд хүнээс олон адуу бий. 3 сая гаруй адуутай!', 'Mongolia has more horses than people: over 3 million!'),
+  ];
+  const RIDERS = ['Бат', 'Сараа', 'Тэмүүжин', 'Номин', 'Ганбаатар', 'Энхжин', 'Мөнх', 'Ану'];
+  function mount(coat) {
+    const v = V(); if (!live) return;
+    if (coat) v.horse.coat = coat;
+    live.ride = { coat: v.horse.coat }; v.look.ride = 'horse'; v.look.coat = v.horse.coat; S.save(); sendLook();
+    TG.sfx.whoosh ? TG.sfx.whoosh() : TG.sfx.tap(); hud(); checkAch();
+  }
+  function dismount() {
+    if (!live || live.race) return;
+    live.ride = null; const v = V(); v.look.ride = null; S.save(); sendLook(); TG.sfx.tap(); hud();
+  }
+  function uyaModal() {
+    const v = V(), hs = v.horse; let coat = hs.coat;
+    const body = h('div');
+    const preview = () => { const c = h('canvas', { class: 'px-icon', width: 28, height: 22, style: { width: '112px', height: '88px' } }); c.getContext('2d').drawImage(PX.horse(coat, 0, true), 0, 0); return c; };
+    const draw = () => rc(body,
+      h('div', { class: 'v-wr-head' }, preview(), h('div', null, h('h2', null, L('Морины уяа', 'Horse line')), h('p', { class: 'muted' }, L('Морь унаж Нутгаар чөлөөтэй давхих, эсвэл Наадмын уралдаанд оролцоорой!', 'Ride freely around Nutag, or join the Naadam horse race!')))),
+      h('div', { class: 'label' }, L('Морио сонго', 'Pick your horse')),
+      h('div', { class: 'v-chips' }, Object.keys(PX.COATS).map((k) => h('button', { class: 'v-chip' + (coat === k ? ' active' : ''), onclick: () => { coat = k; draw(); } }, tx(COAT_NAMES[k])))),
+      h('div', { class: 'stat-cards', style: { marginTop: '10px' } },
+        h('div', { class: 'stat' }, h('small', null, L('Уралдаан', 'Races')), h('b', null, hs.races || 0)),
+        h('div', { class: 'stat' }, h('small', null, L('Түрүү', 'Wins')), h('b', null, hs.wins || 0)),
+        h('div', { class: 'stat' }, h('small', null, L('Шилдэг цаг', 'Best time')), h('b', null, hs.best ? (hs.best / 1000).toFixed(1) + L('с', 's') : '–'))),
+      h('div', { class: 'row-btns' },
+        live.ride ? h('button', { class: 'btn', onclick: () => { close(); dismount(); } }, L('Буух', 'Get off')) : h('button', { class: 'btn', onclick: () => { close(); mount(coat); TG.toast(L('Чөлөөтэй давхиарай! 🐎', 'Ride free! 🐎')); } }, '🐎 ', L('Морь унах', 'Ride')),
+        h('button', { class: 'btn primary', onclick: () => { close(); v.horse.coat = coat; raceStart(); } }, '🏁 ', L('Уралдах', 'Race'))),
+      h('div', { class: 'teach', style: { marginTop: '12px' } }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(TG.pick(HORSE_FACTS)))));
+    draw();
+    const close = TG.modal(body, { cls: 'v-modal' });
+  }
+  function racePath() {
+    const P = WD.RACE, cum = [0];
+    for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y));
+    return { P, cum, total: cum[cum.length - 1] };
+  }
+  function pointAt(path, s, lane) {
+    const { P, cum } = path; let i = 1;
+    while (i < P.length - 1 && cum[i] < s) i++;
+    const a = P[i - 1], b = P[i], segLen = cum[i] - cum[i - 1] || 1, q = Math.max(i === 1 ? -0.5 : 0, Math.min(1, (s - cum[i - 1]) / segLen)); // before the line on the start grid
+    const dx = (b.x - a.x) / segLen, dy = (b.y - a.y) / segLen;
+    return { x: a.x + (b.x - a.x) * q - dy * lane, y: a.y + (b.y - a.y) * q + dx * lane, face: dx < -0.1 ? 1 : dx > 0.1 ? 2 : null };
+  }
+  function raceStart() {
+    if (!live || live.race) return;
+    document.querySelectorAll('.modal-back .modal-x').forEach((x) => x.click());
+    const v = V(), path = racePath(), wins = v.horse.wins || 0;
+    if (!live.ride) mount(v.horse.coat);
+    const s0 = WD.RACE[0];
+    live.me.px = s0.x - 0.5; live.me.py = s0.y - 0.82; live.me.vx = live.me.vy = 0; live.me.path = []; live.me.face = 1; live.cam.x = live.me.px; live.cam.y = live.me.py;
+    // rivals get a little faster as you win more races
+    const pace = 5.35 + Math.min(0.9, wins * 0.15);
+    const names = [...RIDERS].sort(() => Math.random() - 0.5).slice(0, 3);
+    const npcs = names.map((name, i) => ({ name, s: [-1.4, -1.4, -2.8][i], lane: [-0.6, 0.6, 0][i], speed: pace * (0.9 + Math.random() * 0.14), wob: Math.random() * 6, done: 0, face: 1, px: 0, py: 0,
+      look: { deel: TG.pick(Object.keys(R.DEELS)), skin: TG.pick(R.SKINS), hat: TG.pick([null, 'mongol', 'cap']), coat: TG.pick(Object.keys(PX.COATS)), ride: 'horse' } }));
+    npcs.forEach((n) => { const p = pointAt(path, n.s, n.lane); n.px = p.x - 0.5; n.py = p.y - 0.82; });
+    live.race = { path, npcs, ci: 1, phase: 'count', t0: performance.now(), go: 0, finishT: 0, labels: [] };
+    TG.sfx.tick && TG.sfx.tick(); hud(); raceHud();
+  }
+  function raceTick(dt) {
+    const rc0 = live.race, nowP = performance.now();
+    if (rc0.phase === 'count') {
+      const left = 3 - Math.floor((nowP - rc0.t0) / 1000);
+      if (left !== rc0.lastCount) { rc0.lastCount = left; if (left > 0) TG.sfx.tick && TG.sfx.tick(); else TG.sfx.chime && TG.sfx.chime(); }
+      if (nowP - rc0.t0 >= 3000) { rc0.phase = 'go'; rc0.go = nowP; }
+      raceHud(); return;
+    }
+    if (rc0.phase !== 'go') return;
+    const el = (nowP - rc0.go) / 1000;
+    for (const n of rc0.npcs) {
+      if (n.done) continue;
+      const sp = n.speed * (1 + 0.06 * Math.sin(el * 1.3 + n.wob));
+      n.s += sp * dt;
+      if (n.s >= rc0.path.total) { n.s = rc0.path.total; n.done = nowP; }
+      const p = pointAt(rc0.path, n.s, n.lane); n.px = p.x - 0.5; n.py = p.y - 0.82; if (p.face) n.face = p.face;
+    }
+    const P = WD.RACE, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
+    if (rc0.ci < P.length && Math.hypot(P[rc0.ci].x - fx, P[rc0.ci].y - fy) < 1.7) {
+      rc0.ci++; TG.sfx.pop && TG.sfx.pop();
+      if (rc0.ci >= P.length) return raceFinish(false);
+    }
+    if (el > 75) return raceFinish(true);
+    raceHud();
+  }
+  function racePlace() {
+    const rc0 = live.race, P = WD.RACE, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
+    const mine = rc0.ci >= P.length ? rc0.path.total + 1 : rc0.path.cum[rc0.ci] - Math.hypot(P[rc0.ci].x - fx, P[rc0.ci].y - fy);
+    return 1 + rc0.npcs.filter((n) => (n.done && (!rc0.finishT || n.done < rc0.finishT)) || (!n.done && n.s > mine)).length;
+  }
+  function raceHud() {
+    const rc0 = live.race, e = live.els.race;
+    if (!rc0) { e.classList.add('hidden'); return; }
+    e.classList.remove('hidden');
+    if (rc0.phase === 'count') { const n = 3 - Math.floor((performance.now() - rc0.t0) / 1000); if (rc0.shown !== n) { rc0.shown = n; rc(e, h('b', { class: 'v-race-big' }, n > 0 ? String(n) : L('Чү!', 'Go!'))); } return; }
+    const t = ((performance.now() - rc0.go) / 1000).toFixed(1), place = racePlace();
+    rc(e, h('span', null, '🏁 ', `${Math.min(rc0.ci, WD.RACE.length - 1)}/${WD.RACE.length - 1}`), h('span', { class: 'v-race-place' }, `${place}/${rc0.npcs.length + 1}`), h('span', null, `⏱ ${t}`));
+  }
+  function raceFinish(timeout) {
+    const rc0 = live.race; if (!rc0 || rc0.phase === 'done') return;
+    rc0.phase = 'done'; rc0.finishT = performance.now();
+    const ms = rc0.finishT - rc0.go, place = timeout ? rc0.npcs.length + 1 : racePlace(), v = V(), hs = v.horse;
+    hs.races = (hs.races || 0) + 1; if (place === 1) hs.wins = (hs.wins || 0) + 1; if (place <= 5) hs.top5 = (hs.top5 || 0) + 1;
+    const newBest = !timeout && (!hs.best || ms < hs.best); if (newBest) hs.best = Math.round(ms);
+    const pay = [[40, 60], [25, 40], [15, 30], [5, 15]][place - 1] || [5, 15];
+    const r = reward(pay[0], pay[1]); S.save();
+    if (place === 1) { TG.sfx.win(); TG.confetti(90); } else TG.sfx.chime && TG.sfx.chime();
+    if (S.logActivity) S.logActivity({ kind: 'race', id: String(place) });
+    checkAch();
+    const title = place === 1 ? L('Түрүү морь! 🏆', 'Winning horse! 🏆') : place <= 5 ? L(`${place}-р байр · Айргийн тав!`, `Place ${place} · top five!`) : L('Баян ходоод!', 'Bayan khodood!');
+    const close = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('ui:trophy', 64)), h('h2', null, title),
+      h('p', null, timeout ? L('Цаг дууслаа. Дараагийн удаа туг бүрийг дагаарай!', 'Time ran out. Next time follow every flag!') : L(`Цаг: ${(ms / 1000).toFixed(1)} секунд`, `Time: ${(ms / 1000).toFixed(1)} seconds`) + (newBest ? L(' · Шинэ дээд амжилт!', ' · New best!') : '')),
+      r ? h('div', { class: 'l-reward' }, `🪙 +${r.coins} · ⭐ +${r.xp} XP`) : null,
+      h('div', { class: 'teach', style: { marginTop: '10px' } }, h('p', null, tx(HORSE_FACTS[place === 1 ? 1 : place >= 4 ? 2 : 3]))),
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Чөлөөтэй давхих', 'Ride freely')), h('button', { class: 'btn primary', onclick: () => { close(); setTimeout(raceStart, 200); } }, L('Дахин уралдах', 'Race again')))),
+      { cls: 'v-modal', onClose: () => { if (live) { live.race = null; raceHud(); hud(); } } });
+  }
+
+  function openBasar() {
+    const dg = live && live.dog, b = dg && dg.bubble;
+    if (dg) dg.bubble = null;
+    TG.basar.open(b ? { context: tx(b.fact) + ' ' + L('Илүү ихийг мэдмээр байна уу? Надаас асуугаарай!', 'Want to know more? Ask me!') } : {});
   }
 
   function talk() {
@@ -773,6 +948,7 @@
       cleanup();
       if (!win) { TG.sfx.bad(); rc(wrap, h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, '💨'), h('h2', null, L('Загас зугтлаа!', 'The fish got away!')), h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); fishing(); } }, L('Дахин', 'Again'))))); return; }
       quest('fish'); TG.sfx.win();
+      v.fishCaught = (v.fishCaught || 0) + 1;
       if (f.release) reward(f.coins, f.xp); else { v.fish[key] = (v.fish[key] || 0) + 1; reward(0, f.xp); }
       S.save(); hud();
       rc(wrap, h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('fish:' + key, 72)), h('div', { class: 'eyebrow' }, L('Барьлаа!', 'Caught!')), h('h2', null, tx(f.name)),
@@ -816,6 +992,13 @@
   const swatches = (map, cur, onPick, cls = '') => h('div', { class: 'v-chips' }, Object.entries(map).map(([k, c]) => h('button', { class: 'v-chip v-swatch ' + cls + (cur === k ? ' active' : ''), style: { background: c }, 'aria-label': k, onclick: () => onPick(k) })));
   function buyGer(i) {
     const v = V(), body = h('div'); let roof = 'blue', door = 'red';
+    const learned = TG.learn && TG.learn.done('ger');
+    if (!learned) {
+      const close2 = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-gerbox' }, gerPreview('blue', 'red', 3)), h('h2', null, L('Эхлээд гэр барьж сур!', 'Learn to build a ger first!')),
+        h('p', { class: 'muted' }, L('Жинхэнэ малчид гэрээ өөрсдөө барьдаг. Сургуулийн гэрт “Монгол гэр барих” хичээлийг дуусгавал энд өөрийн гэрээ барих эрх нээгдэнэ.', 'Real herders build their own gers. Finish the “Build a Mongol ger” lesson in the school ger to unlock your own ger here.')),
+        h('button', { class: 'btn primary big block', onclick: () => { close2(); TG.go('lesson', { id: 'ger' }); } }, '⛺ ', L('Хичээл эхлэх', 'Start the lesson'))), { cls: 'v-modal' });
+      return;
+    }
     const buy = () => {
       if (lvl() < R.GER_LEVEL) return TG.toast(L(`${R.GER_LEVEL}-р түвшинд хүрээрэй.`, `Reach level ${R.GER_LEVEL} first.`));
       if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!'));
@@ -838,7 +1021,7 @@
     const v = V();
     lotsArr()[m.i] = m.lot;
     if (m.by === v.id && m.act === 'buy') {
-      v.coins = Math.max(0, v.coins - R.GER_PRICE); reward(0, 30); TG.sfx.win(); TG.confetti(70);
+      v.coins = Math.max(0, v.coins - R.GER_PRICE); v.gerBuilt = true; reward(0, 30); TG.sfx.win(); TG.confetti(70);
       factCard('ui:ger', L('Шинэ гэр!', 'Your new ger!'), L('Монгол гэрийг нэг цагийн дотор барьж, нүүж болдог. Хаалга нь ихэвчлэн урд зүг рүү харсан байдаг.', 'A Mongolian ger can be put up in about an hour and moved anywhere. Its door traditionally faces south.'), '+30 XP');
     } else if (m.act === 'buy') TG.toast(`🏠 ${m.lot.n} ${L('гэр барилаа!', 'built a ger!')}`);
     S.save(); if (live) { hud(); updateCtx(); }
@@ -903,93 +1086,126 @@
     if (t && v.look.title !== t) { v.look.title = t; S.save(); sendLook(); return t; }
     return null;
   }
-  function wrestlerPic(pose, col, size = 56) { const c = h('canvas', { class: 'px-icon', width: 28, height: 32, style: { width: size + 'px', height: Math.round(size * 32 / 28) + 'px' } }); c.getContext('2d').drawImage(PX.wrestler(col, R.SKINS.includes(V().look.skin) ? V().look.skin : R.SKINS[0], pose, 0), 0, 0); return c; }
+  const RED = '#d8342b', BLUE = '#2b5bd8'; // traditional zodog colours
+  function wrestlerPic(pose, col, size = 48) { const c = h('canvas', { class: 'px-icon', width: 32, height: 48, style: { width: size + 'px', height: Math.round(size * 48 / 32) + 'px' } }); c.getContext('2d').drawImage(PX.wrestler(col, R.SKINS.includes(V().look.skin) ? V().look.skin : R.SKINS[0], pose, 0), 0, 0); return c; }
   function arenaModal() {
     const v = V(), wr = v.wr, t = titleObj(R.titleFor(wr));
     const next = R.TITLES.find((q) => (q.id === 'avarga' ? (wr.champ || 0) < 2 : (wr.best || 0) < q.need));
     const others = live.online ? [...live.others.values()] : [];
     const stat = (k, n) => h('div', { class: 'stat' }, h('small', null, k), h('b', null, n));
     const close = TG.modal(h('div', null,
-      h('div', { class: 'v-wr-head' }, wrestlerPic('dance', '#e14b3d'), h('div', null, h('h2', null, L('Бөхийн барилдаан', 'Mongolian wrestling')), h('p', { class: 'muted' }, t ? `★ ${tx(t.name)}` : L('Цолгүй бөх', 'No title yet')))),
+      h('div', { class: 'v-wr-head' }, wrestlerPic('dance', RED), h('div', null, h('h2', null, L('Бөхийн барилдаан', 'Mongolian wrestling')), h('p', { class: 'muted' }, t ? `★ ${tx(t.name)}` : L('Цолгүй бөх', 'No title yet')))),
       h('div', { class: 'stat-cards' }, stat(L('Шилдэг давлага', 'Best rounds'), wr.best || 0), stat(L('Түрүү', 'Wins'), wr.champ || 0), stat(L('Ялалт', 'Victories'), (wr.wins || 0) + (wr.pvpW || 0))),
       h('p', { class: 'hint' }, !next ? L('Та хамгийн дээд цол Аварга хүртсэн! 🏆', 'You hold the highest title, Avarga! 🏆')
         : next.id === 'avarga' ? L('Наадамд дахин түрүүлбэл Аварга цол хүртэнэ!', 'Win the Naadam once more to become an Avarga!')
           : L(`Наадамд ${next.need} давбал «${tx(next.name)}» цол хүртэнэ.`, `Win ${next.need} rounds at the Naadam to earn the "${tx(next.name)}" title.`)),
       h('button', { class: 'btn primary big block', onclick: () => { close(); tournament(1); } }, L('Наадамд барилдах (9 даваа)', 'Wrestle in the Naadam (9 rounds)')),
+      h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L('Мэхний ном (7 мэх)', 'Technique book (7 moves)')),
       live.online ? h('div', { style: { marginTop: '12px' } }, h('div', { class: 'label' }, L('Найзтайгаа барилдах', 'Wrestle a friend')),
         others.length ? h('div', { class: 'v-list' }, others.map((o) => h('div', { class: 'v-row' }, portrait(o.look, 28), h('div', { class: 'v-row-b' }, h('b', null, o.name), h('small', null, `${L('Түвшин', 'Level')} ${o.lvl}`)),
           h('button', { class: 'btn sm primary', onclick: () => { net.send({ t: 'wr-invite', to: o.id }); TG.toast(L('Урилга илгээлээ…', 'Invitation sent…')); close(); } }, L('Урих', 'Invite')))))
           : h('p', { class: 'muted' }, L('Одоогоор өрөөнд өөр хүн алга.', 'Nobody else is in the room yet.'))) : null,
       h('div', { class: 'teach', style: { marginTop: '12px' } }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(TG.pick(WR_FACTS))))), { cls: 'v-modal' });
   }
+  function techBook() {
+    const used = (V().wr.techs) || {};
+    TG.modal(h('div', null, h('h2', null, L('Бөхийн мэхний ном', 'Wrestling technique book')),
+      h('p', { class: 'muted' }, L('Мэх бүр дараагийн 3 мэхийг давж, өмнөх 3-д дийлддэг. Нэг мэхийг давтвал өрсөлдөгч таньж, хүч чинь сулардаг. Даваа ахих тусам өрсөлдөгч чинь ухаалаг, хурдан болно!', 'Each move beats the next 3 and loses to the 3 before it. Repeat a move and your opponent reads it, so your power drops. Each round, opponents get smarter and faster!')),
+      h('div', { class: 'v-list' }, R.MOVES.map((m) => h('div', { class: 'v-row' }, h('span', { class: 'v-tech-n' }, used[m.id] || 0),
+        h('div', { class: 'v-row-b' }, h('b', null, tx(m.name)), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
+  }
   function tournament(round) {
-    const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.18 + round * 0.075, skin: TG.pick(R.SKINS) };
+    const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.15 + round * 0.085, skin: TG.pick(R.SKINS) };
     wrestleMatch({ ai: true, round, opp }, (won) => {
       const v = V(), wr = v.wr;
       if (won) { wr.wins = (wr.wins || 0) + 1; reward(8 + round * 2, 10 + round * 3); } else { wr.losses = (wr.losses || 0) + 1; reward(0, 5); }
       const reached = won ? round : round - 1;
       if (won && round === 9) wr.champ = (wr.champ || 0) + 1;
       if (reached > (wr.best || 0)) wr.best = reached;
-      S.save();
+      S.save(); checkAch();
       return { newTitle: updateTitle(), champion: won && round === 9 };
     });
   }
   function wrestleMatch(cfg, onEnd) {
     const v = V(), mySkin = R.SKINS.includes(v.look.skin) ? v.look.skin : R.SKINS[0];
-    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0 };
-    const cv = h('canvas', { class: 'v-wr-canvas', width: 160, height: 84 }), cx = cv.getContext('2d');
+    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0, intro: performance.now(), used: {}, flash: null };
+    // each даваа is harder: more points to win, a faster timing bar, a narrower sweet spot and a sharper opponent
+    const rnd = cfg.ai ? cfg.round : 4, need = cfg.ai && cfg.round >= 7 ? 3 : 2;
+    const barSpeed = cfg.ai ? 2.7 + rnd * 0.33 : 3.6, sharp = cfg.ai ? 1 + rnd * 0.13 : 1.3;
+    const cv = h('canvas', { class: 'v-wr-canvas', width: 192, height: 108 }), cx = cv.getContext('2d');
     const score = h('div', { class: 'v-wr-score' }), msg = h('div', { class: 'v-wr-msg' }, L('Мэхээ сонго!', 'Choose your move!'));
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
-    const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone' }), marker), goBtn);
+    const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone', style: { width: Math.round(36 / sharp) + '%', left: (50 - 18 / sharp) + '%' } }), marker), goBtn);
     const tail = h('div');
-    const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9` : L('Найзтай барилдаан', 'Friendly match')),
+    const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
       h('h2', null, `${live.name} · ${cfg.opp.name}`), cv, score, msg, moves, timing, tail);
-    const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(2 - st.a)), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(2 - st.b), ' ', cfg.opp.name));
+    const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(Math.max(0, need - st.a))), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(Math.max(0, need - st.b)), ' ', cfg.opp.name));
     const moveLabel = (id) => tx(R.MOVES.find((m) => m.id === id).name);
     const setPhase = (p) => {
       st.phase = p;
       moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing');
-      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn', onclick: () => { st.move = m.id; st.t0 = performance.now(); setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); } },
-        h('b', null, tx(m.name)), h('small', null, `> ${moveLabel(m.beats)}`))));
+      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; st.t0 = performance.now(); setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); } },
+        h('b', null, tx(m.name)), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
     };
     let raf = 0, lastT = performance.now();
     const loop = (ts) => {
       const dt = Math.min(0.05, (ts - lastT) / 1000); lastT = ts;
       st.off += (st.target - st.off) * Math.min(1, dt * 8);
-      if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * (cfg.ai ? 3.2 + cfg.round * 0.12 : 3.6)) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
-      // pixel scene
-      cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, 160, 84);
-      for (let i = 0; i < 60; i++) { cx.fillStyle = i % 2 ? '#d4ae72' : '#f6e2b8'; cx.fillRect((i * 37) % 160, 30 + ((i * 53) % 54), 1, 1); }
-      cx.fillStyle = '#6b4220'; cx.fillRect(0, 0, 160, 22); for (let i = 0; i < 26; i++) { cx.fillStyle = ['#e14b3d', '#3f76db', '#f7c646', '#2ea35f', '#ffffff'][i % 5]; cx.fillRect(4 + i * 6, 12 + (i % 2) * 4, 4, 4); cx.fillStyle = i % 3 ? '#edbb93' : '#d9a06e'; cx.fillRect(5 + i * 6, 9 + (i % 2) * 4, 2, 3); }
-      const f = Math.floor(ts / 250) % 2, o = Math.round(st.off);
-      const A = PX.wrestler('#e14b3d', mySkin, st.pose[0], f), B = PX.wrestler('#3f76db', cfg.opp.skin || '#D9A06E', st.pose[1], f);
-      const ax = 80 - 26 + o + (st.pose[0] === 'dance' ? -10 : 0), bx = 80 - 2 + o + (st.pose[1] === 'dance' ? 10 : 0);
-      cx.fillStyle = 'rgba(40,20,0,.25)'; cx.fillRect(ax + 6, 78, 18, 2); cx.fillRect(bx + 4, 78, 18, 2);
-      cx.drawImage(A, ax, 48);
-      cx.save(); cx.translate(bx + 28, 48); cx.scale(-1, 1); cx.drawImage(B, 0, 0); cx.restore();
+      if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * barSpeed) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
+      // pixel scene: crowd stands, flags, sand ring, the zasuul watching
+      const Wc = 192, Hc = 108, ground = 100;
+      cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, Wc, Hc);
+      for (let i = 0; i < 90; i++) { cx.fillStyle = i % 2 ? '#d4ae72' : '#f6e2b8'; cx.fillRect((i * 37) % Wc, 40 + ((i * 53) % 66), 1, 1); }
+      cx.fillStyle = '#5a361c'; cx.fillRect(0, 0, Wc, 30); cx.fillStyle = '#7a4a26'; cx.fillRect(0, 10, Wc, 2); cx.fillRect(0, 21, Wc, 2);
+      for (let row = 0; row < 2; row++) for (let i = 0; i < 31; i++) { const px0 = 3 + i * 6 + row * 3, py0 = 3 + row * 11, bob = Math.floor(ts / 400 + i + row) % 3 === 0 ? -1 : 0; cx.fillStyle = ['#d8342b', '#2b5bd8', '#f7c646', '#2ea35f', '#ffffff', '#9466e0'][(i + row * 2) % 6]; cx.fillRect(px0, py0 + 4 + bob, 4, 4); cx.fillStyle = (i + row) % 3 ? '#edbb93' : '#c98a5a'; cx.fillRect(px0 + 1, py0 + 1 + bob, 2, 3); cx.fillStyle = '#2b1e14'; cx.fillRect(px0 + 1, py0 + bob, 2, 1); }
+      [[8, '#2b5bd8'], [60, '#d8342b'], [132, '#f7c646'], [184, '#2b5bd8']].forEach(([fx, fc]) => { cx.fillStyle = '#4a2a14'; cx.fillRect(fx, 30, 1, 14); cx.fillStyle = fc; for (let r = 0; r < 5; r++) cx.fillRect(fx + 1, 30 + r, 5 - Math.abs(r - 2), 1); });
+      cx.fillStyle = '#b98a50'; cx.fillRect(0, 44, Wc, 1);
+      const zs = PX.char(ZASUUL, 0, Math.floor(ts / 900) % 2 && st.over ? 1 : 0); cx.fillStyle = 'rgba(40,20,0,.25)'; cx.fillRect(167, ground - 1, 12, 2); cx.drawImage(zs, 165, ground - 28);
+      const f = Math.floor(ts / 260) % 2, o = Math.round(st.off), ent = Math.min(1, (ts - st.intro) / 600);
+      const myPose = st.pose[0], opPose = st.pose[1];
+      const A = PX.wrestler(RED, mySkin, myPose === 'grip' && f && st.phase === 'timing' ? 'push' : myPose, f), B = PX.wrestler(BLUE, cfg.opp.skin || '#D9A06E', opPose, f);
+      const cxm = 92, ax = Math.round(cxm - 30 - (1 - ent) * 24) + o + (myPose === 'dance' ? -12 : 0), bx = Math.round(cxm - 4 + (1 - ent) * 24) + o + (opPose === 'dance' ? 12 : 0);
+      const draw1 = (img, X, flip, fallen) => { const Y = ground - img.height; cx.fillStyle = 'rgba(40,20,0,.28)'; cx.fillRect(X + 4, ground - 1, img.width - 8, 2); if (flip) { cx.save(); cx.translate(X + img.width, Y); cx.scale(-1, 1); cx.drawImage(img, 0, 0); cx.restore(); } else cx.drawImage(img, X, Y); };
+      draw1(A, ax - (myPose === 'fall' ? 16 : 0), false);
+      draw1(B, bx + (opPose === 'fall' ? 2 : 0), true);
+      if (st.flash && ts - st.flash.t0 < 1300) {   // the technique's name pops up over the ring
+        const q = (ts - st.flash.t0) / 1300, fy = 60 - q * 10;
+        cx.font = '700 12px Rubik, sans-serif'; cx.textAlign = 'center'; cx.globalAlpha = q > 0.75 ? (1 - q) * 4 : 1;
+        cx.fillStyle = '#2b1e2e'; cx.fillText(st.flash.text, 97, fy + 1); cx.fillText(st.flash.text, 96, fy + 1);
+        cx.fillStyle = st.flash.good ? '#f7c646' : '#ffffff'; cx.fillText(st.flash.text, 96, fy); cx.globalAlpha = 1;
+      }
       raf = requestAnimationFrame(loop);
     };
     function lock() {
       if (st.phase !== 'timing') return;
-      const power = Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2);
+      let power = Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
+      const repeated = st.move === st.lastPlayer;
+      if (repeated) power *= 0.8; // the same move twice in a row is easier to read
+      st.used[st.move] = (st.used[st.move] || 0) + 1;
       setPhase('wait');
       if (cfg.ai) {
-        const counter = { push: 'hook', pull: 'push', hook: 'pull' };
-        const smart = st.lastPlayer && Math.random() < (cfg.opp.skill - 0.3) * 0.7;
-        const om = smart ? counter[st.lastPlayer] : TG.pick(R.MOVES).id;
-        const op = clamp(cfg.opp.skill + (Math.random() - 0.5) * 0.45, 0.05, 1);
+        // the opponent studies you: in later rounds it often picks a move that beats the one you use most
+        const fav = Object.entries(st.used).sort((a2, b2) => b2[1] - a2[1])[0][0];
+        const read = repeated ? st.move : (Math.random() < 0.5 ? st.lastPlayer : fav);
+        const smart = read && Math.random() < Math.min(0.72, 0.04 + cfg.round * 0.075);
+        const counters = R.MOVES.filter((q) => q.beats.includes(read));
+        const om = smart && counters.length ? TG.pick(counters).id : TG.pick(R.MOVES).id;
+        const op = clamp(cfg.opp.skill + (Math.random() - 0.5) * Math.max(0.18, 0.5 - cfg.round * 0.035), 0.05, 1);
         apply(R.exchange(st.move, power, om, op), st.move, power, om, op);
       } else { cfg.remote.mine = { m: st.move, p: power }; net.send({ t: 'wr-move', m: st.move, p: +power.toFixed(2) }); msg.textContent = L('Өрсөлдөгчийг хүлээж байна…', 'Waiting for your opponent…'); }
     }
     function apply(r, mm, mp, om, op) {
+      const wasRepeat = mm === st.lastPlayer;
       st.lastPlayer = mm;
-      if (r > 0) { st.a++; TG.sfx.good(); } else if (r < 0) { st.b++; TG.sfx.bad(); } else TG.sfx.tap();
+      if (r > 0) { st.a++; TG.sfx.good(); const wr = V().wr; wr.techs = wr.techs || {}; wr.techs[mm] = (wr.techs[mm] || 0) + 1; S.save(); } else if (r < 0) { st.b++; TG.sfx.bad(); } else TG.sfx.tap();
+      st.flash = { text: (r >= 0 ? moveLabel(mm) : moveLabel(om)).toUpperCase() + '!', good: r > 0, t0: performance.now() };
+      if (wasRepeat && r < 0) setTimeout(() => { if (!st.over) msg.textContent += ' ' + L('(Давтсан мэхийг өрсөлдөгч таньчихлаа!)', '(They saw your repeated move coming!)'); }, 30);
       st.target = clamp((st.a - st.b) * 12, -26, 26) + (r > 0 ? 6 : r < 0 ? -6 : 0);
       setTimeout(() => { st.target = clamp((st.a - st.b) * 12, -26, 26); }, 260);
       msg.textContent = `${moveLabel(mm)} ${Math.round(mp * 100)}%  ·  ${moveLabel(om)} ${Math.round(op * 100)}%  →  ` + (r > 0 ? L('Та давууллаа!', 'You gain the upper hand!') : r < 0 ? L('Өрсөлдөгч давууллаа!', 'Your opponent gains!') : L('Тэнцлээ!', 'Even!'));
       drawScore();
-      if (cfg.ai) { if (st.a >= 2 || st.b >= 2) setTimeout(() => finish(st.a > st.b), 900); else setTimeout(() => { if (!st.over) { setPhase('choose'); } }, 1100); }
+      if (cfg.ai) { if (st.a >= need || st.b >= need) setTimeout(() => finish(st.a > st.b), 900); else setTimeout(() => { if (!st.over) { setPhase('choose'); } }, 1100); }
       else if (!(st.a >= 2 || st.b >= 2)) setTimeout(() => { if (!st.over) setPhase('choose'); }, 1100);
     }
     function finish(won, reason) {
@@ -1023,7 +1239,7 @@
   function onWrestleMsg(m) {
     const v = V();
     if (m.t === 'wr-invite') {
-      const close = TG.modal(h('div', { class: 'center' }, wrestlerPic('dance', '#3f76db', 64), h('h2', null, L('Барилдах урилга!', 'Wrestling challenge!')),
+      const close = TG.modal(h('div', { class: 'center' }, wrestlerPic('dance', BLUE, 56), h('h2', null, L('Барилдах урилга!', 'Wrestling challenge!')),
         h('p', null, `${m.name} ${L('тантай барилдахыг хүсэж байна.', 'wants to wrestle you.')}`),
         h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { net.send({ t: 'wr-decline', from: m.from }); close(); } }, L('Дараа', 'Not now')),
           h('button', { class: 'btn primary', onclick: () => { net.send({ t: 'wr-accept', from: m.from }); close(); } }, L('Барилдъя!', "Let's wrestle!")))), { cls: 'v-modal' });
@@ -1040,11 +1256,14 @@
   function endRemoteMatch() { if (live && live.match && live.match.ui) live.match.ui({ t: 'wr-end', winner: null, reason: 'disconnected' }); if (live) live.match = null; }
 
   function tips() {
-    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, pic('ui:logo', 72)), h('h2', null, L('Нутагт тавтай морил!', 'Welcome to the village!')),
+    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, TG.basar.face(0, 80)), h('h2', null, L(`Вуф! Сайн уу, ${live ? live.name : ''}!`, `Woof! Hi ${live ? live.name : ''}!`)),
+      h('p', null, L('Би Басар, монгол банхар нохой. Нутагт үргэлж хажууд чинь явна. Намайг дарж эсвэл B товчоор юу ч асуугаарай!', 'I’m Basar, a Mongolian Bankhar dog. I’ll walk beside you everywhere in Nutag. Tap me or press B to ask me anything!')),
       h('div', { class: 'v-list' }, [
         ['ui:star', L('Газар дээр дарж алх. Компьютер дээр сум эсвэл WASD товч.', 'Tap the ground to walk. On a computer use arrows or WASD.')],
         ['crop:carrot', L('Цэцэрлэгт үр тарьж, 3 удаа усалж, ургацаа хураа. Худгаас ус аваарай.', 'Plant seeds in the garden, water 3 times, then harvest. Refill water at the well.')],
-        ['ui:play', L('Тоглоомын гэрт тоглож зоос, XP цуглуул. Дэлгүүрээс хувцас, тэжээвэр ав.', 'Play in the game ger to earn coins and XP. Buy clothes and pets at the shop.')],
+        ['ui:book', L('Сургуулийн гэрт гэр барих, цагаан идээ хийх, Нууц товчоог сур. Сурснаа гэр бүлтэйгээ хий!', 'In the school ger learn to build a ger, make dairy foods and hear the Secret History. Then do it with your family!')],
+        ['ui:ger', L('Гэр барих хичээлээ дуусгаад Нутагт өөрийн гэрээ бариарай.', 'Finish the ger lesson, then build your own ger in Nutag.')],
+        ['ui:horse', L('Морины уяанаас морь унаж давхих, эсвэл уралдаанд оролцоорой!', 'Take a horse from the horse line to ride freely or race!')],
         ['ui:heart', L('Нэг өрөөний найзууд нэг цэцэрлэгт хамт тарьж, бие биеийнхээ ургамлыг усална.', 'Friends in the same room share one garden and can water each other\'s plants.')],
       ].map(([e, t]) => h('div', { class: 'v-row' }, icon(e), h('div', { class: 'v-row-b' }, t)))),
       h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => close() }, L('Эхлэх', "Let's go"))), { cls: 'v-modal', onClose: () => { const v = V(); if (v) { v.tips = true; S.save(); } } });
