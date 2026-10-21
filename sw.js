@@ -1,5 +1,5 @@
 /* Offline-first service worker: once loaded, the whole app works without internet. */
-const CACHE = 'naadamy-v4';
+const CACHE = 'naadamy-v5';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/styles.css', './assets/icon.svg', './assets/fonts/fonts.css',
   './assets/fonts/nunito-cyrillic.woff2', './assets/fonts/nunito-cyrillic-ext.woff2', './assets/fonts/nunito-latin.woff2',
@@ -8,6 +8,7 @@ const FILES = [
   './js/games/letters.js', './js/games/counting.js', './js/games/memory.js', './js/games/healthy.js',
   './js/games/shagai.js', './js/games/mathduel.js', './js/games/coding.js', './js/games/budget.js',
   './js/games/quiz.js', './js/games/breathing.js', './js/games/move.js', './js/satis-levels.js', './js/satis.js',
+  './js/village/rules.js', './js/village/world.js', './js/village/village.js',
 ];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

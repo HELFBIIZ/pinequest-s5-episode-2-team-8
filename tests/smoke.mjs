@@ -51,6 +51,18 @@ try {
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
   }
 
+  step = 'village (solo mode, no server)';
+  await page.evaluate(() => TG.go('village')); await sleep(900);
+  await check('village screen', '.village canvas');
+  const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
+  if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
+  await page.evaluate(() => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
+  await sleep(200);
+  if (!(await page.evaluate(() => { const p = TG.store.active().village.garden[0]; return p && p.c === 'carrot'; }))) errors.push('village: planting in solo mode did not work');
+  for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(250); await check(`village ${btn} panel`, '.modal'); }
+  await page.evaluate(() => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
+  await page.evaluate(() => document.querySelectorAll('.modal-back').forEach((m) => m.remove()));
+
   const games = await page.evaluate(() => TG.gameOrder.map((id) => ({ id, ages: TG.games[id].ages })));
   for (const g of games) {
     for (const together of [false, true]) {
@@ -84,7 +96,7 @@ try {
 
   await page.evaluate(() => TG.go('result', { g: TG.games.shagai, players: [{ name: 'A', emoji: '🐎', color: '#000' }, { name: 'B', emoji: '👩', color: '#111' }], together: true, res: { stars: 3, scores: [15, 9] } }));
   await sleep(250); await check('result screen', '.result');
-  console.log(`Checked 5 screens, ${games.length} games x 2 modes, ${count} puzzle levels.`);
+  console.log(`Checked 5 screens, the village, ${games.length} games x 2 modes, ${count} puzzle levels.`);
 } catch (e) {
   errors.push(`crashed during "${step}": ${e.message}`);
 }
