@@ -188,7 +188,7 @@
   function villageBanner() {
     const vi = TG.villageInfo ? TG.villageInfo() : null;
     return h('button', { class: 'village-banner', onclick: () => TG.go('village') },
-      h('div', { class: 'vb-scene', 'aria-hidden': 'true' }, h('span', null, '⛺'), h('span', null, '🌻'), h('span', null, '🐑'), h('span', null, '🥕')),
+      h('div', { class: 'vb-scene', 'aria-hidden': 'true' }, TG.pixel.icon('ui:logo', 48)),
       h('div', { class: 'vb-body' },
         h('div', { class: 'eyebrow' }, L('Шинэ · Хамт тоглох', 'New · Play together')),
         h('b', null, L('Нутаг: хамтын цэцэрлэг', 'Village: grow together')),
@@ -497,6 +497,10 @@
       h('section', { class: 'card' },
         h('h3', null, '⚙️ ', L('Тохиргоо, хүртээмж', 'Settings & accessibility')),
         toggle('sound', L('🔊 Дуу', '🔊 Sound')),
+        TG.music && TG.music.available ? h('label', { class: 'switch-row' }, h('span', null, L('🎵 Арын хөгжим', '🎵 Background music')),
+          h('input', { type: 'checkbox', class: 'switch', checked: st.settings.music !== false, onchange: () => { TG.music.toggle(); render(); } })) : null,
+        TG.music && TG.music.available ? h('div', { class: 'range-row', style: { padding: '8px 0' } }, h('span', null, L('Хөгжмийн дуу', 'Music volume')),
+          h('input', { type: 'range', min: 0, max: 100, step: 5, value: Math.round((typeof st.settings.musicVolume === 'number' ? st.settings.musicVolume : 0.35) * 100), 'aria-label': 'music volume', oninput: (e) => TG.music.setVolume(e.target.value / 100) })) : null,
         toggle('bigText', L('🔠 Том үсэг', '🔠 Large text')),
         toggle('reduceMotion', L('🐢 Хөдөлгөөн багасгах', '🐢 Reduce motion')),
         h('label', { class: 'switch-row' }, h('span', null, '🌐 ', L('Хэл', 'Language')), h('button', { class: 'btn ghost sm', onclick: toggleLang }, S.state.lang === 'mn' ? 'Монгол → English' : 'English → Монгол'))),
