@@ -45,20 +45,21 @@
     harvest: { n: 3, c: 25, x: 30, t: Tx('3 ургац хураах', 'Harvest 3 crops') },
     plant: { n: 4, c: 15, x: 20, t: Tx('4 үр тарих', 'Plant 4 seeds') },
     fish: { n: 2, c: 25, x: 30, t: Tx('2 загас барих', 'Catch 2 fish') },
-    game: { n: 1, c: 20, x: 30, t: Tx('Naadamy-ийн 1 тоглоом тоглох', 'Play 1 Naadamy game') },
-    together: { n: 1, c: 35, x: 45, t: Tx('Гэр бүлтэйгээ хамт 1 тоглоом тоглох', 'Play 1 game with family') },
-    puzzle: { n: 2, c: 20, x: 30, t: Tx('Цэгцлэе!-ийн 2 түвшин дуусгах', 'Finish 2 puzzle levels') },
+    basar: { n: 2, c: 15, x: 25, t: Tx('Басараас 2 асуулт асуух', 'Ask Basar 2 questions') },
+    quiz: { n: 3, c: 25, x: 35, t: Tx('Басарын 3 асуултад зөв хариулах', 'Answer 3 of Basar’s questions right') },
+    lesson: { n: 1, c: 30, x: 40, t: Tx('Өв соёлын 1 хичээл дуусгах', 'Finish 1 heritage lesson') },
+    together: { n: 1, c: 40, x: 50, t: Tx('Гэр бүлтэйгээ бодит ажил хийх', 'Do a real activity with family') },
     pet: { n: 3, c: 10, x: 20, t: Tx('Хонийг 3 удаа илбэх', 'Pet the sheep 3 times') },
     sell: { n: 5, c: 15, x: 20, t: Tx('5 зүйл зарах', 'Sell 5 items') },
     help: { n: 2, c: 30, x: 40, t: Tx('Найзынхаа ургамлыг 2 удаа услах', "Water a friend's plants twice") },
   };
-  const POOL = ['water', 'harvest', 'plant', 'fish', 'game', 'together', 'puzzle', 'pet', 'sell'];
+  const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz'];
   function quests() {
     const v = V(), d = S.dkey();
-    if (v.quests.d !== d) {
+    if (v.quests.d !== d || v.quests.list.some((q) => !QUESTS[q.k])) { // new day, or quests from an older version
       let hs = 0; for (const ch of d + v.id) hs = (hs * 31 + ch.charCodeAt(0)) >>> 0;
       const pool = [...POOL], pick = [];
-      while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; pick.push(pool.splice(hs % pool.length, 1)[0]); }
+      while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; const k = pool.splice(hs % pool.length, 1)[0]; if (!pick.includes(k)) pick.push(k); }
       pick.push('help');
       v.quests = { d, list: pick.map((k) => ({ k, p: 0, done: false })) };
       v.pets = {};
@@ -74,13 +75,9 @@
     }
     S.save();
   }
-  TG.onGameRecorded = ({ stars, together, gameId }) => {
-    const m = together ? 1.5 : 1;
-    quest('game'); if (together) quest('together'); if (gameId === 'satis') quest('puzzle');
-    return reward(Math.round(stars * 6 * m), Math.round(stars * 12 * m));
-  };
-  TG.onMissionDone = () => reward(15, 25);
-  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r) }; // used by automated tests
+  TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
+  TG.villageQuest = (k, n) => quest(k, n);
+  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i) }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -216,10 +213,12 @@
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
-        h('button', { class: 'v-back px-frame', 'aria-label': 'back', onclick: () => TG.go('home') }, TG.icon('arrowLeft')),
+        h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
         els.me, h('div', { class: 'v-pills' }, els.coins, els.water, els.net)),
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
+          h('button', { class: 'v-round px-frame v-basar', 'aria-label': 'basar', title: L('Басар (B)', 'Basar (B)'), onclick: () => openBasar() }, pic('ui:dog', 34)),
+          h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
@@ -237,7 +236,7 @@
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
     live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
-      cam: { x: sp.x, y: sp.y }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
+      cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
       sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
       raf: 0, last: performance.now(), view: {}, terrain: WD.renderStatic(), buf: PX.mk(1, 1), ctxTimer: 0, sel: null };
     resize();
@@ -322,7 +321,7 @@
         return ['crop:' + p.c, fmtLeft(R.stageLeft(p, now()))];
       }
       case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
-      case 'arcade': return ['ui:play', L('Тоглох', 'Play')];
+      case 'arcade': return ['ui:book', L('Сурах', 'Learn')];
       case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
       case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
       case 'well': return ['ui:drop', L('Ус авах', 'Get water')];
@@ -345,7 +344,7 @@
     switch (a.type) {
       case 'plot': return plotAction(a.i);
       case 'home': return wardrobe();
-      case 'arcade': return arcade();
+      case 'arcade': return TG.go('learn');
       case 'shop': return shopModal();
       case 'board': return questModal();
       case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `${v.water}/${v.can}`, '#93d4f6'); hud(); return; }
@@ -364,6 +363,7 @@
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
     if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
@@ -390,6 +390,7 @@
   function onKey(e) {
     if (!live || document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
+    if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space is only ever the action button: it never re-presses a focused HUD button
       e.preventDefault(); e.stopPropagation();
@@ -445,6 +446,16 @@
     // smooth camera
     const ca = Math.min(1, dt * 7); live.cam.x += (m.px - live.cam.x) * ca; live.cam.y += (m.py - live.cam.y) * ca;
     follow(m.petPos, m.px - 0.45, m.py + 0.25, dt);
+    { // Басар trots behind you and sits beside you when you stop
+      const dg = live.dog, [ddx, ddy] = DIRS[m.dir], tx2 = m.moving ? m.px - ddx * 0.95 + (ddy ? 0.6 : 0) : m.px + 1.1, ty2 = m.moving ? m.py - ddy * 0.7 + 0.15 : m.py + 0.25;
+      const ox = dg.x, oy = dg.y, q = Math.min(1, dt * 3); dg.x += (tx2 - dg.x) * q; dg.y += (ty2 - dg.y) * q;
+      if (Math.hypot(m.px - dg.x, m.py - dg.y) > 4) { dg.x = tx2; dg.y = ty2; }
+      const sp2 = Math.hypot(dg.x - ox, dg.y - oy) / Math.max(dt, 1e-3); dg.moving = sp2 > 0.4; dg.idle = dg.moving ? 0 : dg.idle + dt;
+      if (Math.abs(dg.x - ox) > 0.002) dg.flip = dg.x < ox; else if (!dg.moving) dg.flip = m.px + 0.2 < dg.x;
+      const nowP = performance.now();
+      if (nowP > dg.nextFact && !document.querySelector('.modal-back')) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const f = TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); }
+      if (dg.bubble && nowP - dg.bubble.t0 > 12000) dg.bubble = null;
+    }
     for (const o of live.others.values()) {
       const dx = o.x - o.px, dy = o.y - o.py, d = Math.hypot(dx, dy);
       if (d > 5) { o.px = o.x; o.py = o.y; }
@@ -500,6 +511,8 @@
     };
     for (const o of live.others.values()) person(o);
     const v = V(); person({ ...live.me, look: v.look });
+    const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
+    ents.push({ y: dg.y + 0.05, f: () => { shadow(dg.x * T, dg.y * T + 1); sprite(PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.flip); } });
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
@@ -519,6 +532,8 @@
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
     labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
+    { const [sx, sy] = S(dg.x * T + 8, dg.y * T - 4); pixelText(ctx, L('Басар', 'Basar'), sx, sy, textSize() * 0.8, '#f7c646');
+      if (dg.bubble) { const bob = Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2; pixelText(ctx, '!', sx + 5 * live.view.k, sy - 6 * live.view.k + bob, textSize() * 1.8, '#f7c646'); } }
     live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
     for (const f of live.floaters) {
       const q = (pn - f.t0) / 1400, [sx, sy] = S(f.x * T + 8, f.y * T + 10);
@@ -585,7 +600,7 @@
     const v = V(); let cur = start || 'seeds';
     const body = h('div', { class: 'v-shop' });
     const TABS = [['seeds', 'ui:seed', L('Үр', 'Seeds')], ['wear', 'deel:red', L('Хувцас', 'Clothes')], ['pet', 'pet:lamb', L('Тэжээвэр', 'Pets')], ['tool', 'tool:can-2', L('Багаж', 'Tools')], ['sell', 'ui:coin', L('Зарах', 'Sell')]];
-    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
+    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Хичээл үзэж, Басарын асуултад хариулж, ургац зарж цуглуулаарай!', 'Not enough coins. Learn, answer Basar’s quizzes or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
     const ownedItem = (it) => (it.cat === 'tool' ? (it.slot === 'can' ? v.can >= it.val : v.rod >= it.val) : v.owned.includes(it.id));
     const draw = () => {
       const level = lvl();
@@ -678,18 +693,15 @@
           h('div', { class: 'v-row-b' }, h('b', null, tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
           ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; reward(d.c, d.x); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
       })),
-      h('button', { class: 'btn block', onclick: () => { close(); TG.go('missions'); } }, L('Гэр бүлийн бодит даалгавар', 'Real-life family missions'), ' +15 ', pic('ui:coin', 14)));
+      h('button', { class: 'btn block', onclick: () => { close(); TG.go('learn'); } }, '📚 ', L('Өв соёлын сургууль', 'Heritage school')));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
 
-  function arcade() {
-    const prof = S.active(), ag = S.ageGroupOf(prof.age);
-    const games = TG.gameOrder.map((id) => TG.games[id]).filter((g) => g.ages.includes(ag)).slice(0, 8);
-    const close = TG.modal(h('div', null, h('h2', null, L('Тоглоомын гэр', 'Game ger')),
-      h('p', { class: 'muted' }, L('Тоглоом бүрээр зоос, XP цуглуулна. Гэр бүлтэйгээ хамт тогловол 1.5 дахин их!', 'Every game earns coins and XP. Play with family for 1.5× more!')),
-      h('div', { class: 'v-grid' }, games.map((g) => h('button', { class: 'v-card', onclick: () => { close(); TG.launchGame(g); } }, h('span', { class: 'v-card-e' }, g.icon), h('b', null, tx(g.title))))),
-      h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: () => { close(); TG.go('satis'); } }, '✨ ', L('Цэгцлэе! оньсого', 'Make it perfect! puzzles'))), { cls: 'v-modal' });
+  function openBasar() {
+    const dg = live && live.dog, b = dg && dg.bubble;
+    if (dg) dg.bubble = null;
+    TG.basar.open(b ? { context: tx(b.fact) + ' ' + L('Илүү ихийг мэдмээр байна уу? Надаас асуугаарай!', 'Want to know more? Ask me!') } : {});
   }
 
   function talk() {
@@ -816,6 +828,13 @@
   const swatches = (map, cur, onPick, cls = '') => h('div', { class: 'v-chips' }, Object.entries(map).map(([k, c]) => h('button', { class: 'v-chip v-swatch ' + cls + (cur === k ? ' active' : ''), style: { background: c }, 'aria-label': k, onclick: () => onPick(k) })));
   function buyGer(i) {
     const v = V(), body = h('div'); let roof = 'blue', door = 'red';
+    const learned = TG.learn && TG.learn.done('ger');
+    if (!learned) {
+      const close2 = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-gerbox' }, gerPreview('blue', 'red', 3)), h('h2', null, L('Эхлээд гэр барьж сур!', 'Learn to build a ger first!')),
+        h('p', { class: 'muted' }, L('Жинхэнэ малчид гэрээ өөрсдөө барьдаг. Сургуулийн гэрт “Монгол гэр барих” хичээлийг дуусгавал энд өөрийн гэрээ барих эрх нээгдэнэ.', 'Real herders build their own gers. Finish the “Build a Mongol ger” lesson in the school ger to unlock your own ger here.')),
+        h('button', { class: 'btn primary big block', onclick: () => { close2(); TG.go('lesson', { id: 'ger' }); } }, '⛺ ', L('Хичээл эхлэх', 'Start the lesson'))), { cls: 'v-modal' });
+      return;
+    }
     const buy = () => {
       if (lvl() < R.GER_LEVEL) return TG.toast(L(`${R.GER_LEVEL}-р түвшинд хүрээрэй.`, `Reach level ${R.GER_LEVEL} first.`));
       if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!'));
@@ -1047,11 +1066,13 @@
   function endRemoteMatch() { if (live && live.match && live.match.ui) live.match.ui({ t: 'wr-end', winner: null, reason: 'disconnected' }); if (live) live.match = null; }
 
   function tips() {
-    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, pic('ui:logo', 72)), h('h2', null, L('Нутагт тавтай морил!', 'Welcome to the village!')),
+    const close = TG.modal(h('div', null, h('div', { class: 'v-fact-e' }, TG.basar.face(0, 80)), h('h2', null, L(`Вуф! Сайн уу, ${live ? live.name : ''}!`, `Woof! Hi ${live ? live.name : ''}!`)),
+      h('p', null, L('Би Басар, монгол банхар нохой. Нутагт үргэлж хажууд чинь явна. Намайг дарж эсвэл B товчоор юу ч асуугаарай!', 'I’m Basar, a Mongolian Bankhar dog. I’ll walk beside you everywhere in Nutag. Tap me or press B to ask me anything!')),
       h('div', { class: 'v-list' }, [
         ['ui:star', L('Газар дээр дарж алх. Компьютер дээр сум эсвэл WASD товч.', 'Tap the ground to walk. On a computer use arrows or WASD.')],
         ['crop:carrot', L('Цэцэрлэгт үр тарьж, 3 удаа усалж, ургацаа хураа. Худгаас ус аваарай.', 'Plant seeds in the garden, water 3 times, then harvest. Refill water at the well.')],
-        ['ui:play', L('Тоглоомын гэрт тоглож зоос, XP цуглуул. Дэлгүүрээс хувцас, тэжээвэр ав.', 'Play in the game ger to earn coins and XP. Buy clothes and pets at the shop.')],
+        ['ui:book', L('Сургуулийн гэрт гэр барих, цагаан идээ хийх, Нууц товчоог сур. Сурснаа гэр бүлтэйгээ хий!', 'In the school ger learn to build a ger, make dairy foods and hear the Secret History. Then do it with your family!')],
+        ['ui:ger', L('Гэр барих хичээлээ дуусгаад Нутагт өөрийн гэрээ бариарай.', 'Finish the ger lesson, then build your own ger in Nutag.')],
         ['ui:heart', L('Нэг өрөөний найзууд нэг цэцэрлэгт хамт тарьж, бие биеийнхээ ургамлыг усална.', 'Friends in the same room share one garden and can water each other\'s plants.')],
       ].map(([e, t]) => h('div', { class: 'v-row' }, icon(e), h('div', { class: 'v-row-b' }, t)))),
       h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => close() }, L('Эхлэх', "Let's go"))), { cls: 'v-modal', onClose: () => { const v = V(); if (v) { v.tips = true; S.save(); } } });

@@ -405,6 +405,58 @@
     const A = ANIMALS[kind]; const { c, x } = mk(A.w, A.h); A.draw(x, frame); cache.set(key, c); return c;
   }
 
+  // Басар: a Mongolian Bankhar dog. Big, fluffy, black coat with tan "four-eye" spots above the eyes,
+  // tan muzzle, chest and paws, and a bushy tail curled over the back. Faces right; frames 0–2 walk, 3 sit.
+  const BK = { out: '#1a1418', coat: '#2a2326', coatL: '#4a3f44', tan: '#c98a4b', tanL: '#e2ab6c', tongue: '#e8687a' };
+  function bankhar(frame) {
+    const key = 'bk:' + frame; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(22, 18);
+    const sit = frame === 3;
+    // tail: a fluffy curl over the back
+    blob(x, 4, sit ? 9 : 5, 3, 2, BK.coat, BK.out); P(x, 2, sit ? 8 : 4, BK.coatL); P(x, 6, sit ? 8 : 4, BK.tanL);
+    if (sit) {
+      blob(x, 9, 11, 5, 4, BK.coat, BK.out);                 // haunch
+      R(x, 4, 15, 9, 2, BK.out); R(x, 5, 15, 7, 1, BK.tan);  // folded back leg
+      blob(x, 14, 8, 3, 5, BK.coat, BK.out);                  // upright chest
+      R(x, 15, 9, 2, 4, BK.tan);
+      [13, 16].forEach((lx) => { R(x, lx, 12, 2, 5, BK.out); R(x, lx, 12, 1, 4, BK.coat); R(x, lx, 15, 2, 2, BK.tan); });
+    } else {
+      const b = frame === 2 ? 1 : 0;
+      [[5, 0], [7, 1], [12, 1], [14, 0]].forEach(([lx, ph]) => {
+        const lift = frame && (ph ^ (frame - 1)) ? 1 : 0;
+        R(x, lx, 11, 2, 6 - lift, BK.out); R(x, lx, 11, 1, 4 - lift, BK.coat); R(x, lx, 15 - lift, 2, 1, BK.tan);
+      });
+      blob(x, 10, 9 - b, 6, 3, BK.coat, BK.out);              // fluffy body
+      ell(x, 9, 8 - b, 4, 1, BK.coatL);
+      blob(x, 15, 8 - b, 3, 4, BK.coat, BK.out);              // thick mane around the neck
+      R(x, 16, 10 - b, 2, 2, BK.tan);                          // tan chest
+    }
+    const hy = sit ? 0 : (frame === 2 ? 1 : 2);
+    blob(x, 17, hy + 4, 3, 3, BK.coat, BK.out);               // head
+    R(x, 14, hy + 2, 2, 5, BK.out); R(x, 15, hy + 3, 1, 3, BK.coatL); // floppy ear
+    R(x, 19, hy + 5, 3, 2, BK.out); R(x, 19, hy + 5, 2, 2, BK.tan); P(x, 21, hy + 5, BK.out); // muzzle + nose
+    P(x, 18, hy + 4, BK.out); P(x, 18, hy + 3, BK.tanL);       // eye + the tan "second eye" above it
+    if (sit || frame === 0) P(x, 20, hy + 7, BK.tongue);
+    cache.set(key, c); return c;
+  }
+  /** Basar's face for the chat window (24×22). mood: 0 happy, 1 talking, 2 thinking. */
+  function bankharFace(mood) {
+    const key = 'bkf:' + mood; if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(24, 22);
+    blob(x, 12, 12, 8, 7, BK.coat, BK.out);                   // head + fluffy cheeks
+    ell(x, 12, 9, 5, 3, BK.coatL);
+    [[2, 0], [18, 1]].forEach(([ex, i]) => { R(x, ex + (i ? 0 : 1), 6, 3, 9, BK.out); R(x, ex + (i ? 1 : 0), 8, 3, 8, BK.out); R(x, ex + 1, 7, 2, 8, i ? BK.coatL : BK.coat); P(x, ex + (i ? 1 : 2), 15, BK.out); }); // floppy ears hanging down
+    R(x, 8, 8, 2, 1, BK.tanL); R(x, 14, 8, 2, 1, BK.tanL);   // the tan "four eyes"
+    if (mood === 2) { R(x, 8, 10, 2, 1, BK.out); R(x, 14, 10, 2, 1, BK.out); }
+    else { R(x, 8, 10, 2, 2, BK.out); R(x, 14, 10, 2, 2, BK.out); P(x, 8, 10, '#fff'); P(x, 14, 10, '#fff'); }
+    blob(x, 12, 15, 4, 3, BK.tan, BK.out);                     // muzzle
+    R(x, 11, 13, 3, 2, BK.out);                                // nose
+    if (mood === 1) { R(x, 10, 17, 5, 2, BK.out); R(x, 11, 18, 3, 1, BK.tongue); }
+    else { P(x, 10, 17, BK.out); P(x, 14, 17, BK.out); R(x, 11, 17, 3, 1, BK.out); }
+    if (mood === 0) R(x, 12, 18, 2, 2, BK.tongue);
+    cache.set(key, c); return c;
+  }
+
   // ------------------------------------------------------------ UI icons (16×16) for shop, bag, HUD
   const iconCache = new Map();
   function iconCanvas(key) {
@@ -468,6 +520,9 @@
         ger: () => { const g = gerSprite(K.blue, K.red); x.drawImage(g, 0, 0, 48, 50, 0, 0, 16, 17); },
         wrestle: () => { const w = wrestler('#d8342b', '#edbb93', 'dance', 0); x.drawImage(w, 0, 0, 32, 48, 2, 0, 11, 16); },
         ovoo: () => { for (let r = 0; r < 5; r++) for (let i = -r; i <= r; i++) R(x, 7 + i * 1.5 | 0, 7 + r * 2, 2, 2, [K.rock, K.rockL, K.rockD][(i + r + 6) % 3]); R(x, 7, 1, 1, 7, K.woodD); line(x, 7, 2, 3, 7, K.light); line(x, 8, 2, 12, 6, K.blue); },
+        dog: () => { const f = bankharFace(0); x.drawImage(f, 0, 0, 24, 22, 0, 1, 16, 15); },
+        book: () => { R(x, 1, 3, 14, 11, K.out); R(x, 2, 4, 6, 9, K.paper); R(x, 8, 4, 6, 9, '#fff3d6'); R(x, 7, 3, 2, 11, K.redD); [6, 8, 10].forEach((ly) => { R(x, 3, ly, 4, 1, K.woodL); R(x, 9, ly, 4, 1, K.woodL); }); },
+        menu: () => { [4, 8, 12].forEach((ly) => { R(x, 2, ly - 1, 12, 3, K.out); R(x, 3, ly, 10, 1, K.paper); }); },
         logo: () => { ell(x, 8, 15, 8, 3, K.grass); blob(x, 12, 3, 2, 2, K.gold, K.goldD); for (let c2 = 2; c2 < 14; c2++) { const dx = (c2 - 8) / 6; const top = 9 - Math.round(4 * Math.sqrt(Math.max(0, 1 - dx * dx))); R(x, c2, top, 1, 10 - top, K.white); P(x, c2, top - 1, K.out); } R(x, 3, 9, 10, 4, K.out); R(x, 4, 9, 8, 3, K.felt); R(x, 4, 9, 8, 1, K.blue); R(x, 7, 10, 2, 3, K.red); },
       })[id]();
     }
@@ -480,5 +535,5 @@
     return img;
   }
 
-  TG.pixel = { K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
+  TG.pixel = { bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
 })(window.TG);

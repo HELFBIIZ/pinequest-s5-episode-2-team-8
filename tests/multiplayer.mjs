@@ -29,7 +29,7 @@ async function player(name, look) {
   await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
   await page.evaluate((name, look) => {
     localStorage.clear();
-    const p = TG.store.addProfile({ name, age: 9, avatar: '🐎' });
+    const p = TG.store.addProfile({ name, age: 9, avatar: '🐎' }); TG.store.state.loggedIn = true;
     TG.store.state.settings.screenLimit = 999; TG.store.state.settings.sound = false;
     p.village = { tips: true, look, seeds: { carrot: 5 }, xp: 200, coins: 600 };
     TG.go('village');

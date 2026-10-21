@@ -1,7 +1,7 @@
 {
-  "name": "Naadamy — Хамтдаа суралцъя",
+  "name": "Naadamy — Монгол өв соёлоо хамтдаа сурцгаая",
   "short_name": "Naadamy",
-  "description": "Хүүхэд, гэр бүлд зориулсан хамтдаа суралцах тоглоомууд. Play, learn and grow together.",
+  "description": "Монголын өв соёлыг гэр бүл, найзуудтайгаа хамтдаа сурах тоглоом. Learn Mongolian heritage together.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
