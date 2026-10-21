@@ -1,0 +1,95 @@
+// Headless browser smoke test: opens every screen, every game (solo and
+// together) and every "Цэгцлэе!" level, and fails on any JavaScript error or
+// any request to an outside server. Needs puppeteer-core and Chrome.
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { join, extname, dirname, resolve, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import puppeteer from 'puppeteer-core';
+
+const root = process.env.ROOT || resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const chrome = process.env.CHROME_PATH || (process.platform === 'darwin'
+  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain' };
+
+const server = createServer(async (req, res) => {
+  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
+  try {
+    const body = await readFile(join(root, path.endsWith('/') ? path + 'index.html' : path));
+    res.writeHead(200, { 'content-type': TYPES[extname(path)] || 'application/octet-stream' }); res.end(body);
+  } catch { res.writeHead(404); res.end(); }
+});
+await new Promise((r) => server.listen(0, r));
+const base = `http://localhost:${server.address().port}`;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const errors = [], external = [];
+const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 390, height: 844 });
+await page.setRequestInterception(true);
+page.on('request', (r) => { const u = new URL(r.url()); if (u.protocol.startsWith('http') && u.hostname !== 'localhost') { external.push(r.url()); r.abort(); } else r.continue(); });
+let step = 'load';
+page.on('pageerror', (e) => errors.push(`${step}: ${e.message}`));
+page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push(`${step}: console error: ${m.text()}`); });
+const check = async (label, selector) => {
+  step = label;
+  if (selector && !(await page.$(selector))) errors.push(`${label}: expected "${selector}" to render`);
+};
+
+try {
+  await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: 'networkidle0' });
+  await check('welcome screen', '.onboard');
+
+  const ages = { '3-6': 5, '7-10': 8, '11-14': 12, '15-18': 16 };
+  await page.evaluate(() => { TG.store.addProfile({ name: 'Тест', age: 8, avatar: '🐎' }); TG.store.state.settings.screenLimit = 999; TG.store.state.settings.sound = false; });
+
+  for (const screen of ['home', 'satis', 'missions', 'memories', 'about']) {
+    await page.evaluate((s) => TG.go(s), screen); await sleep(250);
+    await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
+  }
+
+  const games = await page.evaluate(() => TG.gameOrder.map((id) => ({ id, ages: TG.games[id].ages })));
+  for (const g of games) {
+    for (const together of [false, true]) {
+      await page.evaluate((age) => { TG.store.active().age = age; }, ages[g.ages[0]]);
+      await page.evaluate((id, together) => {
+        document.querySelectorAll('.modal-back,.timeout-back').forEach((m) => m.remove());
+        const players = [{ name: 'Тест', emoji: '🐎', color: TG.PCOLORS[0] }];
+        if (together) players.push({ name: 'Ээж', emoji: '👩', color: TG.PCOLORS[1] });
+        TG.go('play', { g: TG.games[id], players, together });
+      }, g.id, together);
+      step = `game ${g.id} (${together ? 'together' : 'solo'})`;
+      await sleep(350);
+      await check(`game ${g.id} (${together ? 'together' : 'solo'})`, '.play-screen');
+      for (let k = 0; k < 6; k++) {   // poke a few buttons to exercise game logic
+        await page.evaluate(() => { const b = [...document.querySelectorAll('.stage button:not(:disabled)')].filter((x) => x.offsetParent); if (b.length) b[Math.floor(Math.random() * b.length)].click(); });
+        await sleep(120);
+      }
+    }
+  }
+
+  const levels = await page.evaluate(() => Object.fromEntries(Object.entries(TG.SATIS).map(([ag, l]) => [ag, l.length])));
+  let count = 0;
+  for (const [ag, n] of Object.entries(levels)) {
+    for (let i = 0; i < n; i++) {
+      step = `puzzle ${ag} #${i + 1}`;
+      await page.evaluate((ag, i) => TG.go('satisLevel', { ag, i }), ag, i); await sleep(200);
+      await check(`puzzle ${ag} #${i + 1}`, '.satis-stage > *');
+      count++;
+    }
+  }
+
+  await page.evaluate(() => TG.go('result', { g: TG.games.shagai, players: [{ name: 'A', emoji: '🐎', color: '#000' }, { name: 'B', emoji: '👩', color: '#111' }], together: true, res: { stars: 3, scores: [15, 9] } }));
+  await sleep(250); await check('result screen', '.result');
+  console.log(`Checked 5 screens, ${games.length} games x 2 modes, ${count} puzzle levels.`);
+} catch (e) {
+  errors.push(`crashed during "${step}": ${e.message}`);
+}
+
+await browser.close(); server.close();
+if (external.length) errors.push(`requests to outside servers (app must work offline): ${[...new Set(external)].join(', ')}`);
+if (errors.length) { console.error('Smoke test failed:\n- ' + errors.join('\n- ')); process.exit(1); }
+console.log('Smoke test passed: no errors, no outside requests.');

@@ -1,119 +1,139 @@
-# Тоглоом — Хамтдаа суралцъя (Play together, grow together)
+# Naadamy — Хамтдаа суралцъя
 
-**Pinequest · Pinecone Academy · Theme: "Fine-Tune for the Future — Equal Access to Health, Education, Skills"**
+**Pinequest · Pinecone Academy · Сэдэв: "Ирээдүйгээ тохируулъя — Эрүүл мэнд, боловсрол, ур чадварт тэгш хүртээмж" (Fine-Tune for the Future)**
 
-A learning-games platform for Mongolian children aged 3–18, built so that kids learn **with** their family and friends, not alone with a screen.
+3–18 насны монгол хүүхдүүдэд зориулсан суралцах тоглоомын платформ. Хүүхэд дэлгэцийн өмнө ганцаараа биш, гэр бүл, найз нөхөдтэйгөө **хамтдаа** суралцахаар бүтээгдсэн.
 
-> "Дэлгэц бол гүүр. Зорилго нь гэр бүл." — The screen is a bridge. The destination is family.
+> "Дэлгэц бол гүүр. Зорилго нь гэр бүл."
 
-## Run it
+## Ажиллуулах
 
-No install or build step. From this folder:
+Суулгах, бүтээх (build) алхам шаардлагагүй. Энэ хавтас дотроос:
 
 ```bash
 python3 -m http.server 8000
-# then open http://localhost:8000
+# дараа нь http://localhost:8000 хаягийг нээнэ
 ```
 
-Opening `index.html` directly also works, but offline mode and microphone recording need a local server.
-On a phone, open the page and choose "Add to Home Screen". After the first load it runs fully offline.
+`index.html` файлыг шууд нээж болно. Гэхдээ офлайн горим болон микрофоны бичлэг ажиллахын тулд дотоод сервер хэрэгтэй.
+Утсан дээр хуудсыг нээгээд "Нүүр дэлгэцэд нэмэх" (Add to Home Screen)-ийг сонгоно. Анх ачаалсны дараа интернэтгүйгээр бүрэн ажиллана.
 
-## No Xcode, no accounts, no licenses
+## Xcode, бүртгэл, лиценз шаардлагагүй
 
-Тоглоом is a plain web app, a Progressive Web App (PWA). You do **not** need Xcode, Android Studio, an Apple Developer account, a Google Play account, or any paid license to build, run, demo or install it.
+Naadamy бол энгийн вэб апп буюу PWA (Progressive Web App) юм. Үүнийг бүтээх, ажиллуулах, танилцуулах, суулгахад Xcode, Android Studio, Apple Developer бүртгэл, Google Play бүртгэл эсвэл ямар нэг төлбөртэй лиценз **хэрэггүй**.
 
-- **No build tools.** It is plain HTML, CSS and JavaScript. Nothing to compile and no `npm install`.
-- **No third-party services.** Fonts are bundled in `assets/fonts`, and sounds are generated in code. The app makes zero requests to outside servers, and all data stays on the device.
-- **No app store.** Phones install it straight from the browser:
-  - **iPhone (Safari):** Share button → "Add to Home Screen".
-  - **Android (Chrome):** menu ⋮ → "Install app" or "Add to Home screen".
-  It then opens full-screen with its own icon and works offline.
+- **Бүтээх хэрэгсэл хэрэггүй.** Зөвхөн HTML, CSS, JavaScript ашигласан. Хөрвүүлэх (compile) зүйл байхгүй, `npm install` хийх шаардлагагүй.
+- **Гуравдагч талын үйлчилгээ ашиглаагүй.** Фонтууд `assets/fonts` хавтсанд багтсан, дуу авиаг кодоор үүсгэдэг. Апп гадны сервер рүү нэг ч хүсэлт илгээдэггүй, бүх мэдээлэл төхөөрөмж дээрээ хадгалагдана.
+- **Апп дэлгүүр хэрэггүй.** Утсанд хөтчөөс шууд суулгана:
+  - **iPhone (Safari):** Хуваалцах товч → "Add to Home Screen".
+  - **Android (Chrome):** цэс ⋮ → "Install app" эсвэл "Add to Home screen".
+  Ингэсний дараа өөрийн дүрс тэмдэгтэй, бүтэн дэлгэцээр нээгдэж, офлайн ажиллана.
 
-### Getting it onto phones for free
-Offline mode and voice recording need **HTTPS** (or `localhost`). For phones, put the folder on any free static host. None of these need a paid plan or license:
-- **Netlify Drop**: drag the `togloom` folder onto app.netlify.com/drop.
-- **GitHub Pages**: push the folder to a repository and turn on Pages in its settings.
-- **Cloudflare Pages** or **Vercel**: connect the repository on the free tier.
+### Утсанд үнэгүй байршуулах
+Офлайн горим болон дуу хоолой бичих функц **HTTPS** (эсвэл `localhost`) хаяг шаарддаг. Утсанд ашиглахын тулд хавтсыг дараах үнэгүй байршуулах үйлчилгээний аль нэгэнд тавина. Аль нь ч төлбөртэй багц, лиценз шаардахгүй:
+- **Netlify Drop**: төслийн хавтсыг app.netlify.com/drop хуудас руу чирж оруулна.
+- **GitHub Pages**: хавтсыг GitHub репозиторид оруулаад, тохиргооноос нь Pages-ийг асаана.
+- **Cloudflare Pages** эсвэл **Vercel**: репозиторийг үнэгүй багцаар холбоно.
 
-For a quick test on the same Wi-Fi, run the local server and open `http://<your-mac-ip>:8000` on the phone. Everything except offline caching and the microphone works this way.
+Нэг Wi-Fi сүлжээнд хурдан турших бол дотоод серверийг ажиллуулаад утсан дээрээ `http://<компьютерийн-IP>:8000` хаягийг нээнэ. Энэ аргаар офлайн кэш болон микрофоноос бусад бүх зүйл ажиллана.
 
-### Credits and licenses of what's included
-| Item | License | Notes |
+### Ашигласан зүйлсийн эх сурвалж, лиценз
+| Зүйл | Лиценз | Тайлбар |
 |---|---|---|
-| Nunito font | SIL Open Font License 1.1 | Free to use and bundle. License text: `assets/fonts/OFL-Nunito.txt` |
-| Rubik font | SIL Open Font License 1.1 | Free to use and bundle. License text: `assets/fonts/OFL-Rubik.txt` |
-| Emoji | Device system fonts | Drawn by the phone's own emoji font. Nothing is bundled. |
-| Icons, illustrations, logo, sounds | Written for this project | Original inline SVG and code-generated audio |
-| App code | Your team's | No third-party libraries are used |
+| Nunito фонт | SIL Open Font License 1.1 | Үнэгүй ашиглаж, апптай хамт түгээж болно. Лицензийн бичвэр: `assets/fonts/OFL-Nunito.txt` |
+| Rubik фонт | SIL Open Font License 1.1 | Үнэгүй ашиглаж, апптай хамт түгээж болно. Лицензийн бичвэр: `assets/fonts/OFL-Rubik.txt` |
+| Эможи | Төхөөрөмжийн системийн фонт | Утасны өөрийн эможи фонтоор зурагдана. Апп дотор юу ч багтаагаагүй. |
+| Дүрс тэмдэг, зураг, лого, дуу авиа | Энэ төсөлд зориулж бүтээсэн | Өөрсдийн SVG зураг, кодоор үүсгэсэн дуу авиа |
+| Аппын код | Манай багийнх | Гуравдагч талын сан (library) ашиглаагүй |
 
-> An app-store version later would need store accounts (Apple charges a yearly fee and requires Xcode on a Mac; Google Play charges a one-time fee). None of that is needed for Pinequest.
+> Ирээдүйд апп дэлгүүрт гаргах бол дэлгүүрийн бүртгэл хэрэгтэй болно (Apple жил бүр төлбөр авдаг бөгөөд Mac дээр Xcode шаарддаг, Google Play нэг удаагийн төлбөр авдаг). Pinequest-д эдгээрийн аль нь ч шаардлагагүй.
 
-## What's inside
+## Агуулга
 
-| Age group | Games |
+| Насны ангилал | Тоглоомууд |
 |---|---|
-| 3–6 Бяцхан од | Цагаан толгой (alphabet), Таван хошуу мал (counting livestock), Санах ойн карт, Эрүүл зуршил, Хөдөлгөөнт завсарлага, Тайван амьсгал, Шагай |
-| 7–10 Сониуч унаач | Шагайн морь уралдаан, Тооны тулаан, Тэмээг худаг руу (coding), Гэр бүлийн сагс, Миний Монгол, Анхны тусламж, … |
-| 11–14 Бүргэд | Coding with loops and block limits, Ухаалаг мөнгө, Дижитал баатар, Сэтгэлийн эрүүл мэнд, … |
-| 15–18 Оргилд | Harder budgets and savings goals, first aid, digital safety, mental health, … |
+| 3–6 Бяцхан од | Цагаан толгой, Таван хошуу мал (мал тоолох), Санах ойн карт, Эрүүл зуршил, Хөдөлгөөнт завсарлага, Тайван амьсгал, Шагай |
+| 7–10 Сониуч унаач | Шагайн морь уралдаан, Тооны тулаан, Тэмээг худаг руу (програмчлал), Гэр бүлийн сагс, Миний Монгол, Анхны тусламж, … |
+| 11–14 Бүргэд | Давталт, блокийн хязгаартай програмчлал, Ухаалаг мөнгө, Дижитал баатар, Сэтгэлийн эрүүл мэнд, … |
+| 15–18 Оргилд | Илүү хэцүү төсөв, хадгаламжийн зорилго, анхны тусламж, дижитал аюулгүй байдал, сэтгэлийн эрүүл мэнд, … |
 
-That makes 15 games across the 3 pillars: 💚 Health, 📘 Education, 🛠️ Skills.
+Нийт 15 тоглоом 3 тулгуурт хуваагдана: 💚 Эрүүл мэнд, 📘 Боловсрол, 🛠️ Ур чадвар.
 
-### ✨ Цэгцлэе! (Make it perfect): satisfying puzzles that teach
-Inspired by "satisfying" puzzle apps like Satisgame, but every level teaches one real thing.
-There are 48 short levels, 12 per age group, on a level map with stars and unlocking. Each level ends with a "Мэдсэн үү?" (Did you know?) fact.
+### ✨ Цэгцлэе!: сэтгэл ханамжтай, сургамжтай оньсого
+Satisgame зэрэг "сэтгэл ханамжтай" оньсогон тоглоомоос санаа авсан боловч түвшин бүр нэг бодит зүйл заадаг.
+Насны ангилал бүрт 12, нийт 48 богино түвшин бий. Түвшнүүд од цуглуулж, дараагийнхаа түвшинг нээдэг газрын зураг дээр байрлана. Түвшин бүр "Мэдсэн үү?" гэсэн сонирхолтой баримтаар төгсдөг.
 
-| Mechanic | Example lessons |
+| Тоглох арга | Жишээ хичээл |
 |---|---|
-| 🫧 Pop bubbles | Count 1–5, alphabet order, divisible by 3, prime numbers, binary |
-| 🧺 Sort into bins | Livestock vs wild, recycling, renewable energy, fact vs opinion, scam messages |
-| 🧽 Scrub | Brush teeth, wash hands, clear smog over the city, smoke-free lungs, wipe off a photo filter |
-| 🧩 Place | Build a ger (khana, uni, toono…), organs in the body, life cycles, history timeline |
-| 🥛 Pour | Half, 1/4, 2/3, 35%, the 50/30/20 savings rule, 80% battery care |
-| 🔗 Connect | Animal and food, Mongolian and English words, capitals, chemical symbols, first aid |
+| 🫧 Бөмбөлөг хагалах | 1–5 хүртэл тоолох, цагаан толгойн дараалал, 3-т хуваагдах тоо, анхны тоо, хоёртын тоо |
+| 🧺 Сагсанд ангилах | Мал ба зэрлэг амьтан, хог ангилах, сэргээгдэх эрчим хүч, баримт ба санал бодол, луйврын мессеж |
+| 🧽 Арчиж цэвэрлэх | Шүд угаах, гар угаах, хотын утааг арилгах, утаагүй уушги, зургийн шүүлтүүрийг арчих |
+| 🧩 Байранд нь тавих | Гэр барих (хана, унь, тооно…), биеийн эрхтэн, амьдралын мөчлөг, түүхийн он дараалал |
+| 🥛 Дүүргэх | Хагас, 1/4, 2/3, 35%, 50/30/20 хадгаламжийн дүрэм, батерейг 80% хүртэл цэнэглэх |
+| 🔗 Холбох | Амьтан ба хоол, монгол ба англи үг, нийслэл хотууд, химийн тэмдэг, анхны тусламж |
 
-Families can pick who plays together on the map. Players then take turns each level, and stars go to the family sky.
-Level content lives in `js/satis-levels.js`. Adding a level is one object, with no new code.
+Гэр бүлүүд газрын зураг дээрээс хэн хамт тоглохоо сонгоно. Ингэвэл түвшин бүрт ээлжлэн тоглож, цуглуулсан од нь гэр бүлийн тэнгэрт нэмэгдэнэ.
+Түвшнүүдийн агуулга `js/satis-levels.js` файлд байдаг. Шинэ түвшин нэмэхэд зөвхөн нэг өгөгдлийн хэсэг бичихэд хангалттай, шинэ код хэрэггүй.
 
-### Features that make it "AI can't replace this"
-- **Together mode in every game.** 2–4 players share one phone with turn-taking. Math Duel splits the screen so two players sit face to face.
-- **Every game ends off-screen.** The result screen gives a real-life challenge to do as a family, worth +2 family stars.
-- **Family sky.** Stars from playing together light up a night sky over a ger. The first 7 stars draw the Big Dipper (Долоон бурхан).
-- **Family missions.** These are daily offline activities, like learning a lullaby from grandma, cooking buuz together, or teaching parents a digital skill.
-- **Memory book.** Kids record grandparents' voices and stories. Recordings stay on the device.
-- **"Ask your family" lifeline.** Quiz help unlocks only after talking with a real person.
+### "Хиймэл оюун орлож чадахгүй" онцлогууд
+- **Тоглоом бүр хамтдаа тоглох горимтой.** 2–4 хүн нэг утсыг ээлжлэн тоглоно. Тооны тулаанд дэлгэц хоёр хуваагдаж, хоёр тоглогч нүүр тулан сууж тоглоно.
+- **Тоглоом бүр дэлгэцээс гадна дуусдаг.** Үр дүнгийн хуудас гэр бүлээрээ бодит амьдрал дээр хийх даалгавар өгөх бөгөөд гүйцэтгэвэл гэр бүлийн тэнгэрт +2 од нэмэгдэнэ.
+- **Гэр бүлийн тэнгэр.** Хамтдаа тоглож цуглуулсан од гэрийн дээрх шөнийн тэнгэрийг гэрэлтүүлнэ. Эхний 7 од Долоон бурханы ордыг зурна.
+- **Гэр бүлийн даалгавар.** Өдөр бүрийн дэлгэцгүй үйл ажиллагаа: эмээгээсээ бүүвэйн дуу сурах, хамтдаа бууз чимхэх, эцэг эхдээ дижитал ур чадвар заах гэх мэт.
+- **Дурсамжийн ном.** Хүүхдүүд өвөө, эмээгийнхээ дуу хоолой, түүхийг бичиж авна. Бичлэгүүд зөвхөн төхөөрөмж дээр хадгалагдана.
+- **"Гэр бүлээсээ асуу" тусламж.** Асуулт хариултын тусламж зөвхөн жинхэнэ хүнтэй ярилцсаны дараа нээгдэнэ.
 
-### Equal access
-- Offline PWA that works in the countryside without internet. It is tiny, with no images or audio files: sound is synthesized and pictures are emoji.
-- Runs on old, cheap phones. It is Mongolian-first, with an English toggle.
-- No accounts, no ads, no server. All data stays in the browser.
-- Large-text and reduced-motion modes. The emoji-first design works for pre-readers.
-- **Healthy screen time.** A parent-set daily limit triggers a break screen with a real family mission. There is also a 20-minute eye-rest reminder. Parents can unlock more time behind a math-question gate.
-- **Fair pricing model** (shown on the About page): free forever for the core, a ₮3,900/month family plan where each family plan sponsors one rural child, and free access for public schools and soums.
+### Тэгш хүртээмж
+- Интернэтгүй хөдөө орон нутагт ажилладаг офлайн PWA. Зураг, дууны файлгүй тул маш бага хэмжээтэй: дуу авиаг кодоор үүсгэж, зургийн оронд эможи ашигладаг.
+- Хуучин, хямд утсан дээр ажиллана. Монгол хэл үндсэн бөгөөд англи хэл рүү сольж болно.
+- Бүртгэл, зар сурталчилгаа, сервер байхгүй. Бүх мэдээлэл хөтөч дотроо хадгалагдана.
+- Том үсэг, хөдөлгөөн багасгах горимтой. Эможид тулгуурласан дизайн нь уншиж сураагүй бяцхан хүүхдэд ч ойлгомжтой.
+- **Эрүүл дэлгэцийн цаг.** Эцэг эхийн тохируулсан өдрийн хязгаарт хүрэхэд апп амрах дэлгэц гаргаж, гэр бүлийн бодит даалгавар санал болгоно. Мөн 20 минут тутамд нүдээ амраахыг сануулна. Эцэг эх математикийн асуулт бодож байж нэмэлт цаг нээнэ.
+- **Шударга үнийн загвар** ("Бидний тухай" хуудсанд харуулсан): үндсэн хэсэг нь үүрд үнэгүй, сарын 3,900₮-ийн Гэр бүлийн багц тус бүр хөдөөгийн нэг хүүхдэд үнэгүй эрх олгоно, төрийн сургууль болон сумдад үнэгүй.
 
-## Project structure
+## Төслийн бүтэц
 ```
-index.html            app shell
-css/styles.css        all styles
-js/core.js            DOM helper, sounds, modals, turns, parental gate
-js/store.js           localStorage state (profiles, stars, logs, screen time)
-js/data.js            age groups, pillars, family missions, memory prompts
-js/app.js             screens: onboarding, home, launcher, result, missions, memory book, parents, about
-js/games/*.js         one file per game (quiz.js holds 5 quiz sets)
-js/satis.js           Цэгцлэе! engine: 6 mechanics, level map, completion card
-js/satis-levels.js    48 Цэгцлэе! levels (content only)
-sw.js                 offline cache
+index.html            аппын үндсэн бүтэц
+css/styles.css        бүх загварчлал
+js/core.js            DOM туслах, дуу авиа, цонх, ээлж, эцэг эхийн хамгаалалт
+js/store.js           localStorage өгөгдөл (профайл, од, түүх, дэлгэцийн цаг)
+js/data.js            насны ангилал, тулгуур, гэр бүлийн даалгавар, дурсамжийн асуулт
+js/app.js             дэлгэцүүд: эхлэл, нүүр, тоглоом эхлүүлэх, үр дүн, даалгавар, дурсамжийн ном, эцэг эх, бидний тухай
+js/games/*.js         тоглоом бүр тусдаа файлтай (quiz.js-д 5 асуулт хариултын багц бий)
+js/satis.js           Цэгцлэе! хөдөлгүүр: 6 тоглох арга, түвшний газрын зураг, амжилтын карт
+js/satis-levels.js    Цэгцлэе!-ийн 48 түвшин (зөвхөн агуулга)
+sw.js                 офлайн кэш
+tests/                автомат шалгалтууд
+.github/workflows/    GitHub Actions (шалгалт, GitHub Pages-д нийтлэх)
 ```
 
-### Adding a game
-Create `js/games/mygame.js`, call `TG.registerGame({ id, icon, pillar, ages, title, desc, realLife, start(ctx) })`, add the script tag to `index.html`, and add the file to `sw.js`.
-`ctx` provides `players`, `together`, `ageGroup`, `root` (the game area), `hud` (the score bar) and `finish({ stars, scores?, summary? })`.
+### Шинэ тоглоом нэмэх
+`js/games/mygame.js` файл үүсгээд `TG.registerGame({ id, icon, pillar, ages, title, desc, realLife, start(ctx) })`-г дуудна. Дараа нь `index.html`-д script мөр нэмж, `sw.js`-ийн файлын жагсаалтад оруулна.
+`ctx` нь `players` (тоглогчид), `together` (хамтдаа эсэх), `ageGroup` (насны ангилал), `root` (тоглоомын талбар), `hud` (онооны мөр), `finish({ stars, scores?, summary? })` (тоглоомыг дуусгах)-ийг агуулна.
 
-## Demo tips for judges
-1. Start on the welcome screen, then create a child profile.
-2. Play **Шагайн морь уралдаан** in Together mode with "Ээж". Show the turn flash, the cultural facts, and the real-life challenge at the end.
-3. Open **✨ Цэгцлэе** and play the ger-building, teeth-scrubbing and pouring levels.
-4. Play **Тооны тулаан** with the phone flat between two people.
-5. Open **Дурсамж** and record a short voice memory.
-6. Open **Эцэг эх** (solve the math gate) to show together-time %, pillar progress and the screen-time limit.
-7. Finish on the **About / fair pricing** page.
+## Автомат шалгалт ба нийтлэл (GitHub Actions)
+
+`.github/workflows/ci.yml` нь кодыг GitHub руу оруулах (push) болон pull request нээх бүрт автоматаар ажиллана:
+
+1. **JavaScript-ийн бичлэгийн шалгалт.** Бүх `.js` файл алдаагүй уншигдаж байгааг шалгана.
+2. **Файлын шалгалт** (`tests/check-assets.mjs`). Аппын ашигладаг бүх файл байгаа эсэх, бүх скрипт офлайн кэшэд орсон эсэх, гадны сервер рүү хүсэлт илгээдэггүйг шалгана.
+3. **Хөтчийн шалгалт** (`tests/smoke.mjs`). Chrome хөтчөөр бүх дэлгэц, 15 тоглоомыг ганцаараа болон хамтдаа горимоор, мөн Цэгцлэе!-ийн 48 түвшинг нэг бүрчлэн нээж, алдаа гарвал анхааруулна.
+4. **GitHub Pages-д нийтлэх.** `main` салбар шинэчлэгдэх бүрт аппыг үнэгүй, HTTPS хаягтай вэб сайт болгон автоматаар нийтэлнэ.
+
+> GitHub Pages-ийг нэг удаа асаах хэрэгтэй: репозиторийн админ **Settings → Pages → Source: GitHub Actions** гэж сонгоно. Асаагаагүй үед нийтлэх алхам алгасагдаж, бусад шалгалт хэвийн ажиллана.
+
+Шалгалтыг компьютер дээрээ ажиллуулах бол (Chrome болон Node.js шаардлагатай):
+
+```bash
+node tests/check-assets.mjs
+npm install --no-save puppeteer-core@22.15.0 && node tests/smoke.mjs
+```
+
+## Шүүгчдэд үзүүлэх дараалал
+1. Эхлэлийн дэлгэцээс эхлээд хүүхдийн профайл үүсгэнэ.
+2. **Шагайн морь уралдаан**-ыг "Ээж"-тэй Хамтдаа горимоор тоглоно. Ээлж солигдох, соёлын баримтууд, төгсгөлийн бодит амьдралын даалгаврыг харуулна.
+3. **✨ Цэгцлэе**-г нээж гэр барих, шүд угаах, дүүргэх түвшнүүдийг тоглоно.
+4. **Тооны тулаан**-ыг утсаа хоёр хүний дунд ширээн дээр тавьж тоглоно.
+5. **Дурсамж**-ийг нээж богино дуу хоолойн дурсамж бичнэ.
+6. **Эцэг эх** хэсгийг (математикийн асуулт бодож) нээгээд хамтын цагийн хувь, тулгуур тус бүрийн ахиц, дэлгэцийн цагийн хязгаарыг харуулна.
+7. **Бидний тухай / Шударга үнэ** хуудсаар төгсгөнө.

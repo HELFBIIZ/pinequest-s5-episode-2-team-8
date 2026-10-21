@@ -1,0 +1,86 @@
+# Naadamy CI/CD
+# - On every push and pull request: syntax check, asset check, browser smoke test.
+# - On main: publish the app to GitHub Pages (once Pages is enabled in repo settings).
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main, feature/togloom-platform]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: JavaScript syntax
+        run: |
+          for f in $(find js -name '*.js') sw.js; do node --check "$f"; done
+          echo "All JavaScript files parse."
+
+      - name: Every referenced file exists and is cached offline
+        run: node tests/check-assets.mjs
+
+      - name: Browser smoke test (every game and puzzle level)
+        run: |
+          npm install --no-save --no-package-lock --silent puppeteer-core@22.15.0
+          node tests/smoke.mjs
+
+  pages-status:
+    name: Is GitHub Pages enabled?
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.probe.outputs.enabled }}
+    steps:
+      - id: probe
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${{ github.token }}" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          if [ "$code" = "200" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GitHub Pages is not enabled yet. A repo admin can turn it on in Settings > Pages > Source: GitHub Actions."
+          fi
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: [check, pages-status]
+    if: needs.pages-status.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect site files
+        run: |
+          mkdir _site
+          cp -r index.html manifest.webmanifest sw.js assets css js _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

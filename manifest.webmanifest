@@ -1,6 +1,6 @@
 {
-  "name": "Тоглоом — Хамтдаа суралцъя",
-  "short_name": "Тоглоом",
+  "name": "Naadamy — Хамтдаа суралцъя",
+  "short_name": "Naadamy",
   "description": "Хүүхэд, гэр бүлд зориулсан хамтдаа суралцах тоглоомууд. Play, learn and grow together.",
   "start_url": "./index.html",
   "scope": "./",

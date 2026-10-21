@@ -1,5 +1,5 @@
 /* Offline-first service worker: once loaded, the whole app works without internet. */
-const CACHE = 'togloom-v3';
+const CACHE = 'naadamy-v4';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/styles.css', './assets/icon.svg', './assets/fonts/fonts.css',
   './assets/fonts/nunito-cyrillic.woff2', './assets/fonts/nunito-cyrillic-ext.woff2', './assets/fonts/nunito-latin.woff2',

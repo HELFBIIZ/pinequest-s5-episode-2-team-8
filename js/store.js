@@ -1,6 +1,7 @@
 /* Local-only storage. No account, no server: family data never leaves the device. */
 (function (TG) {
-  const KEY = 'togloom.v1';
+  const KEY = 'naadamy.v1';
+  const OLD_KEY = 'togloom.v1'; // name before the app was renamed to Naadamy
   const pad = (n) => String(n).padStart(2, '0');
   const dkey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
@@ -26,7 +27,8 @@
 
   function load() {
     try {
-      const raw = localStorage.getItem(KEY);
+      let raw = localStorage.getItem(KEY);
+      if (!raw && (raw = localStorage.getItem(OLD_KEY))) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); } // keep progress after the rename
       if (raw) {
         const s = JSON.parse(raw), d = defaults();
         return Object.assign(d, s, { settings: Object.assign(d.settings, s.settings || {}) });
@@ -36,6 +38,7 @@
   }
 
   TG.store = {
+    KEY,
     state: load(),
     dkey,
     save() { try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch (e) { /* storage full/blocked */ } },
