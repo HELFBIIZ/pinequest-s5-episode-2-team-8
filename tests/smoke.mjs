@@ -51,17 +51,44 @@ try {
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
   }
 
+  // modal accessibility: focus moves into the dialog, Escape closes it, focus returns
+  step = 'modal accessibility';
+  await page.evaluate(() => TG.go('home'));
+  await sleep(200);
+  await page.evaluate(() => {
+    window.__before = document.activeElement;
+    window.__close = TG.modal(TG.h('div', null, TG.h('button', { class: 'btn', id: 'inside-modal' }, 'inside')));
+  });
+  await sleep(150);
+  const a11y = await page.evaluate(() => {
+    const box = document.querySelector('.modal');
+    const x = box && box.querySelector('.modal-x');
+    return {
+      inDialog: !!(box && box.contains(document.activeElement)),
+      closeLabel: x ? x.getAttribute('aria-label') : null,
+      toastRole: (() => { TG.toast('test'); const t = document.querySelector('.toast'); const r = t ? t.getAttribute('role') : null; t && t.remove(); return r; })(),
+    };
+  });
+  if (!a11y.inDialog) errors.push('modal accessibility: focus did not move into the dialog');
+  if (!a11y.closeLabel) errors.push('modal accessibility: close button has no aria-label');
+  if (a11y.toastRole !== 'status') errors.push(`modal accessibility: toast role is "${a11y.toastRole}", expected "status"`);
+  await page.keyboard.press('Escape');
+  await sleep(320);
+  if (await page.evaluate(() => !!document.querySelector('.modal-back'))) errors.push('modal accessibility: Escape did not close the modal');
+  const restored = await page.evaluate(() => document.activeElement === window.__before);
+  if (!restored) errors.push('modal accessibility: focus was not restored after closing');
+
   step = 'village (solo mode, no server)';
   await page.evaluate(() => TG.go('village')); await sleep(900);
   await check('village screen', '.village canvas');
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
-  await page.evaluate(() => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
-  await sleep(200);
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
+  await sleep(300);
   if (!(await page.evaluate(() => { const p = TG.store.active().village.garden[0]; return p && p.c === 'carrot'; }))) errors.push('village: planting in solo mode did not work');
-  for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(250); await check(`village ${btn} panel`, '.modal'); }
-  await page.evaluate(() => { document.querySelectorAll('.modal-back').forEach((m) => m.remove()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
-  await page.evaluate(() => document.querySelectorAll('.modal-back').forEach((m) => m.remove()));
+  for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(300); await check(`village ${btn} panel`, '.modal'); }
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
   const games = await page.evaluate(() => TG.gameOrder.map((id) => ({ id, ages: TG.games[id].ages })));
   for (const g of games) {

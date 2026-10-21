@@ -368,7 +368,10 @@
   function onKey(e) {
     if (!live || document.querySelector('.modal-back') || /INPUT|TEXTAREA/.test((e.target || {}).tagName || '')) return;
     if (e.code in KEYS) { e.preventDefault(); live.held = KEYS[e.code]; live.pending = null; }
-    else if (e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); const a = contextAction(); if (a) doAction(a); }
+    else if (e.code === 'KeyE' || e.code === 'Enter' || e.code === 'Space') {
+      if (e.code !== 'KeyE' && document.activeElement && document.activeElement.tagName === 'BUTTON') return; // a focused button handles its own Enter/Space
+      e.preventDefault(); const a = contextAction(); if (a) doAction(a);
+    }
   }
   function onKeyUp(e) { if (live && e.code in KEYS && live.held === KEYS[e.code]) live.held = null; }
 

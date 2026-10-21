@@ -204,6 +204,7 @@ p { margin: 0 0 .6em; }
 }
 .modal::before { content: ''; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); }
 .modal-back.show .modal { transform: none; }
+.modal:focus { outline: none; }
 @media (min-width: 640px) { .modal-back { align-items: center; } .modal { border-radius: 28px; } .modal::before { display: none; } }
 .modal-x { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; background: var(--bg); display: grid; place-items: center; color: var(--ink-2); }
 .modal-x .ic { width: 18px; height: 18px; }
