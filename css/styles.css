@@ -913,3 +913,6 @@ blockquote { margin: 12px 0; padding: 14px 16px; background: var(--surface-2); b
 .v-music { font-family: 'Tiny5', monospace; font-size: 26px; color: #5a2d10; }
 .v-music.off { color: #b08a62; }
 .v-music.hidden { display: none; }
+.credits { list-style: none; padding: 0; margin: 0 auto; max-width: 640px; display: grid; gap: 6px; font-size: .88rem; font-weight: 600; color: var(--ink-2); }
+.credits li { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+.credits a { color: var(--blue); }
