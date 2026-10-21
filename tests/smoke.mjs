@@ -35,6 +35,9 @@ page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.te
 const check = async (label, selector) => {
   step = label;
   if (selector && !(await page.$(selector))) errors.push(`${label}: expected "${selector}" to render`);
+  // no screen may ever show "null", "undefined" or "NaN" to a child
+  const junk = await page.evaluate(() => { const out = []; const w = (n) => { for (const c of n.childNodes) { if (c.nodeType === 3 && /\bnull\b|\bundefined\b|\bNaN\b|\[object /.test(c.textContent)) out.push(c.textContent.trim().slice(0, 60)); else if (c.nodeType === 1 && c.tagName !== 'SCRIPT') w(c); } }; w(document.body); return out; });
+  junk.forEach((t) => errors.push(`${label}: shows broken text "${t}"`));
 };
 
 try {
@@ -56,7 +59,7 @@ try {
   await check('straight into Нутаг after register', '.village canvas');
   const prof = await page.evaluate(() => { const p = TG.store.active(); return p && { name: p.name, age: p.age, avatar: p.avatar, code: p.code }; });
   if (!prof || prof.name !== 'Тест' || prof.age !== 8 || !prof.code) errors.push(`register: profile not saved correctly: ${JSON.stringify(prof)}`);
-  await page.evaluate(() => { TG.store.state.settings.screenLimit = 999; TG.store.state.settings.sound = false; document.querySelectorAll('.modal-x').forEach((x) => x.click()); });
+  await page.evaluate(() => { TG.store.state.settings.sound = false; document.querySelectorAll('.modal-x').forEach((x) => x.click()); });
 
   // modal accessibility: focus moves into the dialog, Escape closes it, focus returns
   step = 'modal accessibility';
@@ -224,10 +227,6 @@ try {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
   }
-  step = 'screen-break reminder';
-  await page.evaluate(() => TG._timeout()); await sleep(200);
-  await check('screen-break reminder suggests a family activity', '.timeout .l-say');
-  await page.evaluate(() => document.querySelector('.timeout-back').remove());
 
   step = 'log out and log in with the picture password';
   await page.evaluate(() => { TG.store.state.loggedIn = false; TG.go('auth', { tab: 'login' }); }); await sleep(300);

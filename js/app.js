@@ -346,10 +346,8 @@
     const learn = child.learn || {}, bs = child.basar || {};
     const lessonsDone = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].done).length;
     const together = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].family).length;
-    const usedMin = Math.round(S.usageToday() / 60), limit = st.settings.screenLimit;
     const toggle = (key, label) => h('label', { class: 'switch-row' }, h('span', null, label),
       h('input', { type: 'checkbox', class: 'switch', checked: !!st.settings[key], onchange: (e) => { st.settings[key] = e.target.checked; S.save(); render(); } }));
-    const limitLabel = h('b', null, `${limit} ${L('мин', 'min')}`);
     const famName2 = h('input', { class: 'input', placeholder: L('Нэр (ж: Нагац эгч)', 'Name (e.g. Auntie)'), maxlength: 16 });
     let famEmoji = TG.FAMILY_EMOJIS[0];
     const emojiRow = h('div', { class: 'emoji-row' });
@@ -370,7 +368,7 @@
       h('div', { class: 'stat-cards' },
         h('div', { class: 'stat' }, h('small', null, L('Сурсан хичээл', 'Lessons learned')), h('b', null, `${lessonsDone}/${TG.learn.LESSONS.length}`)),
         h('div', { class: 'stat' }, h('small', null, L('Басарын асуулт', 'Basar quiz')), h('b', null, `${bs.right || 0}/${bs.total || 0}`)),
-        h('div', { class: 'stat' }, h('small', null, L('Өнөөдрийн дэлгэц', 'Screen today')), h('b', null, `${usedMin}/${limit}`), h('small', null, L('мин', 'min')))),
+        h('div', { class: 'stat' }, h('small', null, L('Амжилт', 'Badges')), h('b', null, `${Object.keys(child.ach || {}).length}/${TG.achievements.LIST.length}`))),
       h('section', { class: 'card' },
         h('h3', null, `${child.avatar} ${child.name}: `, L('хичээлүүд', 'lessons')),
         TG.learn.LESSONS.map((l) => { const pr = learn[l.id] || {}; return h('div', { class: 'fam-lesson' },
@@ -380,12 +378,6 @@
         h('p', { class: 'muted', style: { marginTop: '10px' } }, L(`Басараас ${bs.asked || 0} асуулт асуусан.`, `Asked Basar ${bs.asked || 0} questions.`), ' ',
           TG.basar.ai ? L('Басар AI (Claude) ухаантай ажиллаж байна.', 'Basar is running with AI (Claude).') : L('Басар офлайн мэдлэгээр ажиллаж байна.', 'Basar is using offline knowledge.'))),
       learnedReport(child),
-      h('section', { class: 'card' },
-        h('h3', null, '⏱️ ', L('Эрүүл дэлгэцийн цаг', 'Healthy screen time')),
-        h('p', { class: 'muted' }, L('Хязгаарт хүрэхэд апп завсарлага авахыг сануулж, гэр бүлээрээ хийх бодит ажлыг санал болгоно.', 'When the limit is reached, the app suggests a break and a real-life family activity.')),
-        h('div', { class: 'range-row' }, h('input', { type: 'range', min: 15, max: 120, step: 15, value: limit, 'aria-label': 'limit',
-          oninput: (e) => (limitLabel.textContent = `${e.target.value} ${L('мин', 'min')}`),
-          onchange: (e) => { st.settings.screenLimit = +e.target.value; S.save(); render(); } }), limitLabel)),
       h('section', { class: 'card' },
         h('h3', null, '⚙️ ', L('Тохиргоо, хүртээмж', 'Settings & accessibility')),
         toggle('sound', L('🔊 Дуу', '🔊 Sound')),
@@ -482,35 +474,6 @@
       h('footer', { class: 'about-foot' }, L('Монгол хүүхэд бүрт ❤️ · Pinecone Academy · Pinequest', 'For every Mongolian child ❤️ · Pinecone Academy · Pinequest'),
         h('div', null, h('button', { class: 'btn primary', onclick: back }, L('Эхлэх ▶', 'Start ▶')))));
   };
-
-  // ---------------- healthy screen-time guardian ----------------
-  let lastNudge = 0;
-  function showTimeout() {
-    if (document.querySelector('.timeout-back')) return;
-    const l = TG.learn.LESSONS.find((x) => TG.learn.done(x.id) && !TG.learn.progress(x.id).family) || TG.learn.LESSONS.find((x) => !TG.learn.progress(x.id).family) || TG.learn.LESSONS[0];
-    const el = h('div', { class: 'timeout-back' }, h('div', { class: 'timeout' },
-      TG.basar.face(0, 72),
-      h('h2', null, L('Дэлгэцээ амраах цаг боллоо!', 'Time for a screen break!')),
-      h('p', null, L(`Өнөөдөр ${Math.round(S.usageToday() / 60)} минут тогллоо. Одоо сурсан зүйлээ гэр бүлтэйгээ бодит амьдрал дээр хийцгээе:`, `You played ${Math.round(S.usageToday() / 60)} minutes today. Now do what you learned, for real, with your family:`)),
-      h('div', { class: 'l-say big' }, tx(l.family.say)),
-      h('p', { class: 'muted' }, tx(l.family.what)),
-      h('button', { class: 'btn ghost block', onclick: () => TG.parentGate(() => {
-        S.state.extend = { d: S.dkey(), sec: S.extraToday() + 15 * 60 }; S.save(); el.remove(); TG.toast(L('+15 минут нэмэгдлээ', '+15 minutes added'));
-      }) }, '🔒 ', L('Том хүн: +15 минут', 'Grown-up: +15 minutes'))));
-    document.body.appendChild(el);
-  }
-  TG._timeout = showTimeout; // used by tests
-  setInterval(() => {
-    if (document.visibilityState !== 'visible' || !loggedIn() || document.querySelector('.timeout-back')) return;
-    S.tick(5);
-    const used = S.usageToday();
-    if (used >= S.state.settings.screenLimit * 60 + S.extraToday()) return showTimeout();
-    if (used - lastNudge >= 20 * 60 && used > 60) {
-      lastNudge = used;
-      TG.toast(L('👀 20 минут боллоо. 20 секунд цонхоор хол харж нүдээ амраагаарай!', '👀 20 minutes! Look out the window for 20 seconds to rest your eyes.'));
-    }
-  }, 5000);
-  lastNudge = S.usageToday();
 
   // ---------------- boot ----------------
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

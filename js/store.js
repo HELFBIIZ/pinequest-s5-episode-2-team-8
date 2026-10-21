@@ -17,13 +17,11 @@
       { id: 'f5', name: { mn: 'Ах, эгч', en: 'Sibling' }, emoji: '🧑' },
       { id: 'f6', name: { mn: 'Найз', en: 'Friend' }, emoji: '🧒' },
     ],
-    settings: { screenLimit: 45, sound: true, bigText: false, reduceMotion: false },
+    settings: { sound: true, bigText: false, reduceMotion: false },
     familyStars: 0,
     friends: [],
     missions: {},
     log: [],
-    usage: {},
-    extend: null,
   });
 
   function load() {
@@ -32,6 +30,7 @@
       if (!raw && (raw = localStorage.getItem(OLD_KEY))) { localStorage.setItem(KEY, raw); localStorage.removeItem(OLD_KEY); } // keep progress after the rename
       if (raw) {
         const s = JSON.parse(raw), d = defaults();
+        delete s.usage; delete s.extend; if (s.settings) delete s.settings.screenLimit; // the screen-time limit was removed
         return Object.assign(d, s, { settings: Object.assign(d.settings, s.settings || {}) });
       }
     } catch (e) { /* corrupted or blocked storage: start fresh */ }
@@ -61,8 +60,5 @@
       this.save();
     },
     addFamilyStars(n) { this.state.familyStars += n; this.save(); },
-    usageToday() { return this.state.usage[dkey()] || 0; },
-    extraToday() { const e = this.state.extend; return e && e.d === dkey() ? e.sec : 0; },
-    tick(sec) { const k = dkey(); this.state.usage[k] = (this.state.usage[k] || 0) + sec; this.save(); },
   };
 })(window.TG);

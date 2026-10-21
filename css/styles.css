@@ -577,9 +577,6 @@ blockquote { margin: 12px 0; padding: 14px 16px; background: var(--surface-2); b
 .about-foot .btn { margin-top: 16px; }
 
 /* timeout */
-.timeout-back { position: fixed; inset: 0; z-index: 90; background: radial-gradient(600px 400px at 50% 0%, #FFE7B0, transparent 70%), linear-gradient(160deg, #FFF6E5, #DCEBFF); display: grid; place-items: center; padding: 20px; }
-.timeout { max-width: 440px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); padding: 28px 22px; box-shadow: var(--sh-3); }
-.timeout .daily { text-align: left; }
 
 @media (min-width: 760px) {
   .page { padding: 28px 24px; }
@@ -1133,7 +1130,6 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .l-cols li { margin: 3px 0; }
 .l-note { font-size: .8rem; color: #7a5432; margin: 10px 0 6px; }
 @media (max-width: 560px) { .l-cols { grid-template-columns: 1fr; } .mascot-grid { grid-template-columns: repeat(3, 1fr); } .auth-brand h1 { font-size: 2.4rem; } }
-.timeout .basar-face { display: block; margin: 0 auto 8px; }
 
 .b-letter, .b-count, .l-reward, .b-src { font-family: 'Tiny5', monospace; font-weight: 400; }
 .auth-brand h1 { letter-spacing: -.01em; font-size: 3.2rem; }

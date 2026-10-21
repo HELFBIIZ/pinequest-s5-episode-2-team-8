@@ -350,7 +350,7 @@
     if (a) { const [k, t] = labelFor(a); rc(b, pic(k, 36), h('span', null, t)); }
   }
   function doAction(a) {
-    if (!a || !live) return;
+    if (!a || !live || live.race) return; // no shops or menus in the middle of a race
     switch (a.type) {
       case 'plot': return plotAction(a.i);
       case 'home': return wardrobe();
@@ -579,6 +579,7 @@
   const textSize = () => 5 * Math.max(2, live.view.k); // Tiny5 is drawn on a 5-pixel grid
   function blit(b, img, X, Y, flip) { if (!flip) return b.drawImage(img, X, Y); b.save(); b.translate(X + img.width, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); }
   function pixelText(ctx, text, x, y, size, color, alpha = 1, outline = '#2b1e2e') {
+    if (text == null || text === '') return; // never draw "null" for a missing name
     const fs = Math.max(10, Math.round(size / 5) * 5), o = Math.max(1, Math.round(fs / 10));
     ctx.save(); ctx.globalAlpha = alpha; ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = outline; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]]) ctx.fillText(text, Math.round(x) + dx, Math.round(y) + dy);
@@ -589,7 +590,8 @@
     const [x, y] = S(o.px * T + 8, o.py * T - 16 - rl), fs = textSize(), u = Math.max(1, Math.round(fs / 10));
     ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     const pad = Math.round(fs * 0.45), th = fs + u * 4, gap = u * 3;
-    const lvT = String(level), lvW = Math.ceil(ctx.measureText(lvT).width) + pad * 2, nmW = Math.ceil(ctx.measureText(name).width) + pad * 2;
+    name = name || '?';
+    const lvT = String(level || 1), lvW = Math.ceil(ctx.measureText(lvT).width) + pad * 2, nmW = Math.ceil(ctx.measureText(name).width) + pad * 2;
     const X0 = Math.round(x - (lvW + gap + nmW) / 2), Y = Math.round(y - th / 2);
     const box = (bx, w, bg, top, fg, text) => {
       ctx.fillStyle = '#2b1e2e'; ctx.fillRect(bx - u, Y - u, w + u * 2, th + u * 2);
