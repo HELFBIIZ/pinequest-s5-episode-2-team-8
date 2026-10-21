@@ -146,20 +146,49 @@ window.TG = { games: {}, gameOrder: [] };
   if ('speechSynthesis' in window) { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices(); }
 
   // ---------- modal / toast / confetti ----------
+  const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  const modalStack = [];
   TG.modal = function (content, opts = {}) {
     const root = document.getElementById('modal-root');
     let closed = false;
-    const close = () => { if (closed) return; closed = true; back.classList.remove('show'); setTimeout(() => back.remove(), 180); opts.onClose && opts.onClose(); };
-    const box = h('div', { class: 'modal ' + (opts.cls || ''), role: 'dialog', 'aria-modal': 'true' },
-      opts.noClose ? null : h('button', { class: 'modal-x', 'aria-label': 'close', onclick: close }, TG.icon('x')),
+    const prevFocus = document.activeElement;
+    const close = () => {
+      if (closed) return; closed = true;
+      back.classList.remove('show');
+      document.removeEventListener('keydown', onKey, true);
+      const i = modalStack.indexOf(back); if (i >= 0) modalStack.splice(i, 1);
+      setTimeout(() => back.remove(), 180);
+      opts.onClose && opts.onClose();
+      // send focus back to whatever opened the dialog, if it is still on the page
+      if (prevFocus && prevFocus.isConnected && typeof prevFocus.focus === 'function') { try { prevFocus.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+    };
+    // keyboard support: Escape closes, Tab stays inside the dialog
+    const onKey = (e) => {
+      if (modalStack[modalStack.length - 1] !== back) return; // only the topmost dialog reacts
+      if (e.key === 'Escape') {
+        if (opts.noClose) return;
+        e.preventDefault(); close(); return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = [...box.querySelectorAll(FOCUSABLE)].filter((el) => el.getClientRects().length);
+      if (!items.length) { e.preventDefault(); box.focus({ preventScroll: true }); return; }
+      const first = items[0], last = items[items.length - 1];
+      const inside = box.contains(document.activeElement);
+      if (e.shiftKey && (!inside || document.activeElement === first)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (!inside || document.activeElement === last)) { e.preventDefault(); first.focus(); }
+    };
+    const box = h('div', { class: 'modal ' + (opts.cls || ''), role: 'dialog', 'aria-modal': 'true', tabindex: '-1' },
+      opts.noClose ? null : h('button', { class: 'modal-x', 'aria-label': TG.L('Хаах', 'Close'), onclick: close }, TG.icon('x')),
       content);
     const back = h('div', { class: 'modal-back', onclick: (e) => { if (e.target === back && !opts.noClose) close(); } }, box);
     root.appendChild(back);
-    requestAnimationFrame(() => back.classList.add('show'));
+    modalStack.push(back);
+    document.addEventListener('keydown', onKey, true);
+    requestAnimationFrame(() => { back.classList.add('show'); box.focus({ preventScroll: true }); });
     return close;
   };
   TG.toast = (msg) => {
-    const t = h('div', { class: 'toast' }, msg);
+    const t = h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }, msg);
     document.getElementById('toast-root').appendChild(t);
     setTimeout(() => t.classList.add('out'), 2600);
     setTimeout(() => t.remove(), 3100);
