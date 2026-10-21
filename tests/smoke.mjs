@@ -51,6 +51,33 @@ try {
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
   }
 
+  // modal accessibility: focus moves into the dialog, Escape closes it, focus returns
+  step = 'modal accessibility';
+  await page.evaluate(() => TG.go('home'));
+  await sleep(200);
+  await page.evaluate(() => {
+    window.__before = document.activeElement;
+    window.__close = TG.modal(TG.h('div', null, TG.h('button', { class: 'btn', id: 'inside-modal' }, 'inside')));
+  });
+  await sleep(150);
+  const a11y = await page.evaluate(() => {
+    const box = document.querySelector('.modal');
+    const x = box && box.querySelector('.modal-x');
+    return {
+      inDialog: !!(box && box.contains(document.activeElement)),
+      closeLabel: x ? x.getAttribute('aria-label') : null,
+      toastRole: (() => { TG.toast('test'); const t = document.querySelector('.toast'); const r = t ? t.getAttribute('role') : null; t && t.remove(); return r; })(),
+    };
+  });
+  if (!a11y.inDialog) errors.push('modal accessibility: focus did not move into the dialog');
+  if (!a11y.closeLabel) errors.push('modal accessibility: close button has no aria-label');
+  if (a11y.toastRole !== 'status') errors.push(`modal accessibility: toast role is "${a11y.toastRole}", expected "status"`);
+  await page.keyboard.press('Escape');
+  await sleep(320);
+  if (await page.evaluate(() => !!document.querySelector('.modal-back'))) errors.push('modal accessibility: Escape did not close the modal');
+  const restored = await page.evaluate(() => document.activeElement === window.__before);
+  if (!restored) errors.push('modal accessibility: focus was not restored after closing');
+
   const games = await page.evaluate(() => TG.gameOrder.map((id) => ({ id, ages: TG.games[id].ages })));
   for (const g of games) {
     for (const together of [false, true]) {
