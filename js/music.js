@@ -31,9 +31,19 @@
     idx = (idx + 1) % order.length;
     const t = tracks[order[idx]];
     const a = new Audio('assets/music/' + encodeURIComponent(t.file));
-    a.preload = 'auto'; a.volume = 0;
-    a.addEventListener('ended', playNext);
-    a.addEventListener('error', () => { if (cur === a) setTimeout(playNext, 500); });
+    const repeats = Math.max(1, Math.min(4, t.repeat | 0 || 1));
+    let loops = 0, lastT = 0, handed = false;
+    a.preload = 'auto'; a.volume = 0; a.loop = repeats > 1;
+    const handOff = () => { if (!handed && cur === a) { handed = true; playNext(); } };
+    // short loops repeat seamlessly; near the end of the last repeat we crossfade into the next song
+    a.addEventListener('timeupdate', () => {
+      if (a.currentTime < lastT - 1) loops++;
+      lastT = a.currentTime;
+      if (loops >= repeats - 1) a.loop = false;
+      if (!a.loop && a.duration && a.duration - a.currentTime < FADE / 1000 + 0.25) handOff();
+    });
+    a.addEventListener('ended', handOff);
+    a.addEventListener('error', () => { if (cur === a) setTimeout(handOff, 500); });
     const old = cur; cur = a;
     a.play().then(() => { fade(a, volume(), FADE); emit(); }).catch(() => { started = false; cur = old; });
     if (old) fade(old, 0, FADE, () => old.pause());

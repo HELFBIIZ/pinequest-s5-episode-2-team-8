@@ -592,6 +592,10 @@
           h('li', null, h('b', null, L('Удахгүй', 'Soon')), L('Казах хэл (Баян-Өлгий), дохионы хэл, хоёр утсаар холбогдон тоглох', 'Kazakh language (Bayan-Ölgii), sign language, two-phone local play')),
           h('li', null, h('b', null, L('Ирээдүй', 'Future')), L('Сургууль, сумтай хамтран ажиллах, QPay төлбөр', 'School and soum partnerships, QPay payments')))),
 
+      TG.music && TG.music.credits().length ? h('section', null,
+        h('h2', null, L('Хөгжмийн зохиогчид', 'Music credits')),
+        h('p', { class: 'center muted' }, L('Арын хөгжим бүгд CC0 (нийтийн өмч) лицензтэй, OpenGameArt.org-оос. Зохиогчдод баярлалаа!', 'All background music is CC0 (public domain) from OpenGameArt.org. Thank you to the composers!')),
+        h('ul', { class: 'credits' }, TG.music.credits().map((c) => h('li', null, h('b', null, c.title), ' — ', c.artist, ' · ', c.license, c.source ? [' · ', h('a', { href: c.source, target: '_blank', rel: 'noopener' }, 'OpenGameArt')] : null)))) : null,
       h('footer', { class: 'about-foot' }, L('Монгол хүүхэд бүрт ❤️ · Pinecone Academy · Pinequest', 'For every Mongolian child ❤️ · Pinecone Academy · Pinequest'),
         h('div', null, h('button', { class: 'btn primary', onclick: back }, L('Тоглож эхлэх ▶', 'Start playing ▶')))));
   };
