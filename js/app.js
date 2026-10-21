@@ -635,8 +635,7 @@
         h('div', { class: 'price-grid' },
           price(L('Үнэгүй', 'Free'), '0₮', L(' / үүрд', ' / forever'), [L('Бүх үндсэн тоглоом', 'All core games'), L('Офлайн горим', 'Offline mode'), L('Гэр бүлийн даалгавар', 'Family missions'), L('Дурсамжийн ном', 'Memory book')]),
           price(L('Гэр бүл', 'Family'), '3,900₮', L(' / сар', ' / month'), [L('Сар бүр шинэ тоглоом', 'New games every month'), L('Хэвлэх даалгаврын карт', 'Printable mission cards'), L('Дурсамжийн номоо хэвлэх', 'Print your memory book'), L('Дэлгэрэнгүй ахицын тайлан', 'Detailed progress reports')], 'featured',
-            L('💛 Нэг гэр бүлийн төлбөр = хөдөөгийн нэг хүүхдэд үнэгүй эрх', '💛 One family plan = free access for one rural child')),
-          price(L('Сургууль, сум', 'Schools & soums'), '0₮', L(' / үнэгүй', ' / free'), [L('Төрийн сургууль, цэцэрлэг', 'Public schools & kindergartens'), L('Сумын номын сан', 'Soum libraries'), L('Багшийн хяналтын самбар', 'Teacher dashboard')])),
+            L('💛 Нэг гэр бүлийн төлбөр = хөдөөгийн нэг хүүхдэд үнэгүй эрх', '💛 One family plan = free access for one rural child'))),
         h('p', { class: 'center muted' }, L('Орлого багатай өрхөд Гэр бүл багцыг хүсэлтээр үнэгүй олгоно.', 'Low-income families can get the Family plan free on request.'))),
 
       h('section', null,
