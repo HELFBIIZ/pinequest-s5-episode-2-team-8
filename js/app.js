@@ -78,7 +78,7 @@
   function topbar() {
     const p = S.active();
     return h('header', { class: 'topbar' },
-      h('button', { class: 'brand', onclick: () => TG.go('home'), 'aria-label': L('Нүүр хуудас', 'Home') }, h('span', { class: 'logo', html: LOGO }), h('span', null, 'Naadamy')),
+      h('button', { class: 'brand', onclick: () => TG.go('home'), 'aria-label': L('Нүүр хуудас', 'Home') }, h('span', { class: 'logo', html: LOGO }), h('span', { class: 'bn' }, 'Naadamy')),
       h('div', { class: 'top-actions' },
         h('button', { class: 'lang-btn', onclick: toggleLang, 'aria-label': L('Хэл солих', 'Switch language') }, TG.icon('globe'), S.state.lang === 'mn' ? 'EN' : 'МН'),
         p && h('button', { class: 'profile-chip', onclick: profileSwitcher, 'aria-label': L(`${p.name}-н профайл`, `${p.name}'s profile`) }, h('span', { class: 'av' }, p.avatar), h('span', { class: 'pn' }, p.name))));

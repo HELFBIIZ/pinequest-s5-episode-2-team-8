@@ -247,6 +247,34 @@ try {
   else if (!duel.onResult) errors.push('math duel star grading: the duel never reached the result screen');
   else if (duel.stars === 3) errors.push('math duel star grading: a run with no correct answers still got 3 stars');
 
+  // layout: the app must never scroll sideways. A long profile name and a
+  // 320px phone used to widen the top bar, and the "Мэргэжил" match level used
+  // to widen the page because its two columns could not shrink.
+  step = 'layout: no sideways scrolling';
+  const sideways = async (where) => {
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (over > 1) errors.push(`${where}: the page is ${over}px wider than the screen`);
+  };
+  await page.evaluate(() => TG.go('home')); await sleep(250);
+  const dailyLink = await page.evaluate(() => {
+    const b = document.querySelector('.daily-link');
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  if (!dailyLink) errors.push('layout: the home screen has no "all missions" link');
+  else if (dailyLink.h < 24) errors.push(`layout: the "all missions" link is only ${dailyLink.h}px tall, expected at least 24px (WCAG 2.5.8)`);
+  await page.setViewport({ width: 320, height: 568 });
+  await sleep(250);
+  await sideways('layout on a 320px phone (home)');
+  await page.evaluate(() => { TG.store.active().name = 'Анандбаярын Эрдэнэчулуун'; TG.go('home'); });
+  await sleep(250);
+  await sideways('layout with a long profile name (home)');
+  await page.setViewport({ width: 390, height: 844 });
+  await page.evaluate(() => { TG.store.active().name = 'Тест'; TG.go('satisLevel', { ag: '7-10', i: 9 }); });
+  await sleep(300);
+  await sideways('layout on the "Мэргэжил" match level');
+
   console.log(`Checked 5 screens, the village, ${games.length} games x 2 modes, ${count} puzzle levels.`);
 } catch (e) {
   errors.push(`crashed during "${step}": ${e.message}`);
