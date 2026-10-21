@@ -1,4 +1,4 @@
-# Тоглоом CI/CD
+# Naadamy CI/CD
 # - On every push and pull request: syntax check, asset check, browser smoke test.
 # - On main: publish the app to GitHub Pages (once Pages is enabled in repo settings).
 name: CI & Deploy

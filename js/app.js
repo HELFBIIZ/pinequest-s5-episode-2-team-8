@@ -1,4 +1,4 @@
-/* Тоглоом — screens, navigation, family features */
+/* Naadamy — screens, navigation, family features */
 (function (TG) {
   const { h, L, tx } = TG;
   const S = TG.store;
@@ -30,7 +30,7 @@
   function topbar() {
     const p = S.active();
     return h('header', { class: 'topbar' },
-      h('button', { class: 'brand', onclick: () => TG.go('home'), 'aria-label': 'home' }, h('span', { class: 'logo', html: LOGO }), h('span', null, 'Тоглоом')),
+      h('button', { class: 'brand', onclick: () => TG.go('home'), 'aria-label': 'home' }, h('span', { class: 'logo', html: LOGO }), h('span', null, 'Naadamy')),
       h('div', { class: 'top-actions' },
         h('button', { class: 'lang-btn', onclick: toggleLang, 'aria-label': 'language' }, TG.icon('globe'), S.state.lang === 'mn' ? 'EN' : 'МН'),
         p && h('button', { class: 'profile-chip', onclick: profileSwitcher }, h('span', { class: 'av' }, p.avatar), h('span', { class: 'pn' }, p.name))));
@@ -113,7 +113,7 @@
         h('div', { class: 'ob-hero' },
           h('div', { class: 'ob-logo', html: LOGO }),
           h('div', { class: 'badge-pill' }, 'Fine-Tune for the Future · Pinequest'),
-          h('h1', null, 'Тоглоом'),
+          h('h1', null, 'Naadamy'),
           h('p', { class: 'tagline' }, L('Хамтдаа тоглож, хамтдаа өсье.', 'Play together. Grow together.')),
           h('p', { class: 'ob-sub' }, L('Хүүхэд бүр, гэр бүл бүрт зориулсан, офлайн ажилладаг, монгол хэл дээрх суралцах тоглоомууд.', 'Learning games in Mongolian for every child and every family. Works offline.')),
           h('div', { class: 'pillars-mini' }, Object.values(TG.PILLARS).map((p) => h('div', { class: 'pm', style: { '--c': p.color } }, h('span', null, p.icon), tx(p.name))))),
@@ -319,7 +319,7 @@
       if (this.db) return Promise.resolve(this.db);
       return new Promise((res, rej) => {
         if (!window.indexedDB) return rej(new Error('no idb'));
-        const r = indexedDB.open('togloom', 1);
+        const r = indexedDB.open('togloom', 1); // database name from before the rename, kept so saved recordings are not lost
         r.onupgradeneeded = () => r.result.createObjectStore('memories', { keyPath: 'id' });
         r.onsuccess = () => { this.db = r.result; res(this.db); };
         r.onerror = () => rej(r.error);
@@ -495,7 +495,7 @@
       h('button', { class: 'link-btn danger center-block', onclick: () => {
         const close = TG.modal(h('div', { class: 'center' }, h('h2', null, L('Бүх өгөгдлийг устгах уу?', 'Erase all data?')), h('p', { class: 'muted' }, L('Профайл, од, тохиргоо устна.', 'Profiles, stars and settings will be erased.')),
           h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => close() }, L('Болих', 'Cancel')),
-            h('button', { class: 'btn danger', onclick: () => { localStorage.removeItem('togloom.v1'); location.reload(); } }, L('Устгах', 'Erase')))));
+            h('button', { class: 'btn danger', onclick: () => { localStorage.removeItem(S.KEY); localStorage.removeItem('togloom.v1'); location.reload(); } }, L('Устгах', 'Erase')))));
       } }, L('Бүх өгөгдлийг устгах', 'Erase all data')),
     ]);
   };
@@ -509,7 +509,7 @@
       h('button', { class: 'icon-btn back-fixed', onclick: back, 'aria-label': 'back' }, TG.icon('arrowLeft')),
       h('header', { class: 'about-hero' },
         h('div', { class: 'badge-pill light' }, 'Pinequest · Fine-Tune for the Future'),
-        h('h1', null, 'Тоглоом'),
+        h('h1', null, 'Naadamy'),
         h('p', { class: 'big-quote' }, L('“Дэлгэц бол гүүр. Зорилго нь гэр бүл.”', '“The screen is a bridge. The destination is family.”')),
         h('p', null, L('Эрүүл мэнд, боловсрол, ур чадварт хүүхэд бүр тэгш хүртээмжтэй байх ёстой. Хамгийн сайн багш нь хайртай хүмүүс нь гэдэгт бид итгэдэг.', 'Every child deserves equal access to health, education and skills. We believe the best teachers are the people who love them.'))),
 

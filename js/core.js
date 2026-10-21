@@ -1,4 +1,4 @@
-/* Тоглоом — core helpers shared by every screen and game */
+/* Naadamy — core helpers shared by every screen and game */
 window.TG = { games: {}, gameOrder: [] };
 
 (function (TG) {
