@@ -53,6 +53,10 @@
     pet: { n: 3, c: 10, x: 20, t: Tx('Хонийг 3 удаа илбэх', 'Pet the sheep 3 times') },
     sell: { n: 5, c: 15, x: 20, t: Tx('5 зүйл зарах', 'Sell 5 items') },
     help: { n: 2, c: 30, x: 40, t: Tx('Найзынхаа ургамлыг 2 удаа услах', "Water a friend's plants twice") },
+    race: { n: 1, c: 25, x: 35, t: Tx('Морин уралдаанд 1 удаа оролцох', 'Ride in 1 horse race') },
+    archery: { n: 3, c: 25, x: 35, t: Tx('Сур харваанд 3 бай онох', 'Hit 3 archery targets') },
+    wrestle: { n: 1, c: 25, x: 35, t: Tx('Бөхийн барилдаанд 1 удаа давах', 'Win 1 wrestling round') },
+    etiquette: { n: 1, c: 30, x: 40, t: Tx('Эмээгийн гэрт ёсоор зочлох', 'Visit Grandma’s ger with good manners') },
   };
   const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz'];
   function quests() {
@@ -62,7 +66,10 @@
       const pool = [...POOL], pick = [];
       while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; const k = pool.splice(hs % pool.length, 1)[0]; if (!pick.includes(k)) pick.push(k); }
       pick.push('help');
-      v.quests = { d, list: pick.map((k) => ({ k, p: 0, done: false })) };
+      // one extra quest from today's season, worth +50%
+      const sea = TG.seasons ? TG.seasons.current() : null, list = pick.map((k) => ({ k, p: 0, done: false }));
+      if (sea) { const opts = sea.tasks.filter((k) => !pick.includes(k)); if (opts.length) list.unshift({ k: opts[hs % opts.length], p: 0, done: false, season: sea.id }); }
+      v.quests = { d, list };
       v.pets = {};
       S.save();
     }
@@ -79,7 +86,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), mount: (c) => mount(c), dismount: () => dismount(), race: () => raceStart(), raceState: () => live && live.race }; // used by automated tests
+  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -209,16 +216,20 @@
     const els = {
       me: h('button', { class: 'v-me px-frame', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
       water: h('div', { class: 'v-pill px-frame' }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
+      season: h('button', { class: 'v-pill px-frame v-season', onclick: () => TG.seasons.open() }),
+      loc: h('button', { class: 'v-loc px-frame', onclick: () => TG.go('passport') }),
       ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
       hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Үр сонгох', 'Choose seeds') }),
       race: h('div', { class: 'v-race px-frame hidden', 'aria-live': 'polite' }),
+      sprint: h('button', { class: 'v-sprint px-frame hidden', 'aria-label': L('Чү! (Shift)', 'Chü! (Shift)'),
+        onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        els.me, h('div', { class: 'v-pills' }, els.coins, els.water, els.net)),
+        h('div', { class: 'v-mecol' }, els.me, els.loc), h('div', { class: 'v-pills' }, els.coins, els.water, els.season, els.net)),
       els.race,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
@@ -229,7 +240,7 @@
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
           els.music),
-        els.hotbar, els.ctx));
+        els.hotbar, els.ctx, els.sprint));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -243,7 +254,7 @@
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
     live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
-      cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
+      season: TG.seasons.current().id, fx: [], cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
       sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
       raf: 0, last: performance.now(), view: {}, terrain: WD.renderStatic(), buf: PX.mk(1, 1), ctxTimer: 0, sel: null };
     resize();
@@ -295,6 +306,9 @@
     rc(e.water, pic('ui:drop', 20), h('span', null, `${v.water}/${v.can}`));
     const n = live.others.size + 1;
     e.net.className = 'v-pill px-frame v-net ' + live.status;
+    const sea = TG.seasons.current(); e.season.textContent = `${sea.icon} ${tx(sea.name)}`;
+    const prof = S.active(), ai = TG.aimags && TG.aimags.byId(prof.aimag), et = TG.ethnic && TG.ethnic.byId(prof.eth);
+    e.loc.textContent = ai ? `📍 ${tx(ai.name)}${et ? ' · ' + tx(et.name) : ''}` : `📍 ${L('Нутгаа сонго', 'Pick home')}`;
     e.net.textContent = live.status === 'online' ? `● ${n} · ${live.room}` : live.status === 'solo' ? `○ ${L('Ганцаараа', 'Solo')}` : `◌ ${L('Холбогдож…', 'Connecting…')}`;
     hotbar();
     e.horse.classList.toggle('hidden', !live.ride || !!live.race);
@@ -340,6 +354,8 @@
       case 'zasuul': case 'arena': return ['ui:wrestle', L('Барилдах', 'Wrestle')];
       case 'ovoo': return ['ui:ovoo', L('Овоо тахих', 'Visit ovoo')];
       case 'uya': return ['ui:horse', L('Морь', 'Horses')];
+      case 'archery': return ['ui:bow', L('Сур харваа', 'Archery')];
+      case 'emee': return ['ui:heart', L('Эмээ', 'Grandma')];
     }
     return ['ui:star', ''];
   }
@@ -364,6 +380,8 @@
       case 'zasuul': case 'arena': return arenaModal();
       case 'ovoo': return ovooAction();
       case 'uya': return uyaModal();
+      case 'archery': return archeryModal();
+      case 'emee': return emeeVisit();
     }
   }
 
@@ -402,6 +420,7 @@
     if (!live || document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
+    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && live.race) { live.race.sprint = true; return; }
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space is only ever the action button: it never re-presses a focused HUD button
       e.preventDefault(); e.stopPropagation();
@@ -412,6 +431,7 @@
   function onKeyUp(e) {
     if (!live) return;
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
+    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && live.race) live.race.sprint = false;
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
   }
 
@@ -424,7 +444,7 @@
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
   function update(dt) {
-    const m = live.me, k = live.keys, SP = live.ride ? (live.race ? 6.6 : 7.2) : SPEED;
+    const m = live.me, k = live.keys, SP = live.ride ? (live.race ? raceSpeed() : 7.2) : SPEED;
     if (live.race && live.race.phase === 'count') { k.clear(); m.path = []; }
     let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), tvx = 0, tvy = 0;
     if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SP; tvy = (iy / n) * SP; }
@@ -468,7 +488,7 @@
       const sp2 = Math.hypot(dg.x - ox, dg.y - oy) / Math.max(dt, 1e-3); dg.moving = sp2 > 0.4; dg.idle = dg.moving ? 0 : dg.idle + dt;
       if (Math.abs(dg.x - ox) > 0.002) dg.flip = dg.x < ox; else if (!dg.moving) dg.flip = m.px + 0.2 < dg.x;
       const nowP = performance.now();
-      if (nowP > dg.nextFact && !document.querySelector('.modal-back')) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const f = TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); }
+      if (nowP > dg.nextFact && !document.querySelector('.modal-back')) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const sf = TG.seasons.current(), f = Math.random() < 0.5 ? (() => { const ff = TG.pick(sf.facts); return { mn: `${sf.icon} Мэдэх үү? ${ff.mn}`, en: `${sf.icon} Did you know? ${ff.en}` }; })() : TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); }
       if (dg.bubble && nowP - dg.bubble.t0 > 12000) dg.bubble = null;
     }
     for (const o of live.others.values()) {
@@ -486,6 +506,24 @@
     live.ctxTimer -= dt; if (live.ctxTimer <= 0) { live.ctxTimer = 0.4; updateCtx(); }
   }
 
+  /** Season look, drawn into the low-res buffer so it stays pixel-crisp: tint plus falling snow, leaves or petals. */
+  function seasonFx(b, bw, bh, t, c) {
+    const id = live.season;
+    if (id === 'winter') { b.globalCompositeOperation = 'screen'; b.fillStyle = 'rgba(150,175,205,.42)'; b.fillRect(0, 0, bw + 1, bh + 1); b.globalCompositeOperation = 'source-over'; }
+    else if (id === 'autumn') { b.globalCompositeOperation = 'multiply'; b.fillStyle = '#ffd59a'; b.fillRect(0, 0, bw + 1, bh + 1); b.globalCompositeOperation = 'source-over'; }
+    else if (id === 'spring') { b.fillStyle = 'rgba(255,200,230,.06)'; b.fillRect(0, 0, bw + 1, bh + 1); }
+    const n = id === 'winter' ? 70 : id === 'summer' ? 10 : 28;
+    for (let i = 0; i < n; i++) {
+      const sp = id === 'winter' ? 14 + (i % 5) * 4 : id === 'summer' ? 4 : 10 + (i % 4) * 3;
+      const x0 = (WD.hash(i, 7) * (bw + 40) + Math.sin(t * 0.8 + i) * (id === 'summer' ? 18 : 6)) % (bw + 40) - 20;
+      const y0 = id === 'summer' ? (WD.hash(i, 3) * bh + Math.sin(t * 1.7 + i) * 6) : ((WD.hash(i, 11) * (bh + 30) + t * sp) % (bh + 30)) - 15;
+      const X = Math.round(x0), Y = Math.round(y0);
+      if (id === 'winter') { PX.R(b, X, Y, i % 3 ? 1 : 2, i % 3 ? 1 : 2, '#ffffff'); }
+      else if (id === 'autumn') { PX.R(b, X, Y, 2, 1, ['#e8752a', '#c9461e', '#f2b33d'][i % 3]); PX.R(b, X + (Math.floor(t * 3 + i) % 2), Y + 1, 1, 1, '#a8501c'); }
+      else if (id === 'spring') { PX.R(b, X, Y, 1, 1, i % 2 ? '#ffb7d5' : '#ffffff'); if (i % 3 === 0) PX.R(b, X + 1, Y, 1, 1, '#ff8fb1'); }
+      else { const on = Math.floor(t * 6 + i) % 2; PX.R(b, X, Y, 1, 1, '#ffffff'); if (on) { PX.R(b, X - 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); PX.R(b, X + 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); } } // butterflies
+    }
+  }
   function draw(t) {
     const ctx = live.ctx, b = live.buf.x, { devW, devH, dpr, k, bw, bh } = live.view, cf = cam(), nowMs = now(), pn = performance.now();
     // 1) static world + crops into the low-res buffer at a whole-pixel camera…
@@ -507,6 +545,7 @@
       PX.crop(b, X, Y, p.c, p.s, !!p.w, R.mature(p) && ((t * 1.6 + i * 0.37) % 2) < 0.35);
       if (R.needsWater(p)) PX.drop(b, X + 11, Y - 5 + (Math.floor(t * 3 + i) % 2));
     }
+    seasonFx(b, bw, bh, t, c);
     // 2) …then upscale it, shifted by the camera's fractional part in real screen pixels (smooth scrolling)
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(live.buf.c, -Math.round((cf.x - c.x) * k), -Math.round((cf.y - c.y) * k), (bw + 1) * k, (bh + 1) * k);
@@ -520,6 +559,7 @@
     const shadow = (wx, wy) => { const X = SX(wx), Y = SY(wy); ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(X + 4 * k, Y + 13 * k, 9 * k, k); ctx.fillRect(X + 3 * k, Y + 14 * k, 11 * k, k); ctx.fillRect(X + 4 * k, Y + 15 * k, 9 * k, k); };
     const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
     live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
+    if (live.season === 'spring') live.sheep.forEach((q) => ents.push({ y: q.py + 0.3, f: () => sprite(PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.flip) })); // spring: the lambs are born
     const person = (o) => {
       if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const a = PX.animal(o.look.pet, frame(o)); shadow(o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.px > o.petPos.x + 0.05); } });
       if (o.look.ride) ents.push({ y: o.py, f: () => drawRider(o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py) });
@@ -541,10 +581,12 @@
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
+    const em = WD.objects.find((q) => q.kind === 'emee');
+    if (em) ents.push({ y: em.y, f: () => { shadow(em.x * T, em.y * T); sprite(PX.char(EMEE, Math.floor(t / 3) % 4 === 2 ? 1 : 0, 0), em.x * T, em.y * T - 12); } });
     if (live.race) {
       live.race.labels = [];
-      const RC = WD.RACE, fl = Math.floor(t * 4) % 2;
-      for (let i = Math.max(1, live.race.ci); i < RC.length; i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
+      const RC = live.race.path.P, fl = Math.floor(t * 4) % 2;
+      for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
     }
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
     // 4) evening: dark tint + stepped lantern glow
@@ -560,11 +602,12 @@
     const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
+    if (em) { const [sx, sy] = S(em.x * T + 8, em.y * T - 16); pixelText(ctx, L('Эмээ', 'Grandma'), sx, sy, textSize(), '#f7c646'); if (!(V().emee && V().emee.visits)) pixelText(ctx, '!', sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2, textSize() * 1.8, '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
     labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
     if (live.race) {
       if (live.race.phase === 'go') for (const [nm, lx, ly] of live.race.labels) pixelText(ctx, nm, lx, ly, textSize() * 0.8, '#ffffff');
-      const nx = WD.RACE[Math.min(live.race.ci, WD.RACE.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
+      const nx = live.race.path.P[Math.min(live.race.ci, live.race.path.P.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
       if (live.race.phase !== 'done') { const [ax, ay] = S(live.me.px * T + 8, live.me.py * T - 36), r = 7 * k; ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(r + k, 0); ctx.lineTo(-r * 0.6, -r * 0.75); ctx.lineTo(-r * 0.6, r * 0.75); ctx.fill(); ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(r - k, 0); ctx.lineTo(-r * 0.4, -r * 0.5); ctx.lineTo(-r * 0.4, r * 0.5); ctx.fill(); ctx.restore(); }
     }
     { const [sx, sy] = S(dg.x * T + 8, dg.y * T - 4); pixelText(ctx, L('Басар', 'Basar'), sx, sy, textSize() * 0.8, '#f7c646');
@@ -728,8 +771,8 @@
       h('div', { class: 'v-list' }, quests().map((q) => {
         const d = QUESTS[q.k], ready = q.p >= d.n && !q.done;
         return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? 'ui:star' : q.k === 'help' ? 'ui:heart' : 'ui:scroll'),
-          h('div', { class: 'v-row-b' }, h('b', null, tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
-          ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; reward(d.c, d.x); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
+          h('div', { class: 'v-row-b' }, h('b', null, q.season ? `${TG.seasons.byId(q.season).icon} ` : '', tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null, q.season ? h('small', { class: 'v-season-tag' }, ` ${tx(TG.seasons.byId(q.season).name)} ×1.5`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
+          ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; if (q.season) { v.seasonDone = v.seasonDone || {}; v.seasonDone[q.season] = Date.now(); } reward(Math.round(d.c * (q.season ? 1.5 : 1)), Math.round(d.x * (q.season ? 1.5 : 1))); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
       })),
       h('button', { class: 'btn block', onclick: () => { close(); TG.go('learn'); } }, '📚 ', L('Өв соёлын сургууль', 'Heritage school')));
     draw();
@@ -756,27 +799,47 @@
     if (!live || live.race) return;
     live.ride = null; const v = V(); v.look.ride = null; S.save(); sendLook(); TG.sfx.tap(); hud();
   }
+  // Naadam race classes by the horse's age (real Naadam categories). Higher classes ride more laps against faster rivals.
+  const CLASSES = [
+    { id: 'daaga', name: Tx('Даага', 'Daaga'), age: Tx('2 настай', '2 years'), laps: 1, pace: 5.2, fact: Tx('Даага бол 2 настай морь. Наадмын хамгийн бага насны уралдаан.', 'A daaga is a 2-year-old horse: the youngest Naadam race.') },
+    { id: 'shudlen', name: Tx('Шүдлэн', 'Shüdlen'), age: Tx('3 настай', '3 years'), laps: 1, pace: 5.55, fact: Tx('Шүдлэн бол 3 настай морь.', 'A shüdlen is a 3-year-old horse.') },
+    { id: 'khyazaalan', name: Tx('Хязаалан', 'Khyazaalan'), age: Tx('4 настай', '4 years'), laps: 2, pace: 5.75, fact: Tx('Хязаалан бол 4 настай морь.', 'A khyazaalan is a 4-year-old horse.') },
+    { id: 'soyolon', name: Tx('Соёолон', 'Soyolon'), age: Tx('5 настай', '5 years'), laps: 2, pace: 5.95, fact: Tx('Соёолон бол 5 настай морь.', 'A soyolon is a 5-year-old horse.') },
+    { id: 'ikhnas', name: Tx('Их нас', 'Ikh nas'), age: Tx('6+ настай', '6+ years'), laps: 3, pace: 6.15, fact: Tx('Их насны морьд хамгийн урт зайд, 25 гаруй км давхидаг.', 'Ikh nas horses (6+) race the longest distance, over 25 km.') },
+    { id: 'azarga', name: Tx('Азарга', 'Azarga'), age: Tx('азарга', 'stallions'), laps: 3, pace: 6.35, fact: Tx('Азаргын уралдаанд адууны сүргийн эзэн азарганууд уралддаг.', 'In the azarga race, the stallions who lead the herds compete.') },
+  ];
+  const stat = (n) => h('div', { class: 'h-stat' }, h('div', { class: 'meter' }, h('span', { style: { width: Math.min(100, n * 10) + '%' } })), h('b', null, `${n}/10`));
   function uyaModal() {
-    const v = V(), hs = v.horse; let coat = hs.coat;
+    const v = V(), hs = v.horse; let coat = hs.coat, cls = Math.min(hs.cls || 0, CLASSES.length - 1);
+    hs.spd = hs.spd || 1; hs.sta = hs.sta || 1;
     const body = h('div');
     const preview = () => { const c = h('canvas', { class: 'px-icon', width: 28, height: 22, style: { width: '112px', height: '88px' } }); c.getContext('2d').drawImage(PX.horse(coat, 0, true), 0, 0); return c; };
     const draw = () => rc(body,
       h('div', { class: 'v-wr-head' }, preview(), h('div', null, h('h2', null, L('Морины уяа', 'Horse line')), h('p', { class: 'muted' }, L('Морь унаж Нутгаар чөлөөтэй давхих, эсвэл Наадмын уралдаанд оролцоорой!', 'Ride freely around Nutag, or join the Naadam horse race!')))),
       h('div', { class: 'label' }, L('Морио сонго', 'Pick your horse')),
       h('div', { class: 'v-chips' }, Object.keys(PX.COATS).map((k) => h('button', { class: 'v-chip' + (coat === k ? ' active' : ''), onclick: () => { coat = k; draw(); } }, tx(COAT_NAMES[k])))),
-      h('div', { class: 'stat-cards', style: { marginTop: '10px' } },
+      h('div', { class: 'h-stats' }, h('span', null, '⚡ ', L('Хурд', 'Speed')), stat(hs.spd), h('span', null, '💪 ', L('Тэсвэр', 'Stamina')), stat(hs.sta)),
+      h('small', { class: 'muted' }, L('Уралдаан бүрийн дараа морь чинь дасгалжиж хүчирхэгжинэ.', 'Your horse trains and gets stronger after every race.')),
+      h('div', { class: 'label', style: { marginTop: '10px' } }, L('Уралдааны ангилал (морины нас)', 'Race class (horse age)')),
+      h('div', { class: 'race-classes' }, CLASSES.map((c, i) => { const open = i <= (hs.cls || 0); return h('button', { class: 'race-cls' + (cls === i ? ' on' : '') + (open ? '' : ' locked'), disabled: !open, onclick: () => { cls = i; draw(); } },
+        h('b', null, open ? '' : '🔒 ', tx(c.name)), h('small', null, `${tx(c.age)} · ${c.laps} ${L('тойрог', c.laps > 1 ? 'laps' : 'lap')}`)); })),
+      h('p', { class: 'muted' }, tx(CLASSES[cls].fact), ' ', (hs.cls || 0) < CLASSES.length - 1 ? L('Эхний гуравт орж дараагийн ангиллыг нээгээрэй.', 'Finish in the top three to unlock the next class.') : ''),
+      h('div', { class: 'stat-cards' },
         h('div', { class: 'stat' }, h('small', null, L('Уралдаан', 'Races')), h('b', null, hs.races || 0)),
         h('div', { class: 'stat' }, h('small', null, L('Түрүү', 'Wins')), h('b', null, hs.wins || 0)),
-        h('div', { class: 'stat' }, h('small', null, L('Шилдэг цаг', 'Best time')), h('b', null, hs.best ? (hs.best / 1000).toFixed(1) + L('с', 's') : '–'))),
+        h('div', { class: 'stat' }, h('small', null, L('Айргийн тав', 'Top five')), h('b', null, hs.top5 || 0))),
       h('div', { class: 'row-btns' },
         live.ride ? h('button', { class: 'btn', onclick: () => { close(); dismount(); } }, L('Буух', 'Get off')) : h('button', { class: 'btn', onclick: () => { close(); mount(coat); TG.toast(L('Чөлөөтэй давхиарай! 🐎', 'Ride free! 🐎')); } }, '🐎 ', L('Морь унах', 'Ride')),
-        h('button', { class: 'btn primary', onclick: () => { close(); v.horse.coat = coat; raceStart(); } }, '🏁 ', L('Уралдах', 'Race'))),
+        h('button', { class: 'btn primary', onclick: () => { close(); v.horse.coat = coat; raceStart(cls); } }, '🏁 ', L('Уралдах', 'Race'))),
       h('div', { class: 'teach', style: { marginTop: '12px' } }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(TG.pick(HORSE_FACTS)))));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
-  function racePath() {
-    const P = WD.RACE, cum = [0];
+  function racePath(laps) {
+    const P = [];
+    for (let l = 0; l < laps; l++) P.push(...WD.LAP);
+    P.push(WD.LAP[0]);
+    const cum = [0];
     for (let i = 1; i < P.length; i++) cum.push(cum[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].y - P[i - 1].y));
     return { P, cum, total: cum[cum.length - 1] };
   }
@@ -787,78 +850,276 @@
     const dx = (b.x - a.x) / segLen, dy = (b.y - a.y) / segLen;
     return { x: a.x + (b.x - a.x) * q - dy * lane, y: a.y + (b.y - a.y) * q + dx * lane, face: dx < -0.1 ? 1 : dx > 0.1 ? 2 : null };
   }
-  function raceStart() {
+  /** Your horse's speed in the race: steady canter, or a "Чү!" sprint that uses stamina. */
+  function raceSpeed() {
+    const rc0 = live.race, hs = V().horse;
+    if (!rc0 || rc0.phase !== 'go') return 6;
+    const cruise = 5.6 + (hs.spd || 1) * 0.09, sprint = cruise + 2.1;
+    return rc0.sprint && rc0.stam > 0.02 ? sprint : rc0.stam < 0.05 ? cruise - 0.7 : cruise;
+  }
+  function raceStart(clsIdx = 0) {
     if (!live || live.race) return;
     document.querySelectorAll('.modal-back .modal-x').forEach((x) => x.click());
-    const v = V(), path = racePath(), wins = v.horse.wins || 0;
+    const v = V(), C = CLASSES[clsIdx] || CLASSES[0], path = racePath(C.laps), wins = v.horse.wins || 0;
     if (!live.ride) mount(v.horse.coat);
-    const s0 = WD.RACE[0];
-    live.me.px = s0.x - 0.5; live.me.py = s0.y - 0.82; live.me.vx = live.me.vy = 0; live.me.path = []; live.me.face = 1; live.cam.x = live.me.px; live.cam.y = live.me.py;
-    // rivals get a little faster as you win more races
-    const pace = 5.35 + Math.min(0.9, wins * 0.15);
+    const s0 = WD.LAP[0];
+    live.me.px = s0.x - 0.5; live.me.py = s0.y - 0.82; live.me.vx = live.me.vy = 0; live.me.path = []; live.me.face = 2; live.cam.x = live.me.px; live.cam.y = live.me.py;
+    const pace = C.pace + Math.min(0.5, wins * 0.06);
     const names = [...RIDERS].sort(() => Math.random() - 0.5).slice(0, 3);
-    const npcs = names.map((name, i) => ({ name, s: [-1.4, -1.4, -2.8][i], lane: [-0.6, 0.6, 0][i], speed: pace * (0.9 + Math.random() * 0.14), wob: Math.random() * 6, done: 0, face: 1, px: 0, py: 0,
+    const npcs = names.map((name, i) => ({ name, s: [-1.6, -1.6, -3.2][i], lane: [-0.6, 0.6, 0][i], speed: pace * (0.93 + Math.random() * 0.1), wob: Math.random() * 6, surge: 0, done: 0, face: 2, px: 0, py: 0,
       look: { deel: TG.pick(Object.keys(R.DEELS)), skin: TG.pick(R.SKINS), hat: TG.pick([null, 'mongol', 'cap']), coat: TG.pick(Object.keys(PX.COATS)), ride: 'horse' } }));
     npcs.forEach((n) => { const p = pointAt(path, n.s, n.lane); n.px = p.x - 0.5; n.py = p.y - 0.82; });
-    live.race = { path, npcs, ci: 1, phase: 'count', t0: performance.now(), go: 0, finishT: 0, labels: [] };
+    live.race = { cls: clsIdx, C, path, npcs, ci: 1, phase: 'count', t0: performance.now(), go: 0, finishT: 0, labels: [], stam: 1, sprint: false, lap: 1, leader: null, say: L('🎵 Гийнгоо! Унаачид морьдоо урамшуулж дуулж байна…', '🎵 Giingoo! The riders sing to cheer their horses…') };
     TG.sfx.tick && TG.sfx.tick(); hud(); raceHud();
   }
   function raceTick(dt) {
-    const rc0 = live.race, nowP = performance.now();
+    const rc0 = live.race, nowP = performance.now(), hs = V().horse;
     if (rc0.phase === 'count') {
       const left = 3 - Math.floor((nowP - rc0.t0) / 1000);
       if (left !== rc0.lastCount) { rc0.lastCount = left; if (left > 0) TG.sfx.tick && TG.sfx.tick(); else TG.sfx.chime && TG.sfx.chime(); }
-      if (nowP - rc0.t0 >= 3000) { rc0.phase = 'go'; rc0.go = nowP; }
+      if (nowP - rc0.t0 >= 3000) { rc0.phase = 'go'; rc0.go = nowP; rc0.say = L('Чү! Уралдаан эхэллээ!', 'Chü! The race is on!'); }
       raceHud(); return;
     }
     if (rc0.phase !== 'go') return;
+    // stamina: sprinting drains it, cantering refills it; a fitter horse tires more slowly
+    const moving = Math.hypot(live.me.vx, live.me.vy) > 0.5;
+    if (rc0.sprint && moving && rc0.stam > 0) rc0.stam = Math.max(0, rc0.stam - dt * (0.3 - (hs.sta || 1) * 0.017));
+    else rc0.stam = Math.min(1, rc0.stam + dt * 0.11);
     const el = (nowP - rc0.go) / 1000;
     for (const n of rc0.npcs) {
       if (n.done) continue;
-      const sp = n.speed * (1 + 0.06 * Math.sin(el * 1.3 + n.wob));
+      if (n.surge <= 0 && Math.random() < dt * 0.12) n.surge = 2 + Math.random() * 1.5; // rivals make their own dashes
+      if (n.surge > 0) n.surge -= dt;
+      const sp = n.speed * (1 + 0.05 * Math.sin(el * 1.3 + n.wob)) + (n.surge > 0 ? 1.1 : 0);
       n.s += sp * dt;
       if (n.s >= rc0.path.total) { n.s = rc0.path.total; n.done = nowP; }
       const p = pointAt(rc0.path, n.s, n.lane); n.px = p.x - 0.5; n.py = p.y - 0.82; if (p.face) n.face = p.face;
     }
-    const P = WD.RACE, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
-    if (rc0.ci < P.length && Math.hypot(P[rc0.ci].x - fx, P[rc0.ci].y - fy) < 1.7) {
+    const P = rc0.path.P, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
+    if (rc0.ci < P.length && Math.hypot(P[rc0.ci].x - fx, P[rc0.ci].y - fy) < 1.9) {
       rc0.ci++; TG.sfx.pop && TG.sfx.pop();
+      const lap = 1 + Math.floor((rc0.ci - 1) / WD.LAP.length);
+      if (lap > rc0.lap && rc0.ci < P.length) { rc0.lap = lap; rc0.say = lap === rc0.C.laps ? L('🔔 Сүүлийн тойрог!', '🔔 Final lap!') : L(`${lap}-р тойрог!`, `Lap ${lap}!`); }
       if (rc0.ci >= P.length) return raceFinish(false);
     }
-    if (el > 75) return raceFinish(true);
+    // commentary when the leader changes
+    const leader = racePlace() === 1 ? live.name : rc0.npcs.reduce((a, b2) => (b2.s > a.s ? b2 : a)).name;
+    if (leader !== rc0.leader && el > 2) { rc0.leader = leader; rc0.say = leader === live.name ? L('🎉 Та тэргүүлж байна!', '🎉 You are in the lead!') : L(`${leader} тэргүүлж байна!`, `${leader} takes the lead!`); }
+    if (el > 40 + rc0.C.laps * 40) return raceFinish(true);
     raceHud();
   }
   function racePlace() {
-    const rc0 = live.race, P = WD.RACE, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
+    const rc0 = live.race, P = rc0.path.P, fx = live.me.px + 0.5, fy = live.me.py + 0.82;
     const mine = rc0.ci >= P.length ? rc0.path.total + 1 : rc0.path.cum[rc0.ci] - Math.hypot(P[rc0.ci].x - fx, P[rc0.ci].y - fy);
     return 1 + rc0.npcs.filter((n) => (n.done && (!rc0.finishT || n.done < rc0.finishT)) || (!n.done && n.s > mine)).length;
   }
   function raceHud() {
     const rc0 = live.race, e = live.els.race;
+    live.els.sprint.classList.toggle('hidden', !rc0 || rc0.phase !== 'go');
     if (!rc0) { e.classList.add('hidden'); return; }
     e.classList.remove('hidden');
-    if (rc0.phase === 'count') { const n = 3 - Math.floor((performance.now() - rc0.t0) / 1000); if (rc0.shown !== n) { rc0.shown = n; rc(e, h('b', { class: 'v-race-big' }, n > 0 ? String(n) : L('Чү!', 'Go!'))); } return; }
+    if (rc0.phase === 'count') { const n = 3 - Math.floor((performance.now() - rc0.t0) / 1000); if (rc0.shown !== n) { rc0.shown = n; rc(e, h('div', { class: 'v-race-row' }, h('b', { class: 'v-race-big' }, n > 0 ? String(n) : L('Чү!', 'Go!'))), h('small', { class: 'v-race-say' }, rc0.say)); } return; }
     const t = ((performance.now() - rc0.go) / 1000).toFixed(1), place = racePlace();
-    rc(e, h('span', null, '🏁 ', `${Math.min(rc0.ci, WD.RACE.length - 1)}/${WD.RACE.length - 1}`), h('span', { class: 'v-race-place' }, `${place}/${rc0.npcs.length + 1}`), h('span', null, `⏱ ${t}`));
+    rc(e, h('div', { class: 'v-race-row' }, h('span', null, `🔁 ${Math.min(rc0.lap, rc0.C.laps)}/${rc0.C.laps}`), h('span', { class: 'v-race-place' }, `${place}/${rc0.npcs.length + 1}`), h('span', null, `⏱ ${t}`)),
+      h('div', { class: 'v-stam' + (rc0.stam < 0.2 ? ' low' : '') }, h('i', { style: { width: Math.round(rc0.stam * 100) + '%' } })),
+      h('small', { class: 'v-race-say' }, rc0.say));
   }
   function raceFinish(timeout) {
     const rc0 = live.race; if (!rc0 || rc0.phase === 'done') return;
-    rc0.phase = 'done'; rc0.finishT = performance.now();
+    rc0.phase = 'done'; rc0.finishT = performance.now(); rc0.sprint = false; raceHud();
     const ms = rc0.finishT - rc0.go, place = timeout ? rc0.npcs.length + 1 : racePlace(), v = V(), hs = v.horse;
     hs.races = (hs.races || 0) + 1; if (place === 1) hs.wins = (hs.wins || 0) + 1; if (place <= 5) hs.top5 = (hs.top5 || 0) + 1;
-    const newBest = !timeout && (!hs.best || ms < hs.best); if (newBest) hs.best = Math.round(ms);
-    const pay = [[40, 60], [25, 40], [15, 30], [5, 15]][place - 1] || [5, 15];
-    const r = reward(pay[0], pay[1]); S.save();
+    // training: every race makes the horse a little faster or tougher
+    const trained = Math.random() < 0.5 ? 'spd' : 'sta'; hs[trained] = Math.min(10, (hs[trained] || 1) + 1);
+    let unlocked = null;
+    if (place <= 3 && rc0.cls === (hs.cls || 0) && (hs.cls || 0) < CLASSES.length - 1) { hs.cls = (hs.cls || 0) + 1; unlocked = CLASSES[hs.cls]; }
+    const key = 'best_' + rc0.C.id, newBest = !timeout && (!hs[key] || ms < hs[key]); if (newBest) hs[key] = Math.round(ms);
+    if (!timeout && (!hs.best || ms < hs.best)) hs.best = Math.round(ms);
+    const pay = [[40, 60], [25, 40], [15, 30], [5, 15]][place - 1] || [5, 15], boost = 1 + rc0.cls * 0.25;
+    const r = reward(Math.round(pay[0] * boost), Math.round(pay[1] * boost)); S.save();
+    quest('race');
     if (place === 1) { TG.sfx.win(); TG.confetti(90); } else TG.sfx.chime && TG.sfx.chime();
     if (S.logActivity) S.logActivity({ kind: 'race', id: String(place) });
     checkAch();
+    // results table: everyone who finished, in order
+    const rows = [{ name: live.name, t: timeout ? Infinity : ms, me: true }, ...rc0.npcs.map((n) => ({ name: n.name, t: n.done ? n.done - rc0.go : Infinity }))].sort((a, b2) => a.t - b2.t);
     const title = place === 1 ? L('Түрүү морь! 🏆', 'Winning horse! 🏆') : place <= 5 ? L(`${place}-р байр · Айргийн тав!`, `Place ${place} · top five!`) : L('Баян ходоод!', 'Bayan khodood!');
-    const close = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('ui:trophy', 64)), h('h2', null, title),
-      h('p', null, timeout ? L('Цаг дууслаа. Дараагийн удаа туг бүрийг дагаарай!', 'Time ran out. Next time follow every flag!') : L(`Цаг: ${(ms / 1000).toFixed(1)} секунд`, `Time: ${(ms / 1000).toFixed(1)} seconds`) + (newBest ? L(' · Шинэ дээд амжилт!', ' · New best!') : '')),
+    const close = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('ui:trophy', 64)), h('div', { class: 'eyebrow' }, `${tx(rc0.C.name)} · ${rc0.C.laps} ${L('тойрог', rc0.C.laps > 1 ? 'laps' : 'lap')}`), h('h2', null, title),
+      h('div', { class: 'race-table' }, rows.map((x, i) => h('div', { class: 'rt-row' + (x.me ? ' me' : '') }, h('b', null, i + 1), h('span', null, x.name), h('small', null, x.t === Infinity ? '–' : (x.t / 1000).toFixed(1) + L('с', 's'))))),
+      newBest ? h('p', null, '⏱ ', L('Шинэ дээд амжилт!', 'New personal best!')) : null,
       r ? h('div', { class: 'l-reward' }, `🪙 +${r.coins} · ⭐ +${r.xp} XP`) : null,
-      h('div', { class: 'teach', style: { marginTop: '10px' } }, h('p', null, tx(HORSE_FACTS[place === 1 ? 1 : place >= 4 ? 2 : 3]))),
-      h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Чөлөөтэй давхих', 'Ride freely')), h('button', { class: 'btn primary', onclick: () => { close(); setTimeout(raceStart, 200); } }, L('Дахин уралдах', 'Race again')))),
+      h('p', { class: 'muted' }, trained === 'spd' ? L('🐎 Морь чинь хурдан боллоо! (Хурд +1)', '🐎 Your horse got faster! (Speed +1)') : L('🐎 Морь чинь тэсвэртэй боллоо! (Тэсвэр +1)', '🐎 Your horse got tougher! (Stamina +1)')),
+      unlocked ? h('div', { class: 'l-unlock' }, '🔓 ', L(`Шинэ ангилал нээгдлээ: ${tx(unlocked.name)}!`, `New class unlocked: ${tx(unlocked.name)}!`)) : null,
+      h('div', { class: 'teach', style: { marginTop: '10px' } }, h('p', null, tx(place === 1 ? Tx('Түрүүлсэн морины толгой, сүүл, гуяыг айргаар цацаж ерөөдөг. Унаач хүүхдийг ч магтдаг.', 'The winning horse is blessed by sprinkling airag on its head, tail and back, and the young jockey is praised.') : HORSE_FACTS[place >= 4 ? 2 : 1]))),
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Чөлөөтэй давхих', 'Ride freely')), h('button', { class: 'btn primary', onclick: () => { close(); setTimeout(() => raceStart(unlocked ? hs.cls : rc0.cls), 200); } }, unlocked ? L('Шинэ ангилалд уралдах', 'Race the new class') : L('Дахин уралдах', 'Race again')))),
       { cls: 'v-modal', onClose: () => { if (live) { live.race = null; raceHud(); hud(); } } });
+  }
+
+  // ================================================================ сур харваа: Mongolian archery
+  const ARCH_FACTS = [
+    Tx('Бай онох бүрт шүүгчид гараа өргөн “Уухай!” гэж дуулдаг.', 'Each time the target is hit, the judges raise their arms and sing “Uukhai!”.'),
+    Tx('Сур харваанд эрэгтэйчүүд 75 метр, эмэгтэйчүүд 60 метрээс харвадаг.', 'In Mongolian archery men shoot from 75 metres and women from 60 metres.'),
+    Tx('Бай нь олон жижиг “сур”-ыг хана шиг өрсөн хэлбэртэй.', 'The target is a low wall made of many small leather “sur”.'),
+    Tx('Чингисийн чулууны бичээст Есүнгэ мэргэн 335 алд газар харвасан тухай бичсэн байдаг.', 'The Chinggis Stone records that the archer Yesüngge shot an arrow 335 alds (over 500 m).'),
+    Tx('Шилдэг харваачдыг “мэргэн” гэж цоллодог.', 'The best archers earn the title “mergen” (sharpshooter).'),
+  ];
+  const ARCH_TITLES = [{ need: 12, t: Tx('Улсын мэргэн', 'State Sharpshooter') }, { need: 9, t: Tx('Гарамгай мэргэн', 'Excellent Sharpshooter') }, { need: 6, t: Tx('Мэргэн', 'Sharpshooter') }];
+  function archeryModal() {
+    const a = V().arch = V().arch || { best: 0, hits: 0, shots: 0, games: 0 };
+    const t = ARCH_TITLES.find((x) => a.best >= x.need);
+    TG.modal(h('div', null,
+      h('div', { class: 'v-wr-head' }, pic('ui:bow', 56), h('div', null, h('h2', null, L('Сур харваа', 'Mongolian archery')), h('p', { class: 'muted' }, t ? `★ ${tx(t.t)}` : L('Цолгүй харваач', 'No title yet')))),
+      h('div', { class: 'stat-cards' }, h('div', { class: 'stat' }, h('small', null, L('Шилдэг оноо', 'Best score')), h('b', null, `${a.best}/12`)), h('div', { class: 'stat' }, h('small', null, L('Нийт оносон', 'Total hits')), h('b', null, a.hits)), h('div', { class: 'stat' }, h('small', null, L('Тоглолт', 'Games')), h('b', null, a.games))),
+      h('p', { class: 'hint' }, L('3 үе, үе бүрт 4 сум. Эхлээд өнцгөө, дараа нь хүчээ сонгоно. Салхийг анхаараарай! 6 онвол “Мэргэн”, 9 бол “Гарамгай мэргэн”, 12 бүгдийг онвол “Улсын мэргэн” цол.', '3 rounds of 4 arrows. Set the angle, then the power, and watch the wind! Hit 6 for “Mergen”, 9 for “Garamgai mergen”, all 12 for “Ulsyn mergen”.')),
+      h('button', { class: 'btn primary big block', onclick: (e) => { e.currentTarget.closest('.modal').querySelector('.modal-x').click(); archeryGame(); } }, '🏹 ', L('Харваж эхлэх', 'Start shooting')),
+      h('div', { class: 'teach', style: { marginTop: '12px' } }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(TG.pick(ARCH_FACTS))))), { cls: 'v-modal' });
+  }
+  function archeryGame() {
+    const v = V(), arch = v.arch = v.arch || { best: 0, hits: 0, shots: 0, games: 0 };
+    const DIST = [92, 118, 142], TOL = [10, 8, 6], X0 = 34, GROUND = 94, G = 120;
+    const st = { round: 0, arrow: 0, hits: 0, phase: 'aim', angle: 0.3, power: 0.5, t0: performance.now(), wind: 0, shot: null, marks: [], cheer: 0, msg: '', over: false };
+    const newWind = () => { const m = [6, 14, 24][st.round]; st.wind = Math.round((Math.random() * 2 - 1) * m); };
+    newWind();
+    const cv = h('canvas', { class: 'v-wr-canvas', width: 192, height: 108 }), cx = cv.getContext('2d');
+    const info = h('div', { class: 'v-wr-score' }), msg = h('div', { class: 'v-wr-msg' });
+    const btn = h('button', { class: 'btn primary big block' });
+    const tail = h('div');
+    const drawInfo = () => {
+      rc(info, h('span', { class: 'me' }, `${L('Үе', 'Round')} ${st.round + 1}/3 · ${L('Сум', 'Arrow')} ${Math.min(st.arrow + 1, 4)}/4`), h('span', { class: 'them' }, `🎯 ${st.hits}  ·  ${L('Салхи', 'Wind')} ${st.wind === 0 ? '0' : (st.wind > 0 ? '→ ' : '← ') + Math.abs(st.wind)}`));
+      btn.textContent = st.phase === 'aim' ? L('Өнцөг сонгох (Space)', 'Set angle (Space)') : st.phase === 'power' ? L('Харвах! (Space)', 'Shoot! (Space)') : L('…', '…');
+      btn.disabled = !(st.phase === 'aim' || st.phase === 'power');
+    };
+    const body = h('div', { class: 'v-wrestle v-archery' }, h('div', { class: 'eyebrow' }, L('Сур харваа', 'Mongolian archery')), cv, info, msg, btn, tail);
+    const angleOf = (q) => 0.12 + q * 0.75; // ≈ 7°–50°
+    const look = { ...v.look, pet: null, ride: null };
+    let raf = 0;
+    const loop = (ts) => {
+      const k = (ts - st.t0) / 1000;
+      if (st.phase === 'aim') st.angle = (Math.sin(k * (1.6 + st.round * 0.35)) + 1) / 2;
+      if (st.phase === 'power') st.power = (Math.sin(k * (2.2 + st.round * 0.45) - Math.PI / 2) + 1) / 2;
+      if (st.phase === 'fly' && st.shot) {
+        const s2 = st.shot, dt = 1 / 60;
+        for (let i = 0; i < 2; i++) { s2.vx += st.wind * dt; s2.vy += G * dt; s2.x += s2.vx * dt; s2.y += s2.vy * dt; s2.trail.push([s2.x, s2.y]); }
+        if (s2.y >= GROUND - 2 || s2.x > 200) land(s2);
+      }
+      // scene: sky, steppe, judges, the low wall of сур, the archer
+      cx.imageSmoothingEnabled = false;
+      cx.fillStyle = '#9fd8f7'; cx.fillRect(0, 0, 192, 60); cx.fillStyle = '#b9e3f8'; cx.fillRect(0, 40, 192, 20);
+      cx.fillStyle = '#86b1cf'; for (let x = 0; x < 192; x++) { const top = Math.round(58 - 6 * Math.abs(Math.sin(x / 19))); cx.fillRect(x, top, 1, 62 - top); }
+      cx.fillStyle = '#76b947'; cx.fillRect(0, 60, 192, 48); cx.fillStyle = '#d8ab6c'; cx.fillRect(X0 - 6, GROUND - 2, 192, 4);
+      const TX = X0 + DIST[st.round], tol = TOL[st.round];
+      cx.fillStyle = 'rgba(92,154,54,.55)'; cx.fillRect(TX - tol, GROUND - 2, tol * 2, 4);
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) { cx.fillStyle = '#2b1e2e'; cx.fillRect(TX - 9 + c * 3, GROUND - 6 - r * 3, 3, 3); cx.fillStyle = ['#e14b3d', '#ffffff', '#3f76db'][(c + r) % 3]; cx.fillRect(TX - 9 + c * 3, GROUND - 6 - r * 3, 2, 2); }
+      const cheer = ts - st.cheer < 1400;
+      [[TX + 18, '#2b5bd8'], [TX + 26, '#d8342b']].forEach(([jx, col]) => { cx.fillStyle = col; cx.fillRect(jx, GROUND - 10, 4, 6); cx.fillStyle = '#edbb93'; cx.fillRect(jx + 1, GROUND - 13, 2, 3); if (cheer) { cx.fillRect(jx - 1, GROUND - 14 - (Math.floor(ts / 150) % 2), 1, 4); cx.fillRect(jx + 4, GROUND - 14 - (Math.floor(ts / 150 + 1) % 2), 1, 4); } });
+      if (cheer) { cx.font = '700 11px Rubik, sans-serif'; cx.textAlign = 'center'; cx.fillStyle = '#2b1e2e'; cx.fillText(L('Уухай!', 'Uukhai!'), TX + 24, GROUND - 22); cx.fillStyle = '#f7c646'; cx.fillText(L('Уухай!', 'Uukhai!'), TX + 23, GROUND - 23); }
+      // wind flag
+      cx.fillStyle = '#4a2a14'; cx.fillRect(96, 64, 1, 18); cx.fillStyle = '#e14b3d'; const wl = Math.round(st.wind / 3); for (let r = 0; r < 4; r++) cx.fillRect(st.wind >= 0 ? 97 : 96 + wl, 64 + r, Math.abs(wl) + 1 - (r % 2), 1);
+      st.marks.forEach(([mx, hit]) => { cx.fillStyle = hit ? '#f7c646' : '#6b4220'; cx.fillRect(Math.round(mx), GROUND - 4, 1, 4); });
+      const archer = PX.char(look, 2, 0); cx.drawImage(archer, X0 - 14, GROUND - 28);
+      const ang = angleOf(st.phase === 'aim' ? st.angle : st.lockA != null ? st.lockA : st.angle), bx = X0, by = GROUND - 16;
+      cx.strokeStyle = '#6b4220'; cx.lineWidth = 1; cx.beginPath(); cx.arc(bx - 2, by, 6, -ang - 1.2, -ang + 1.2); cx.stroke(); // bow
+      if (st.phase === 'aim' || st.phase === 'power') { cx.strokeStyle = 'rgba(43,30,46,.6)'; cx.setLineDash([2, 2]); cx.beginPath(); cx.moveTo(bx, by); cx.lineTo(bx + Math.cos(ang) * 26, by - Math.sin(ang) * 26); cx.stroke(); cx.setLineDash([]); }
+      if (st.phase === 'power') { cx.fillStyle = '#2b1e2e'; cx.fillRect(6, 30, 6, 52); cx.fillStyle = '#f7c646'; const ph = Math.round(st.power * 50); cx.fillRect(7, 81 - ph, 4, ph); }
+      if (st.shot) { const s2 = st.shot, n2 = s2.trail.length; const [px, py] = s2.trail[n2 - 1] || [bx, by], [qx, qy] = s2.trail[Math.max(0, n2 - 4)] || [bx, by]; cx.strokeStyle = '#4a2a14'; cx.beginPath(); cx.moveTo(qx, qy); cx.lineTo(px, py); cx.stroke(); cx.fillStyle = '#e14b3d'; cx.fillRect(Math.round(qx), Math.round(qy), 1, 1); }
+      raf = requestAnimationFrame(loop);
+    };
+    function press() {
+      if (st.over) return;
+      if (st.phase === 'aim') { st.lockA = st.angle; st.phase = 'power'; st.t0 = performance.now(); msg.textContent = L('Одоо хүчээ сонго!', 'Now choose your power!'); }
+      else if (st.phase === 'power') {
+        const a2 = angleOf(st.lockA), v0 = 70 + st.power * 115;
+        st.shot = { x: X0, y: GROUND - 16, vx: Math.cos(a2) * v0, vy: -Math.sin(a2) * v0, trail: [] }; st.phase = 'fly'; TG.sfx.whoosh && TG.sfx.whoosh(); arch.shots++;
+      }
+      drawInfo();
+    }
+    function land(s2) {
+      st.phase = 'wait';
+      const TX = X0 + DIST[st.round], tol = TOL[st.round], off = s2.x - TX, hit = Math.abs(off) <= tol;
+      st.marks.push([Math.min(190, s2.x), hit]);
+      if (hit) { st.hits++; arch.hits++; st.cheer = performance.now(); TG.sfx.win(); quest('archery'); msg.textContent = L('Оносон! Уухай! 🎯', 'Hit! Uukhai! 🎯'); }
+      else { TG.sfx.bad(); msg.textContent = off < 0 ? L('Дутлаа. Өнцөг эсвэл хүчээ нэмээрэй.', 'Short. Add more angle or power.') : L('Хэтэрлээ. Хүчээ бага зэрэг сулруулаарай.', 'Too far. Use a little less power.'); if (Math.abs(st.wind) > 8) msg.textContent += ' ' + L('Салхийг тооцоорой!', 'Mind the wind!'); }
+      setTimeout(() => {
+        st.shot = null; st.arrow++;
+        if (st.arrow >= 4) { st.arrow = 0; st.round++; st.marks = []; if (st.round >= 3) return finish(); newWind(); msg.textContent = L(`${st.round + 1}-р үе: бай холдож, салхи хүчтэй боллоо!`, `Round ${st.round + 1}: the target is further and the wind stronger!`); }
+        st.phase = 'aim'; st.lockA = null; st.t0 = performance.now(); drawInfo();
+      }, 1200);
+    }
+    function finish() {
+      st.over = true; st.phase = 'done'; drawInfo();
+      arch.games++; const newBest = st.hits > arch.best; if (newBest) arch.best = st.hits;
+      const tNow = ARCH_TITLES.find((x) => st.hits >= x.need);
+      const r = reward(st.hits * 4, st.hits * 6); S.save(); checkAch();
+      if (st.hits >= 6) { TG.confetti(70); TG.sfx.win(); }
+      rc(tail, h('div', { class: 'v-zasuul' }, h('b', null, `🎯 ${st.hits}/12`), tNow ? [' · ', L(`«${tx(tNow.t)}» цол хүртлээ!`, `You earned the “${tx(tNow.t)}” title!`)] : '', newBest ? h('p', null, L('Шинэ дээд амжилт!', 'New best score!')) : null, r ? h('p', null, `🪙 +${r.coins} · ⭐ +${r.xp} XP`) : null),
+        h('div', { class: 'teach' }, h('p', null, tx(TG.pick(ARCH_FACTS)))),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')), h('button', { class: 'btn primary', onclick: () => { close(); setTimeout(archeryGame, 200); } }, L('Дахин харвах', 'Shoot again'))));
+    }
+    btn.addEventListener('click', press);
+    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) press(); } };
+    window.addEventListener('keydown', key, true); window.addEventListener('keyup', key, true);
+    msg.textContent = L('Зүү хамгийн зөв өнцөгт ирэхэд дар!', 'Press when the line is at a good angle!');
+    drawInfo();
+    const close = TG.modal(body, { cls: 'v-modal', onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', key, true); window.removeEventListener('keyup', key, true); } });
+    raf = requestAnimationFrame(loop);
+  }
+
+  // ================================================================ Эмээгийн гэр: etiquette with Grandma (gentle, never punishing)
+  const EMEE = { deel: 'purple', skin: '#EDBB93', hat: 'mongol', face: 'glasses', neck: 'khadag', pet: null };
+  const O2 = (mn, en, ok, wmn, wen) => ({ t: Tx(mn, en), ok: !!ok, why: wmn ? Tx(wmn, wen) : null });
+  const EMEE_STEPS = [
+    { say: Tx('Миний хүү/охин ирлээ! Эмээгийн гэрт тавтай морил. Хаалгаар яаж орох вэ?', 'My dear child, welcome to Grandma’s ger! How do you come in through the door?'), hl: 'door',
+      opts: [O2('Босгыг алхаж давна', 'Step over the threshold', 1), O2('Босгон дээр гишгэнэ', 'Step on the threshold', 0, 'Хүүхэд минь, босго бол гэрийн хүндэт хил. Түүн дээр гишгэдэггүй, харин алхаж давдаг юм. Дахиад оролдоод үз дээ.', 'Dear, the threshold is the honoured border of the home. We never step on it; we step over it. Try again.'), O2('Гүйж орно', 'Run in', 0, 'Гэрт тайван, аажуухан ордог юм. Гэрийн эзэнд хүндэтгэл үзүүлж байгаа хэрэг шүү.', 'We come into a ger calmly and slowly. It shows respect to the family.')] },
+    { say: Tx('Сайн байна уу гэж мэндлэх үү? Эмээ чинь сонсож байна.', 'Will you greet me? Grandma is listening.'),
+      opts: [O2('“Сайн байна уу, эмээ!”', '“Sain baina uu, Grandma!”', 1), O2('Юу ч хэлэхгүй', 'Say nothing', 0, 'Гэрт ормогц эхлээд ахмадтайгаа мэндэлдэг. “Сайн байна уу” гэвэл эмээ чинь их баярлана.', 'When we enter, we first greet the elders. A “sain baina uu” makes Grandma very happy.')] },
+    { say: Tx('Одоо гэр дотор аль чигээр явах вэ?', 'Which way do you walk inside the ger?'), hl: 'west',
+      opts: [O2('Нар зөв: орохдоо зүүн гар тал руугаа', 'Sunwise: towards your left as you enter', 1), O2('Нар буруу: баруун гар тал руугаа', 'Against the sun: towards your right', 0, 'Гэрт нарны явахтай адил нар зөв эргэдэг юм. Орж ирээд зүүн гар тал руугаа явбал зөв шүү.', 'Inside a ger we move the way the sun travels. Going to your left as you enter is right.'), O2('Голоор нь шууд гатална', 'Cut straight across the middle', 0, 'Гал голомт, хоёр баганын дундуур гаталдаггүй юм. Тойруулж нар зөв яваарай.', 'We never cut between the hearth and the two posts. Walk around, sunwise.')] },
+    { say: Tx('Эмээ чамд халуун цай аягаллаа. Яаж авах вэ?', 'Grandma pours you hot milk tea. How do you take it?'),
+      opts: [O2('Баруун гараараа авч, зүүн гараараа тохойгоо түшинэ', 'Take it with your right hand, left hand under your right elbow', 1), O2('Зүүн гараараа авна', 'Take it with your left hand', 0, 'Ахмадаас юм авахдаа баруун гар эсвэл хоёр гараараа авдаг юм. Зүүн гараараа тохойгоо түшвэл бүр ёсорхуу.', 'We take things from elders with the right hand or both hands. Supporting the elbow with your left hand is even more polite.'), O2('“Ширээн дээр тавь” гэнэ', 'Say “put it on the table”', 0, 'Эмээгийн өгсөн цайг гараараа хүндэтгэлтэй авбал эмээ чинь баярлана.', 'Taking Grandma’s tea from her hands, respectfully, makes her happy.')] },
+    { say: Tx('Зочин хүү/охин минь хаана суух вэ? Зураг дээр дараарай.', 'And where does a guest sit? Tap the picture.'), zone: 'west',
+      zones: { khoimor: Tx('Хоймор бол ахмад, хүндтэй зочны суудал. Эмээ урих хүртэл хүлээнэ дээ.', 'The khoimor is for elders and honoured guests. Wait until Grandma invites you.'), east: Tx('Энэ бол гэрийн эзэгтэйн тал, гал тогоо байдаг. Зочин баруун талд суудаг юм.', 'That is the hostess’s side with the kitchen. Guests sit on the west side.'), hearth: Tx('Гал голомт бол гэрийн зүрх. Түүний дэргэд сууж болохгүй шүү.', 'The hearth is the heart of the home. We don’t sit right by it.'), door: Tx('Хаалганы дэргэд сууж болох ч дотогшоо ороод баруун талд суувал илүү ёстой.', 'You could sit by the door, but come in and sit on the west side; that is proper.') } },
+    { say: Tx('Сайхан зочиллоо! Гарахдаа яах вэ?', 'What a lovely visit! How do you leave?'),
+      opts: [O2('“Баярлалаа, эмээ!” гээд босго алхаж гарна', 'Say “Thank you, Grandma!” and step over the threshold', 1), O2('Юу ч хэлэлгүй гүйгээд гарна', 'Run out without a word', 0, 'Гарахдаа гэрийн эзэндээ баярлалаа, баяртай гэж хэлдэг юм. Босгоо ч бас алхаж давна шүү.', 'When leaving, we thank the family and say goodbye, and step over the threshold again.')] },
+  ];
+  function emeePic(size = 64) { const c = h('canvas', { class: 'px-icon', width: 16, height: 28, style: { width: size + 'px', height: Math.round(size * 28 / 16) + 'px' } }); c.getContext('2d').drawImage(PX.char(EMEE, 0, 0), 0, 0); return c; }
+  function emeeVisit() {
+    const v = V(), em = v.emee = v.emee || { visits: 0, perfect: 0 };
+    let i = 0, slips = 0;
+    const st = { hl: null };
+    const cv = h('canvas', { class: 'l-scene', width: TG.scenes.W, height: TG.scenes.H }), cx2 = cv.getContext('2d');
+    let raf = 0; const t0 = performance.now();
+    const loop = () => { if (!cv.isConnected) return; TG.scenes.inside(cx2, st, (performance.now() - t0) / 1000); raf = requestAnimationFrame(loop); };
+    const bubble = h('div', { class: 'emee-say' }), opts = h('div', { class: 'l-opts' }), note = h('div');
+    const sayEmee = (txt, kind) => rc(bubble, emeePic(40), h('p', { class: kind || '' }, txt));
+    function show() {
+      const s = EMEE_STEPS[i]; st.hl = s.hl || null; st.hlBad = false; rc(note);
+      sayEmee(tx(s.say));
+      if (s.zones) { rc(opts, h('p', { class: 'l-hint' }, '👆 ', L('Зураг дээр дар', 'Tap the picture'))); return; }
+      rc(opts, ...[...s.opts].sort(() => Math.random() - 0.5).map((o) => h('button', { class: 'l-opt', onclick: (e) => {
+        if (o.ok) { TG.sfx.good(); e.currentTarget.classList.add('right'); next(); }
+        else { slips++; TG.sfx.tap(); e.currentTarget.disabled = true; sayEmee('💛 ' + tx(o.why), 'gentle'); }
+      } }, tx(o.t))));
+    }
+    cv.addEventListener('pointerdown', (e) => {
+      const s = EMEE_STEPS[i]; if (!s || !s.zones) return;
+      const r = cv.getBoundingClientRect(), z = TG.scenes.zoneAt((e.clientX - r.left) / r.width * TG.scenes.W, (e.clientY - r.top) / r.height * TG.scenes.H);
+      if (!z) return; st.hl = z;
+      if (z === s.zone) { st.hlBad = false; TG.sfx.good(); next(); }
+      else { slips++; st.hlBad = true; sayEmee('💛 ' + tx(s.zones[z] || s.say), 'gentle'); }
+    });
+    function next() {
+      i++;
+      if (i < EMEE_STEPS.length) return setTimeout(show, 450);
+      em.visits++; const perfect = slips === 0; if (perfect) em.perfect++;
+      const r = reward(perfect ? 30 : 20, perfect ? 40 : 30); quest('etiquette'); S.save(); checkAch();
+      TG.sfx.win(); TG.confetti(50);
+      sayEmee(perfect ? L('Ёстой ёсорхог хүүхэд вэ! Энэ ааруулаас ав, миний хүү/охин. 🧀', 'Such a well-mannered child! Have some aaruul, dear. 🧀') : L('Сайн байна! Алдах нь сурах л гэсэн үг. Энэ ааруулаас ав. 🧀', 'Well done! Making mistakes is how we learn. Have some aaruul. 🧀'));
+      rc(opts, h('div', { class: 'l-reward' }, r ? `🪙 +${r.coins} · ⭐ +${r.xp} XP` : ''), h('p', { class: 'muted' }, perfect ? L('Нэг ч алдаагүй! 🏅', 'Not a single slip! 🏅') : L(`Эмээ ${slips} удаа зөөлөн зааж өглөө.`, `Grandma gently helped you ${slips} time(s).`)),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Баяртай, эмээ!', 'Bye, Grandma!')), h('button', { class: 'btn primary', onclick: () => { close(); TG.go('lesson', { id: 'customs' }); } }, L('Ёс заншлын хичээл', 'Manners lesson'))));
+    }
+    show();
+    const close = TG.modal(h('div', { class: 'emee-visit' }, h('div', { class: 'eyebrow' }, L('Эмээгийн гэр · Ёс заншил', 'Grandma’s ger · Manners')), h('h2', null, L('Эмээдээ зочлох', 'Visiting Grandma')), cv, bubble, opts, note), { cls: 'v-modal', onClose: () => cancelAnimationFrame(raf) });
+    raf = requestAnimationFrame(loop);
   }
 
   function openBasar() {
@@ -1118,7 +1379,7 @@
     const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.15 + round * 0.085, skin: TG.pick(R.SKINS) };
     wrestleMatch({ ai: true, round, opp }, (won) => {
       const v = V(), wr = v.wr;
-      if (won) { wr.wins = (wr.wins || 0) + 1; reward(8 + round * 2, 10 + round * 3); } else { wr.losses = (wr.losses || 0) + 1; reward(0, 5); }
+      if (won) { wr.wins = (wr.wins || 0) + 1; quest('wrestle'); reward(8 + round * 2, 10 + round * 3); } else { wr.losses = (wr.losses || 0) + 1; reward(0, 5); }
       const reached = won ? round : round - 1;
       if (won && round === 9) wr.champ = (wr.champ || 0) + 1;
       if (reached > (wr.best || 0)) wr.best = reached;

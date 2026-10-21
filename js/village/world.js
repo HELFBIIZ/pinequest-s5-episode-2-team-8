@@ -29,7 +29,8 @@
   rect(27, 14, 27, 18, 'p');
   // ger neighborhood (south): 8 lots along a lane
   const LOT_X = [3, 7, 11, 21, 25, 29, 33, 37];
-  rect(2, 31, 40, 32, 'p');
+  rect(2, 31, 42, 32, 'p');
+  rect(41, 14, 42, 32, 'p'); // east road: closes the loop around town (used by the horse race)
   // decorative pond in the south meadow
   for (let y = 33; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (((x + 0.5 - 30.5) / 4.2) ** 2 + ((y + 0.5 - 35.8) / 2.2) ** 2 <= 1) set(x, y, 'w');
   // Naadam wrestling arena (east): sand ring, reached from the main road
@@ -50,6 +51,8 @@
     { id: 'zasuul', kind: 'npc', x: 47, y: 8, w: 1, h: 1, door: { x: 47, y: 9 } },
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
     { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
+    { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
+    { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
     { id: 'lantern4', kind: 'lantern', x: 40, y: 11, w: 1, h: 1 },
     { id: 'lantern5', kind: 'lantern', x: 40, y: 14, w: 1, h: 1 },
     ...LOT_X.map((x, i) => ({ id: 'lot' + i, kind: 'lot', i, x, y: 28, w: 3, h: 3, door: { x: x + 1, y: 31 } })),
@@ -61,12 +64,14 @@
   // Horse race: from the Naadam arena west along the main road, south down the long road, east to the finish by the gers
   // points are in feet coordinates (tile units, centre of the two-tile-wide roads)
   const RACE = [{ x: 50, y: 13 }, { x: 34, y: 13 }, { x: 18, y: 13 }, { x: 18, y: 22 }, { x: 18, y: 32 }, { x: 28, y: 32 }, { x: 39.5, y: 32 }];
+  // Naadam race loop around town (one lap ≈ 86 tiles): start line on the main road, east road, south lane, west road
+  const LAP = [{ x: 30, y: 13 }, { x: 42, y: 13 }, { x: 42, y: 22 }, { x: 42, y: 32 }, { x: 30, y: 32 }, { x: 18, y: 32 }, { x: 18, y: 22 }, { x: 18, y: 13 }];
 
   // trees, flowers, rocks
   const trees = [], flowers = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y][x] === 'T') trees.push({ x, y, pine: hash(x, y) > 0.7 });
   const clearAround = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const c = (g[y + dy] || [])[x + dx]; if (c && c !== 'g' && c !== 'T') return false; } return true; };
-  const reserved = (x, y) => (x >= 13 && x <= 22 && y >= 9 && y <= 16) || (y >= 2 && y <= 7 && x >= 2 && x <= 14) || (x >= 22 && x <= 33 && y >= 18 && y <= 25) || (x >= 3 && x <= 14 && y >= 14 && y <= 24) || (x >= 38 && y >= 3 && y <= 19) || (x >= 1 && x <= 41 && y >= 26 && y <= 33) || (x >= 43 && x <= 50 && y >= 22 && y <= 28);
+  const reserved = (x, y) => (x >= 13 && x <= 22 && y >= 9 && y <= 16) || (y >= 2 && y <= 7 && x >= 2 && x <= 14) || (x >= 22 && x <= 33 && y >= 18 && y <= 25) || (x >= 3 && x <= 14 && y >= 14 && y <= 24) || (x >= 38 && y >= 3 && y <= 19) || (x >= 1 && x <= 41 && y >= 26 && y <= 33) || (x >= 43 && x <= 50 && y >= 22 && y <= 28) || (x >= 43 && x <= 54 && y >= 30 && y <= 37);
   for (let y = 2; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
     if (g[y][x] !== 'g' || reserved(x, y) || !clearAround(x, y)) continue;
     const r = rnd();
@@ -111,7 +116,7 @@
   }
 
   // drawing lives in pixel.js (16-pixel tiles, pure pixel art)
-  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, RACE, lots, blocked, plotAt, findPath, nearestOpen, hash };
+  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, RACE, LAP, lots, blocked, plotAt, findPath, nearestOpen, hash };
   api.renderStatic = () => TG.pixel.renderStatic(api);
   TG.vworld = api;
 })(window.TG);

@@ -6,7 +6,7 @@
   let cleanup = null, screen = 'village', params = {}, parentUntil = 0;
 
   // ---------------- navigation ----------------
-  const NAV_ORDER = ['village', 'learn', 'achievements', 'family', 'memories'];
+  const NAV_ORDER = ['village', 'learn', 'passport', 'aimag', 'tree', 'achievements', 'family', 'memories'];
   const calm = () => S.state.settings.reduceMotion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function transition(kind, update) {
     document.documentElement.dataset.vt = kind;
@@ -76,12 +76,16 @@
     const m = TG.MASCOTS.find((x) => x.e === p.avatar);
     const item = (icon, label, fn) => h('button', { class: 'menu-item', onclick: () => { close(); fn(); } }, h('span', { class: 'mi-i' }, icon), h('span', null, label), TG.icon('chevronRight'));
     const close = TG.modal(h('div', null,
-      h('div', { class: 'menu-me' }, h('span', { class: 'av big' }, p.avatar), h('div', null, h('b', null, p.name), h('small', null, `${p.age} ${L('настай', 'years old')}${m ? ' · ' + tx(m.name) : ''}`))),
+      h('div', { class: 'menu-me' }, h('span', { class: 'av big' }, p.avatar), h('div', null, h('b', null, p.name), h('small', null, `${p.age} ${L('настай', 'years old')}${TG.ethnic.byId(p.eth) ? ' · ' + tx(TG.ethnic.byId(p.eth).name) : m ? ' · ' + tx(m.name) : ''}${TG.aimags.byId(p.aimag) ? ' · 📍 ' + tx(TG.aimags.byId(p.aimag).name) : ''}`))),
       h('div', { class: 'menu-list' },
         item('⛺', L('Нутаг', 'Nutag'), () => TG.go('village')),
         item('📚', L('Өв соёлын сургууль', 'Heritage school'), () => TG.go('learn')),
         item('🐕', L('Басартай ярилцах', 'Talk with Basar'), () => TG.basar.open()),
         item('🏅', L('Миний амжилтууд', 'My achievements'), () => TG.go('achievements')),
+        item('🛂', L('Аймгийн паспорт', 'Aimag passport'), () => TG.go('passport')),
+        item('🌳', L('Миний ургийн мод (7 үе)', 'My family tree (7 generations)'), () => TG.go('tree')),
+        item('🎨', L('Дүрээ өөрчлөх', 'Change my character'), () => TG.go('create')),
+        item('🍃', L('Улирлын тухай', 'About the season'), () => TG.seasons.open()),
         item('🎙️', L('Гэр бүлийн дурсамж', 'Family memory book'), () => TG.go('memories')),
         item('👨‍👩‍👧', L('Эцэг эхийн самбар', 'Parent dashboard'), openFamily),
         item('🌐', S.state.lang === 'mn' ? 'English' : 'Монгол хэл', toggleLang),
@@ -130,7 +134,9 @@
       h('button', { class: tab === 'register' ? 'on' : '', onclick: () => TG.go('auth', { tab: 'register' }) }, L('Бүртгүүлэх', 'Register')));
     const enter = (p) => {
       S.state.activeId = p.id; S.state.loggedIn = true; S.save();
-      TG.sfx.win(); TG.toast(L(`Тавтай морил, ${p.name}! 🐕`, `Welcome, ${p.name}! 🐕`)); TG.go('village');
+      TG.sfx.win();
+      if (!p.eth) return TG.go('create'); // new: build your character (ethnic group, home province, outfit) first
+      TG.toast(L(`Тавтай морил, ${p.name}! 🐕`, `Welcome, ${p.name}! 🐕`)); TG.go('village');
     };
 
     function login() {
@@ -145,7 +151,7 @@
     }
 
     function register() {
-      const d = { name: '', age: 8, avatar: TG.MASCOTS[0].e, code: null };
+      const d = { name: '', age: 8, avatar: TG.MASCOTS[0].e, code: null, aimag: null };
       let step = 0;
       const draw = () => {
         const prog = h('div', { class: 'auth-prog' }, [0, 1, 2, 3].map((k) => h('i', { class: k <= step ? 'on' : '' })));
@@ -188,6 +194,10 @@
   SCREENS.village = () => TG.villageScreen({ setCleanup });
   SCREENS.learn = () => TG.learn.hub({ shell });
   SCREENS.lesson = (p) => TG.learn.lesson({ ...p, shell, setCleanup });
+  SCREENS.tree = () => TG.familyTree.screen({ shell, rerender: () => render() });
+  SCREENS.passport = () => TG.passport.screen({ shell });
+  SCREENS.aimag = (p) => TG.passport.visit({ ...p, shell });
+  SCREENS.create = () => TG.ethnic.screen({ onDone: () => { TG.toast(L('Нутагт тавтай морил! 🐕', 'Welcome to Nutag! 🐕')); TG.go('village'); } });
 
   // ---------------- achievements ----------------
   const fmtDay = (ts) => TG.fmtDate ? TG.fmtDate(ts) : new Date(ts).toLocaleDateString();
@@ -371,6 +381,7 @@
         h('div', { class: 'stat' }, h('small', null, L('Амжилт', 'Badges')), h('b', null, `${Object.keys(child.ach || {}).length}/${TG.achievements.LIST.length}`))),
       h('section', { class: 'card' },
         h('h3', null, `${child.avatar} ${child.name}: `, L('хичээлүүд', 'lessons')),
+        TG.aimags.byId(child.aimag) ? h('p', { class: 'muted' }, '📍 ', tx(TG.aimags.byId(child.aimag).name), ' · ', tx(TG.aimags.byId(child.aimag).fact)) : null,
         TG.learn.LESSONS.map((l) => { const pr = learn[l.id] || {}; return h('div', { class: 'fam-lesson' },
           h('span', { class: 'fl-name' }, l.icon, ' ', tx(l.title)),
           h('span', { class: 'tag' + (pr.done ? ' ok' : '') }, pr.done ? '✓ ' + L('Сурсан', 'Learned') : L('Эхлээгүй', 'Not yet')),

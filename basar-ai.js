@@ -27,7 +27,7 @@ module.exports = function createBasar(root) {
   const TOPICS = {
     history: 'Mongolian history (from the Xiongnu to modern Mongolia)', nuuts: 'The Secret History of the Mongols (Монголын нууц товчоо)',
     ger: 'the Mongol ger: its parts and how a family builds it', idee: 'Mongolian dairy foods (цагаан идээ) and how they are made',
-    naadam: 'Naadam: wrestling, horse racing and archery', customs: 'Mongolian customs and manners, especially inside a ger', mix: 'any Mongolian heritage topic',
+    naadam: 'Naadam: wrestling, horse racing and archery', customs: 'Mongolian customs and manners, especially inside a ger', nomad: 'Mongolian nomadic herding life: the five animals, seasonal camps and the provinces', arts: 'Mongolian music and arts: morin khuur, long song, khöömii and folk dances', mix: 'any Mongolian heritage topic',
   };
   let day = '', used = 0;
   const buckets = new Map(); // ip -> { tokens, last }

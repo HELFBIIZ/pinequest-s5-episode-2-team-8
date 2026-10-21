@@ -148,5 +148,73 @@
     }
   }
 
-  TG.scenes = { bg, W, H, ger, idee, inside, story, zoneAt, ZONES };
+
+  // ------------------------------------------------------------ five herd animals (st.sub = how many are shown)
+  function herd(x, st, t) {
+    bg(x, t);
+    const n = Math.round((st.sub == null ? 1 : st.sub) * 5), bob = (i) => (Math.floor(t * 2 + i) % 2);
+    const goat = (X, Y, f) => { blob(x, X + 6, Y + 6, 5, 3, '#e8e0d0', '#6a5a4a'); R(x, X + 10, Y + 2, 3, 4, '#e8e0d0'); P(x, X + 12, Y + 3, K.eye); line(x, X + 11, Y + 2, X + 9, Y - 1, '#6a5a4a'); P(x, X + 12, Y + 6, '#d8cfba'); [X + 3, X + 5, X + 8, X + 9].forEach((lx, i) => R(x, lx, Y + 9, 1, 3 - ((f + i) % 2), '#6a5a4a')); };
+    const cow = (X, Y, f) => { blob(x, X + 8, Y + 6, 7, 4, '#3a2c2c', K.out); R(x, X + 14, Y + 3, 4, 4, '#3a2c2c'); P(x, X + 16, Y + 4, '#ffffff'); P(x, X + 13, Y + 2, '#d8cfba'); P(x, X + 18, Y + 2, '#d8cfba'); line(x, X + 1, Y + 5, X - 1, Y + 10, '#3a2c2c'); [X + 4, X + 6, X + 11, X + 13].forEach((lx, i) => R(x, lx, Y + 10, 1, 4 - ((f + i) % 2), '#241a1a')); };
+    const list = [
+      (i) => x.drawImage(PX.horse('bay', bob(i) ? 0 : 0, false), 4, 38),
+      (i) => cow(30, 44, bob(i)),
+      (i) => x.drawImage(PX.animal('camel', bob(i)), 52, 42),
+      (i) => x.drawImage(PX.animal('sheep', bob(i)), 72, 48),
+      (i) => goat(90, 46, bob(i)),
+    ];
+    for (let i = 0; i < n; i++) list[i](i);
+    dog(x, 98, 62);
+  }
+  // ------------------------------------------------------------ Tsagaan Sar table (st.buuz, st.layers)
+  function table(x, st, t) {
+    R(x, 0, 0, W, H, '#f4efe3'); for (let X = 0; X < W; X += 6) R(x, X, 0, 1, 40, '#e8dfc8');
+    R(x, 0, 40, W, 40, '#c8483c'); R(x, 0, 40, W, 2, K.gold); for (let X = 4; X < W; X += 10) { P(x, X, 44, K.gold); P(x, X + 1, 45, K.gold); P(x, X + 2, 44, K.gold); }
+    R(x, 14, 46, 92, 20, K.out); R(x, 15, 47, 90, 18, K.wood); R(x, 15, 47, 90, 2, K.woodL);
+    const layers = Math.round(st.layers || 0); // ul boov stack
+    for (let i = 0; i < layers; i++) { R(x, 22, 44 - i * 4, 24, 4, K.out); R(x, 23, 44 - i * 4, 22, 3, '#e9c27a'); R(x, 25, 45 - i * 4, 18, 1, '#c99a4a'); }
+    if (layers) { R(x, 26, 40 - layers * 4, 16, 3, '#f7f0e0'); P(x, 30, 39 - layers * 4, K.red); P(x, 34, 39 - layers * 4, K.gold); P(x, 38, 39 - layers * 4, K.white); } // aaruul & candy on top
+    const buuz = Math.round(st.buuz || 0);
+    ell(x, 74, 50, 18, 5, K.white); ell(x, 74, 50, 16, 4, '#e6f7ff');
+    for (let i = 0; i < buuz; i++) { const bx = 62 + (i % 5) * 6, by = 46 + Math.floor(i / 5) * 4; blob(x, bx, by, 2, 2, '#fbf3e0', '#c9b893'); P(x, bx, by - 2, '#c9b893'); }
+    R(x, 92, 34, 6, 12, K.out); R(x, 93, 35, 4, 10, K.white); R(x, 93, 37, 4, 2, K.blue); // milk tea jug
+    if (Math.floor(t * 2) % 2) P(x, 95, 32, '#ffffff');
+  }
+  // ------------------------------------------------------------ morin khuur (st.lit 0..1 glows the strings)
+  function khuur(x, st, t) {
+    R(x, 0, 0, W, H, '#2b1e3a'); for (let i = 0; i < 20; i++) P(x, (i * 37) % W, (i * 17) % 40, '#f7e6b0');
+    const glow = st.lit || 0, cx = 60;
+    R(x, cx - 1, 8, 3, 46, K.woodD); R(x, cx, 8, 1, 46, K.wood); // neck
+    R(x, cx - 4, 4, 8, 5, K.wood); R(x, cx + 3, 3, 3, 3, K.woodD); P(x, cx + 5, 4, K.eye); P(x, cx - 2, 2, K.woodD); // horse head
+    R(x, cx - 6, 14, 3, 2, K.woodL); R(x, cx + 4, 16, 3, 2, K.woodL); // tuning pegs
+    for (let r = 0; r < 18; r++) { const w = Math.round(14 - Math.abs(r - 9) * 0.5); R(x, cx - w, 52 + r, w * 2 + 1, 1, r === 0 || r === 17 ? K.out : K.wood); } // trapezoid body
+    R(x, cx - 9, 56, 19, 10, K.woodL);
+    const sc = glow > 0.05 ? `rgba(255,230,130,${0.5 + glow * 0.5})` : '#d8cfba';
+    line(x, cx - 1, 10, cx - 1, 66, sc); line(x, cx + 1, 10, cx + 1, 66, sc);
+    const bowY = 58 + Math.round(Math.sin(t * 4) * (glow ? 3 : 0)); line(x, cx - 22, bowY - 6, cx + 22, bowY + 4, K.woodD); line(x, cx - 22, bowY - 5, cx + 22, bowY + 5, '#e8e0d0'); // bow
+    if (glow > 0.05) for (let i = 0; i < 4; i++) { const ny = 40 - ((t * 20 + i * 10) % 36), nx = cx + 18 + Math.sin(t * 2 + i) * 6; R(x, nx, ny, 2, 2, K.gold); R(x, nx + 2, ny - 4, 1, 5, K.gold); }
+  }
+  // ------------------------------------------------------------ shagai: four knucklebones (st.sides = ['horse', ...])
+  const SIDE_COL = { horse: '#e14b3d', camel: '#f39b2c', sheep: '#ffffff', goat: '#3f76db' };
+  function shagai(x, st, t) {
+    R(x, 0, 0, W, H, '#8a4b1f'); R(x, 6, 6, W - 12, H - 12, '#c8483c'); R(x, 10, 10, W - 20, H - 20, '#e9a24a');
+    for (let i = 0; i < 4; i++) {
+      const side = (st.sides || [])[i], X = 18 + i * 24, Y = 30 + (i % 2) * 6;
+      blob(x, X + 6, Y + 6, 7, 5, '#f4e6c4', '#8a6a42'); R(x, X + 3, Y + 2, 6, 3, '#d8c49a');
+      if (side) { R(x, X + 3, Y + 5, 7, 3, SIDE_COL[side]); P(x, X + 6, Y + 9, '#8a6a42'); }
+      else if (Math.floor(t * 6 + i) % 2) P(x, X + 6, Y - 2, '#ffffff');
+    }
+    if (st.sides && st.sides.length) [['horse', 'М'], ['camel', 'Т'], ['sheep', 'Х'], ['goat', 'Я']].forEach(([k], j) => { R(x, 14 + j * 24, 60, 8, 4, SIDE_COL[k]); });
+  }
+  // ------------------------------------------------------------ the three manly games (st.focus: bokh | horse | archer)
+  function naadam(x, st, t) {
+    bg(x, t);
+    const f = st.focus;
+    R(x, 0, 30, W, 6, '#5a361c'); for (let i = 0; i < 30; i++) R(x, 2 + i * 4, 31 + (i % 2), 2, 2, ['#e14b3d', '#3f76db', '#f7c646', '#2ea35f'][i % 4]); // crowd
+    const fade = (k) => (f && f !== k ? 0.35 : 1);
+    x.globalAlpha = fade('bokh'); x.drawImage(PX.wrestler('#d8342b', '#edbb93', f === 'bokh' && Math.floor(t * 2) % 2 ? 'push' : 'grip', 0), 0, 0, 32, 48, 4, 38, 20, 30); x.save(); x.translate(44, 38); x.scale(-1, 1); x.drawImage(PX.wrestler('#2b5bd8', '#d9a06e', 'grip', 0), 0, 0, 32, 48, 0, 0, 20, 30); x.restore();
+    x.globalAlpha = fade('horse'); const hx = 46 + (f === 'horse' ? Math.round((t * 12) % 20) : 0); x.drawImage(PX.horse('chestnut', f === 'horse' ? 1 + Math.floor(t * 10) % 4 : 0, true), hx, 48); x.drawImage(PX.char({ deel: 'gold', skin: '#EDBB93', hat: 'cap' }, 2, 0), hx + 6, 33);
+    x.globalAlpha = fade('archer'); x.drawImage(PX.char({ deel: 'green', skin: '#D9A06E', hat: 'mongol' }, 2, 0), 92, 40); line(x, 106, 46, 106, 58, K.woodD); line(x, 106, 46, 104, 52, K.white); line(x, 104, 52, 106, 58, K.white);
+    x.globalAlpha = 1;
+  }
+  TG.scenes = { bg, W, H, ger, idee, inside, story, herd, table, khuur, shagai, naadam, zoneAt, ZONES };
 })(window.TG);

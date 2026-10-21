@@ -113,6 +113,99 @@
         steps: [T('Хүн бүр нэг мөчир хугалж үзнэ — амархан!', 'Everyone breaks one twig — easy!'), T('Таван мөчрийг утсаар багцлаад хугалж үзнэ — хэцүү!', 'Tie five together and try — hard!'), T('Гэр бүлд эв нэгдэл яагаад чухал вэ гэж ярилцаарай.', 'Talk about why unity matters in a family.'), T('Алан гуа эхийн түүхийг дүү, найздаа ярьж өгөөрэй.', 'Tell Alan Gua’s story to a sibling or friend.')],
       },
     },
+    {
+      id: 'herd', icon: '🐑', scene: 'herd', topic: 'nomad', color: '#2ea35f', final: { sub: 1 },
+      title: T('Таван хошуу мал', 'The five herd animals'),
+      learned: [T('Таван хошуу мал: морь, үхэр, тэмээ, хонь, ямаа', 'The five animals: horse, cattle, camel, sheep, goat'), T('Мал бүрийн өгдөг зүйл: айраг, ноос, ноолуур, сүү, хүч', 'What each gives: airag, wool, cashmere, milk, strength'), T('Малчид жилд 4 удаа нүүдэг', 'Herders move four times a year')],
+      desc: T('Морь, үхэр, тэмээ, хонь, ямаа: мал бүр малчин айлд юу өгдөг вэ?', 'Horse, cattle, camel, sheep, goat: what does each give a herding family?'),
+      steps: [
+        { type: 'learn', set: { sub: 0.2 }, title: T('Малчдын баялаг', 'The herders’ wealth'), text: T('Монголчууд мянга мянган жил таван хошуу мал маллаж ирсэн. Мал бүр өөр өөр ашигтай.', 'For thousands of years Mongols have herded five kinds of animals. Each one is useful in its own way.') },
+        { type: 'tap', n: 5, field: 'sub', label: T('Малаа тоолох', 'Count the herd'), title: T('Малаа тоол!', 'Count the herd!'), text: T('5 удаа дарж таван хошуу малаа цуглуулаарай.', 'Tap 5 times to gather all five animals.'), after: T('Морь, үхэр, тэмээ, хонь, ямаа: таван хошуу мал.', 'Horse, cattle, camel, sheep, goat: the five animals.') },
+        { type: 'pick', title: T('Айраг', 'Airag'), text: T('Айргийг аль малын сүүгээр хийдэг вэ?', 'Airag is made from which animal’s milk?'), options: [O('Морь (гүү)', 'Horse (mare)', 1), O('Хонь', 'Sheep'), O('Тэмээ', 'Camel')], after: T('Гүүний сүүгээр айраг, тэмээний сүүгээр хоормог хийдэг.', 'Mare’s milk makes airag; camel’s milk makes khoormog.') },
+        { type: 'pick', title: T('Эсгий', 'Felt'), text: T('Гэрийн эсгий хийх ноосыг голдуу аль малаас авдаг вэ?', 'The wool for ger felt mostly comes from which animal?'), options: [O('Хонь', 'Sheep', 1), O('Морь', 'Horse'), O('Үхэр', 'Cattle')], after: T('Хонины ноосыг дэвтээж, өнхрүүлж эсгий хийдэг.', 'Sheep’s wool is wetted and rolled into felt.') },
+        { type: 'pick', title: T('Ноолуур', 'Cashmere'), text: T('Зөөлөн ноолуурыг аль малаас самнаж авдаг вэ?', 'Which animal gives soft cashmere?'), options: [O('Ямаа', 'Goat', 1), O('Тэмээ', 'Camel'), O('Хонь', 'Sheep')], after: T('Хавар ямааг самнаж ноолуур авдаг.', 'In spring goats are combed for cashmere.') },
+        { type: 'pick', title: T('Говийн хөлөг', 'Ship of the Gobi'), text: T('Говьд хүнд ачаа зөөж, ус ундгүй удаан тэсдэг мал аль вэ?', 'Which animal carries heavy loads and goes long without water in the Gobi?'), options: [O('Тэмээ', 'Camel', 1), O('Хонь', 'Sheep'), O('Ямаа', 'Goat')], after: T('Хоёр бөхтэй монгол тэмээг “говийн хөлөг” гэдэг.', 'The two-humped Mongolian camel is called “the ship of the Gobi”.') },
+        { type: 'tf', answer: true, title: T('Зөв үү, буруу юу?', 'True or false?'), text: T('Малчид жилд дөрвөн улирлын бууцанд нүүдэг.', 'Herders move between four seasonal camps a year.'), after: T('Хаваржаа, зуслан, намаржаа, өвөлжөө.', 'Spring, summer, autumn and winter camps.') },
+        { type: 'learn', title: T('Морь бол далавч', 'The horse is our wings'), text: T('“Морь бол монгол хүний далавч” гэдэг. Монголд хүнээс олон адуу бий!', 'They say “the horse is a Mongol’s wings”. Mongolia has more horses than people!') },
+      ],
+      family: { say: T('“Өвөө, эмээ ээ, та нар ямар мал маллаж байсан бэ?”', '“Grandpa, Grandma, which animals did you herd?”'), what: T('Ахмадуудаасаа малын тухай асуух', 'Ask your elders about their animals'),
+        materials: [T('Өвөө, эмээ эсвэл ахмад хамаатан', 'Grandparents or older relatives'), T('Цаас, өнгийн харандаа', 'Paper and coloured pencils')],
+        steps: [T('Тэд бага байхдаа ямар мал маллаж байсныг асуу.', 'Ask which animals they herded as children.'), T('Хамгийн дуртай морь нь хэн гэдэг нэртэй байсныг асуу.', 'Ask the name of their favourite horse.'), T('Таван хошуу малаа хамтдаа зураарай.', 'Draw the five animals together.'), T('Түүхийг нь Дурсамжийн номонд бичээрэй.', 'Save their story in the memory book.')] },
+    },
+    {
+      id: 'tsagaansar', icon: '🥟', scene: 'table', topic: 'customs', color: '#e14b3d', final: { buuz: 10, layers: 5 },
+      title: T('Цагаан сар', 'Tsagaan Sar'),
+      learned: [T('Битүүнээр гэрээ цэвэрлэж, гэр бүлээрээ цуглардаг', 'On Bituun, families clean the home and gather'), T('Ул боовыг сондгой давхраар өрдөг, бууз чимхдэг', 'Ul boov is stacked in odd layers; families make buuz'), T('Золгохдоо хадаг барьж, ахмадын тохойг доороос түшдэг', 'To greet elders, offer a khadag and support their elbows')],
+      desc: T('Бууз чимхэж, ул боов өрж, ахмадуудтайгаа хэрхэн золгохыг сур.', 'Make buuz, stack ul boov and learn how to greet your elders.'),
+      steps: [
+        { type: 'learn', title: T('Сар шинийн баяр', 'Lunar New Year'), text: T('Цагаан сар бол монголчуудын шинэ жил. Өвлийг үдэж, хаврыг угтдаг. Битүүний орой гэр бүлээрээ цуглаж, шинийн нэгэнд ахмадуудтайгаа золгодог.', 'Tsagaan Sar is the Mongolian New Year, seeing off winter and welcoming spring. On the eve families gather, and on the first day they greet their elders.') },
+        { type: 'tap', n: 10, field: 'buuz', scale: 10, label: T('Бууз чимхэх', 'Pinch a buuz'), title: T('Бууз чимхье!', 'Let’s make buuz!'), text: T('Гэр бүлээрээ олон мянган бууз чимхдэг айл ч бий. 10 удаа дараарай!', 'Some families make thousands of buuz together. Tap 10 times!'), after: T('Сайхан бууз боллоо! Битүүний өмнө бүгд хамтдаа чимхдэг.', 'Lovely buuz! Everyone makes them together before the holiday.') },
+        { type: 'pick', title: T('Ул боов', 'Ul boov'), text: T('Ул боовыг ширээн дээр хэрхэн өрдөг вэ?', 'How is ul boov stacked on the table?'), options: [O('Сондгой давхраар (3, 5, 7)', 'In odd layers (3, 5, 7)', 1), O('Тэгш давхраар (2, 4, 6)', 'In even layers (2, 4, 6)'), O('Ганцхан ширхэг', 'Just one piece')], after: T('Сондгой тоо өсөлт, сайн сайхныг бэлгэддэг гэдэг.', 'Odd numbers are said to symbolise growth and good fortune.') },
+        { type: 'tap', n: 5, field: 'layers', scale: 5, label: T('Давхарга өрөх', 'Add a layer'), title: T('Ул боовоо өрье', 'Stack the ul boov'), text: T('5 давхар ул боов өрөөд оройд нь цагаан идээ, чихэр тавина.', 'Stack 5 layers and put dairy foods and sweets on top.') },
+        { type: 'pick', title: T('Битүүн', 'Bituun'), text: T('Битүүний орой юу хийдэг вэ?', 'What do families do on the eve, Bituun?'), options: [O('Гэрээ цэвэрлэж, гэр бүлээрээ цуглардаг', 'Clean the home and gather as a family', 1), O('Ганцаараа унтдаг', 'Sleep alone'), O('Дэлгүүр хэсдэг', 'Go shopping')], after: T('Хуучин жилийн бүх зүйлийг цэгцэлж, шинэ жилийг цэвэр угтдаг.', 'Everything is tidied so the new year starts fresh.') },
+        { type: 'pick', title: T('Золголт', 'Greeting'), text: T('Золгохдоо ахмадад юу барьдаг вэ?', 'What do you offer an elder when greeting them?'), options: [O('Хадаг', 'A khadag scarf', 1), O('Ном', 'A book'), O('Бөмбөг', 'A ball')], after: T('Цэнхэр хадаг нь тэнгэр, хүндэтгэлийг бэлгэддэг.', 'The blue khadag symbolises the sky and respect.') },
+        { type: 'tf', answer: true, title: T('Зөв үү, буруу юу?', 'True or false?'), text: T('Золгохдоо залуу хүн ахмадын тохойг доороос нь түшдэг.', 'When greeting, the younger person supports the elder’s elbows from below.'), after: T('Энэ нь ахмадаа түших, хүндлэхийн бэлгэдэл.', 'It shows that you support and respect your elder.') },
+      ],
+      family: { say: T('“Ээж, аав аа, хамтдаа бууз чимхэцгээе!”', '“Mom, Dad, let’s make buuz together!”'), what: T('Гэр бүлээрээ бууз чимхэж, золгох дадлага хийх', 'Make buuz together and practise the greeting'),
+        materials: [T('Гурил, мах (том хүнтэй)', 'Flour and meat (with a grown-up)'), T('Хадаг', 'A khadag')],
+        steps: [T('Том хүнтэй хамт гурилаа зуурч, махаа бэлдэнэ.', 'With a grown-up, make the dough and filling.'), T('Хүн бүр бууз чимхэж үзнэ.', 'Everyone tries pinching buuz.'), T('Хадаг барьж, ахмадын тохойг доороос түшиж золгох дадлага хийнэ.', 'Practise the greeting: offer the khadag and support the elder’s elbows.'), T('Ахмадаасаа хуучин Цагаан сарын дурсамжийг асуугаарай.', 'Ask your elders about Tsagaan Sar when they were young.')] },
+    },
+    {
+      id: 'khuur', icon: '🎻', scene: 'khuur', topic: 'arts', color: '#7d57c4', final: { lit: 1 },
+      title: T('Морин хуур ба уртын дуу', 'Morin khuur & long song'),
+      learned: [T('Морин хуур хоёр утастай, морин толгойтой', 'The morin khuur has two strings and a horse head'), T('Хөөрхөн Намжилын домог', 'The legend of Khökhöö Namjil'), T('Уртын дуу, хөөмий, биелгээ, ёохор', 'Long song, khöömii, biyelgee and yokhor')],
+      desc: T('Хөөрхөн Намжилын домог, морин хуур, уртын дуу, хөөмий, ардын бүжиг.', 'The legend of Khökhöö Namjil, the horsehead fiddle, long song, throat singing and folk dance.'),
+      steps: [
+        { type: 'story', title: T('Хөөрхөн Намжилын домог', 'The legend of Khökhöö Namjil'), text: T('Эрт урьд цагт Хөөрхөн Намжил гэдэг залуу жигүүртэй хурдан морьтой байжээ. Морь нь үхэхэд Намжил ихэд гунигласан бөгөөд хайртай морио дурсан, түүний толгойн дүрсээр анхны морин хуурыг урласан гэдэг.', 'Long ago a young man named Khökhöö Namjil had a swift, winged horse. When the horse died, Namjil grieved, and carved the first morin khuur in its memory, with a horse’s head.') },
+        { type: 'pick', title: T('Асуулт', 'Question'), text: T('Морин хуурын толгой ямар дүрстэй вэ?', 'What shape is the head of the morin khuur?'), options: [O('Морь', 'A horse', 1), O('Луу', 'A dragon'), O('Арслан', 'A lion')] },
+        { type: 'pick', title: T('Утас', 'Strings'), text: T('Морин хуур хэдэн утастай вэ?', 'How many strings does the morin khuur have?'), options: [O('2', '2', 1), O('4', '4'), O('6', '6')], after: T('Хоёр утсыг адууны сүүлний үсээр хийдэг уламжлалтай.', 'Traditionally the two strings are made of horsetail hair.') },
+        { type: 'tap', n: 6, field: 'lit', scale: 1, tone: true, label: T('Нумаа татах', 'Draw the bow'), title: T('Хуураа хөгжимдье!', 'Let’s play!'), text: T('6 удаа нумаа татаж аялгуу тоглоорой.', 'Draw the bow 6 times to play a tune.'), after: T('Морин хуурын дууг “талын салхи”, “морины янцгаалах” дуутай зүйрлэдэг.', 'The fiddle’s sound is compared to the steppe wind and a horse’s neigh.') },
+        { type: 'pick', title: T('Уртын дуу', 'Long song'), text: T('Уртын дууны онцлог юу вэ?', 'What is special about the long song?'), options: [O('Удаан, сунжирсан аялгуутай', 'Slow, long-stretched notes', 1), O('Маш хурдан', 'Very fast'), O('Үггүй', 'No words at all')] },
+        { type: 'pick', title: T('Хөөмий', 'Khöömii'), text: T('Нэг хүн нэгэн зэрэг хоёр дуу авиа гаргадаг урлагийг юу гэдэг вэ?', 'What is the art of singing two sounds at once called?'), options: [O('Хөөмий', 'Khöömii', 1), O('Биелгээ', 'Biyelgee'), O('Ёохор', 'Yokhor')] },
+        { type: 'tf', answer: true, title: T('Зөв үү, буруу юу?', 'True or false?'), text: T('Морин хуур, уртын дуу, хөөмий ЮНЕСКО-гийн биет бус өвд бүртгэлтэй.', 'The morin khuur, long song and khöömii are on UNESCO’s intangible heritage list.'), after: T('Монголын соёлын өв дэлхийд хүлээн зөвшөөрөгдсөн.', 'Mongolian heritage is recognised around the world.') },
+        { type: 'learn', title: T('Ардын бүжиг', 'Folk dance'), text: T('Баруун Монголын биелгээг голдуу дээд биеэрээ бүжиглэдэг тул гэрийн бага зайд ч болдог. Буриадын ёохорыг гар гараасаа барьж тойрон бүжиглэдэг.', 'Western Mongolia’s biyelgee uses mostly the upper body, so it fits inside a ger. The Buryat yokhor is danced holding hands in a circle.') },
+      ],
+      family: { say: T('“Ээж, аав аа, хамтдаа уртын дуу сонсъё!”', '“Mom, Dad, let’s listen to a long song together!”'), what: T('Гэр бүлээрээ монгол хөгжим сонсох, бүжиглэх', 'Listen to Mongolian music and dance together'),
+        materials: [T('Утас эсвэл радио', 'A phone or radio'), T('Гэр бүлийн гишүүд', 'Your family')],
+        steps: [T('Морин хуурын аялгуу, уртын дуу хамтдаа сонсоорой.', 'Listen to morin khuur music and a long song together.'), T('Өвөө, эмээгээсээ мэддэг дууг нь заалгаарай.', 'Ask your grandparents to teach you a song they know.'), T('Гар гараасаа барьж ёохор шиг тойрон бүжиглээрэй.', 'Hold hands and dance in a circle like the yokhor.')] },
+    },
+    {
+      id: 'shagai', icon: '🦴', scene: 'shagai', topic: 'naadam', color: '#c98a4b', final: { sides: ['horse', 'camel', 'sheep', 'goat'] },
+      title: T('Шагай наадам', 'Shagai games'),
+      learned: [T('Шагай 4 талтай: морь, тэмээ, хонь, ямаа', 'A shagai has 4 sides: horse, camel, sheep, goat'), T('Шагайгаар морь уралдуулах тоглоом', 'The shagai horse-race game'), T('Шагай харваа 2014 онд ЮНЕСКО-д бүртгэгдсэн', 'Knucklebone shooting was listed by UNESCO in 2014')],
+      desc: T('Шагай хаяж, морь уралдуулж, урт өвлийн оройн тоглоомуудыг сур.', 'Roll knucklebones, race horses and learn the games of long winter evenings.'),
+      steps: [
+        { type: 'learn', set: { sides: [] }, title: T('Шагай гэж юу вэ?', 'What is shagai?'), text: T('Шагай бол хонины шагай. Хаяхад морь, тэмээ, хонь, ямаа гэсэн 4 талын нэгээр нь буудаг.', 'Shagai are sheep anklebones. When thrown, each lands on one of 4 sides: horse, camel, sheep or goat.') },
+        { type: 'tap', n: 4, roll: true, label: T('Шагай хаях', 'Throw a shagai'), title: T('Шагайгаа хая!', 'Throw the bones!'), text: T('4 удаа дарж дөрвөн шагайгаа хаяарай.', 'Tap 4 times to throw four shagai.'), after: T('Аль талаар нь буусныг харж тоолоорой!', 'See which side each one landed on!') },
+        { type: 'pick', title: T('Асуулт', 'Question'), text: T('Шагай хэдэн талтай вэ?', 'How many sides does a shagai have?'), options: [O('4', '4', 1), O('2', '2'), O('6', '6')] },
+        { type: 'pick', title: T('Морь уралдуулах', 'Horse race game'), text: T('“Морь уралдуулах” тоглоомд ямар тал буувал морио урагшлуулдаг вэ?', 'In the horse-race game, which side moves your horse forward?'), options: [O('Морь', 'Horse', 1), O('Ямаа', 'Goat'), O('Тэмээ', 'Camel')], after: T('Хэдэн морь буусан тоогоор шагайн морио урагшлуулна.', 'You move your shagai horse forward by the number of horse sides rolled.') },
+        { type: 'pick', title: T('Шагай харваа', 'Knucklebone shooting'), text: T('Шагай харвааг хэрхэн тоглодог вэ?', 'How is knucklebone shooting played?'), options: [O('Шагайн сумыг няслан шагайн бай онох', 'Flick a small piece to hit a target of shagai', 1), O('Шагайг усанд шидэх', 'Throw shagai into water'), O('Шагайг өнхрүүлж гүйх', 'Roll shagai and run')] },
+        { type: 'tf', answer: true, title: T('Зөв үү, буруу юу?', 'True or false?'), text: T('Шагай харваа ЮНЕСКО-гийн биет бус өвд бүртгэлтэй.', 'Knucklebone shooting is on UNESCO’s intangible heritage list.'), after: T('2014 онд бүртгэгдсэн.', 'It was listed in 2014.') },
+        { type: 'learn', title: T('Өвлийн оройн тоглоом', 'Winter evening games'), text: T('Урт өвлийн оройгоор гэр бүлээрээ шагай тоглож, тоо тоолж, хурдан сэтгэж сурдаг.', 'On long winter evenings families play shagai, learning to count and think fast.') },
+      ],
+      family: { say: T('“Ээж, аав аа, шагайгаар морь уралдуулъя!”', '“Mom, Dad, let’s race shagai horses!”'), what: T('Гэр бүлээрээ шагай тоглох', 'Play shagai as a family'),
+        materials: [T('4 шагай (эсвэл 4 талыг зурсан цаасан шоо)', '4 shagai (or paper cubes with the 4 sides drawn)'), T('Морь болгох жижиг юм (товч, чулуу)', 'Small tokens as horses (buttons, pebbles)')],
+        steps: [T('Хүн бүр нэг “морь” сонгоно.', 'Everyone picks a “horse” token.'), T('Ээлжлэн 4 шагай хаяна.', 'Take turns throwing the 4 shagai.'), T('Хэдэн морь буусан тоогоор морио урагшлуулна.', 'Move forward by the number of horse sides.'), T('Барианд хамгийн түрүүнд хүрсэн нь ялна!', 'First to the finish wins!')] },
+    },
+    {
+      id: 'naadam', icon: '🏆', scene: 'naadam', topic: 'naadam', color: '#e9a91f', final: {},
+      title: T('Эрийн гурван наадам', 'The three manly games'),
+      learned: [T('Наадам: бөх, морь уралдаан, сур харваа', 'Naadam: wrestling, horse racing, archery'), T('Ялсан бөх гарьдын бүжиг хийдэг', 'Winning wrestlers do the eagle dance'), T('Түрүү морийг айргаар цацаж, харвааны шүүгчид “уухай” гэдэг', 'The winning horse is blessed with airag; archery judges sing “uukhai”')],
+      desc: T('Бөх, морь уралдаан, сур харвааны ёс заншил, сонирхолтой баримтууд.', 'The customs and fun facts of wrestling, horse racing and archery.'),
+      steps: [
+        { type: 'learn', set: { focus: null }, title: T('Улсын баяр наадам', 'The national Naadam'), text: T('Жил бүр 7-р сарын 11–13-нд эрийн гурван наадам болдог: бөх, морь уралдаан, сур харваа.', 'Every year on July 11–13 the three manly games take place: wrestling, horse racing and archery.') },
+        { type: 'pick', set: { focus: 'bokh' }, title: T('Бөх', 'Wrestling'), text: T('Монгол бөх юу өмсдөг вэ?', 'What do Mongolian wrestlers wear?'), options: [O('Зодог, шуудаг, гутал', 'Zodog, shuudag and gutal boots', 1), O('Цамц, өмд', 'A shirt and trousers'), O('Дээл, малгай', 'A deel and hat')] },
+        { type: 'pick', set: { focus: 'bokh' }, title: T('Бөх', 'Wrestling'), text: T('Ялсан бөх ямар бүжиг хийдэг вэ?', 'What dance does the winner do?'), options: [O('Гарьдын (шонхорын) бүжиг', 'The eagle dance', 1), O('Ёохор', 'Yokhor'), O('Вальс', 'Waltz')] },
+        { type: 'pick', set: { focus: 'horse' }, title: T('Морь уралдаан', 'Horse racing'), text: T('Наадмын морь уралдаанд хэн унадаг вэ?', 'Who rides in Naadam horse races?'), options: [O('Хүүхэд унаачид', 'Child jockeys', 1), O('Өвөө нар', 'Grandfathers'), O('Бөхчүүд', 'Wrestlers')] },
+        { type: 'pick', set: { focus: 'horse' }, title: T('Түрүү морь', 'The winning horse'), text: T('Түрүүлсэн морийг юугаар цацаж ерөөдөг вэ?', 'What is sprinkled on the winning horse as a blessing?'), options: [O('Айраг', 'Airag', 1), O('Ус', 'Water'), O('Элс', 'Sand')] },
+        { type: 'pick', set: { focus: 'archer' }, title: T('Сур харваа', 'Archery'), text: T('Бай онох бүрт шүүгчид юу гэж дуулдаг вэ?', 'What do the judges sing at every hit?'), options: [O('Уухай!', 'Uukhai!', 1), O('Чү!', 'Chü!'), O('Баяртай!', 'Goodbye!')] },
+        { type: 'tf', set: { focus: null }, answer: true, title: T('Зөв үү, буруу юу?', 'True or false?'), text: T('Наадам 2010 онд ЮНЕСКО-д бүртгэгдсэн.', 'Naadam was listed by UNESCO in 2010.'), after: T('Наадмыг дэлхий нийт хүндэлдэг.', 'Naadam is honoured around the world.') },
+        { type: 'learn', title: T('Нутагт туршаад үз!', 'Try it in Nutag!'), text: T('Нутгийн Наадмын талбайд бөх барилдаж, морины уяанаас уралдаж, сурын талбайд харваарай!', 'Wrestle at the arena, race from the horse line and shoot at the archery range in Nutag!') },
+      ],
+      family: { say: T('“Ээж, аав аа, гэртээ жижиг наадам хийцгээе!”', '“Mom, Dad, let’s hold a little Naadam at home!”'), what: T('Гэр бүлийн жижиг наадам', 'A family mini-Naadam'),
+        materials: [T('Олс эсвэл алчуур', 'A rope or towel'), T('Цаасан бай, зөөлөн бөмбөг', 'A paper target and a soft ball')],
+        steps: [T('“Бөх”: олс таталтаар хүчээ үзнэ.', '“Wrestling”: a tug-of-war.'), T('“Морь”: гэрийн гадаа уралдаж гүйнэ.', '“Horse race”: a running race outside.'), T('“Сур”: зөөлөн бөмбөгөөр цаасан бай онооно.', '“Archery”: hit a paper target with a soft ball.'), T('Ялагч гарьдын бүжиг хийнэ, бусад нь “Уухай!” гэнэ.', 'The winner does the eagle dance; everyone else shouts “Uukhai!”')] },
+    },
   ];
 
   const progress = (id) => { const p = S.active(); if (!p) return {}; p.learn = p.learn || {}; return (p.learn[id] = p.learn[id] || {}); };
@@ -130,7 +223,7 @@
     if (onClick) c.addEventListener('pointerdown', (e) => { const r = c.getBoundingClientRect(); onClick((e.clientX - r.left) / r.width * SC.W, (e.clientY - r.top) / r.height * SC.H); });
     return { el: c, st, stop: () => cancelAnimationFrame(raf) };
   }
-  TG.learn.thumb = (l) => { const st = { ...l.final, sub: 1 }; const c = h('canvas', { class: 'l-thumb', width: SC.W, height: SC.H }); const x = c.getContext('2d'); SC[l.scene](x, st, 2); return c; };
+  TG.learn.thumb = (l) => { const st = { sub: 1, ...l.final }; const c = h('canvas', { class: 'l-thumb', width: SC.W, height: SC.H }); const x = c.getContext('2d'); SC[l.scene](x, st, 2); return c; };
 
   /** Real-life family activity card (also shown on the screen-break reminder). */
   TG.learn.familyCard = (l, onDone) => {
@@ -169,6 +262,10 @@
       h('section', { class: 'l-hero px-card' }, TG.basar.face(0, 72),
         h('div', null, h('div', { class: 'eyebrow' }, L('Өв соёлын сургууль', 'Heritage school')), h('h1', null, L('Хамтдаа сурцгаая!', 'Let’s learn together!')),
           h('p', null, L('Тоглоод сур, сурснаа гэр бүлтэйгээ бодит амьдрал дээр хий.', 'Learn by playing, then do it for real with your family.')))),
+      h('div', { class: 'hub-row' },
+        h('button', { class: 'hub-card px-card', onclick: () => TG.go('passport') }, h('span', null, '🛂'), h('b', null, L('Аймгийн паспорт', 'Aimag passport')), h('small', null, L(`${TG.passport.stamps(p)}/22 тамга`, `${TG.passport.stamps(p)}/22 stamps`))),
+        h('button', { class: 'hub-card px-card', onclick: () => TG.go('tree') }, h('span', null, '🌳'), h('b', null, L('Ургийн мод', 'Family tree')), h('small', null, `⭐ ${TG.familyTree.filled(p)}/12`)),
+        h('button', { class: 'hub-card px-card', onclick: () => TG.seasons.open() }, h('span', null, TG.seasons.current().icon), h('b', null, tx(TG.seasons.current().name)), h('small', null, L('Улирлын тухай', 'About the season')))),
       h('div', { class: 'l-grid' }, LESSONS.map(card)),
       h('section', { class: 'px-card l-quizcard' },
         h('h2', null, '🎯 ', L('Басарын асуулт хариулт', 'Basar’s quiz')),
@@ -205,6 +302,7 @@
       if (i >= l.steps.length) return quiz();
       const s = l.steps[i];
       if (s.ch) st.ch = s.ch; st.broken = !!s.broken;
+      if (s.set) Object.assign(st, JSON.parse(JSON.stringify(s.set)));
       if (s.stage !== undefined && s.type !== 'pick' && s.type !== 'zones' && s.type !== 'tf') { st.stage = s.stage; st.sub = s.type === 'tap' || s.type === 'hold' || s.type === 'timing' ? 0 : 1; }
       else if (s.type === 'pick' && s.stage !== undefined) { st.stage = s.stage - 1; st.sub = 1; }
       pr.step = Math.max(pr.step || 0, i); S.save();
@@ -238,7 +336,9 @@
       if (s.type === 'tap') {
         let n = 0;
         const btn = h('button', { class: 'btn primary big block l-tap', onclick: () => {
-          if (n >= s.n) return; n++; st.sub = n / s.n; TG.sfx.tap(); TG.buzz && TG.buzz(10);
+          if (n >= s.n) return; n++; st.sub = s.field && s.field !== 'sub' ? st.sub : n / s.n; if (s.field) st[s.field] = (n / s.n) * (s.scale || 1);
+          if (s.roll) st.sides = [...(st.sides || []), TG.pick(['horse', 'camel', 'sheep', 'goat'])].slice(-4);
+          s.tone ? (TG.sfx.chime && TG.sfx.chime()) : TG.sfx.tap(); TG.buzz && TG.buzz(10);
           btn.querySelector('small').textContent = `${n} / ${s.n}`;
           if (n >= s.n) { btn.disabled = true; out.replaceChildren(...[success(s), nextBtn()].filter(Boolean)); }
         } }, tx(s.label), h('small', null, `0 / ${s.n}`));
