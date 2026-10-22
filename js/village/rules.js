@@ -42,7 +42,7 @@
   const EMOTES = ['👋', '❤️', '😂', '🎉', '👍', '🌱', '😮', '⭐'];
 
   const SKINS = ['#F6D3B3', '#EDBB93', '#D9A06E', '#B97A4A'];
-  const DEELS = { blue: '#2F6BFF', red: '#E8453C', green: '#12A05F', purple: '#7A5AF8', pink: '#F06CA8', gold: '#E0A21A' };
+  const DEELS = { blue: '#2F6BFF', red: '#E8453C', green: '#12A05F', purple: '#7A5AF8', pink: '#F06CA8', gold: '#E0A21A', teal: '#1FA3A3', brown: '#8A5A33', white: '#F2EEE4', black: '#2D2A33' };
   const TITLES = [
     { id: 'nachin', name: T('Начин', 'Falcon'), need: 5, fact: T('Начин (шонхор) цол Улсын наадамд 5 давж авдаг.', 'The Nachin (falcon) title is earned by winning 5 rounds at the State Naadam.') },
     { id: 'khartsaga', name: T('Харцага', 'Hawk'), need: 6, fact: T('Харцага (хартсага шувуу) цол 6 давсан бөхөд олгогддог.', 'The Khartsaga (hawk) title goes to a wrestler who wins 6 rounds.') },
@@ -51,14 +51,22 @@
     { id: 'arslan', name: T('Арслан', 'Lion'), need: 9, fact: T('Наадамд түрүүлсэн бөх Арслан цол хүртэнэ.', 'The wrestler who wins the whole Naadam becomes an Arslan (lion).') },
     { id: 'avarga', name: T('Аварга', 'Titan'), need: 10, fact: T('Хоёр удаа түрүүлсэн Арслан Аварга цол хүртдэг. Монголын хамгийн дээд бөхийн цол!', 'An Arslan who wins twice becomes an Avarga (titan), the highest wrestling title in Mongolia!') },
   ];
-  // wrestling moves: each beats one other (push > pull > hook > push); timing power can turn a bad match-up
+  // Wrestling techniques (мэх). Seven real бөх techniques in a circle: each one beats the next three
+  // and loses to the three before it, so there is always a counter. Timing power can still turn a bad match-up.
+  const M = (id, mn, en, fmn, fen) => ({ id, name: T(mn, en), fact: T(fmn, fen) });
   const MOVES = [
-    { id: 'push', name: T('Түлхэх', 'Push'), beats: 'pull' },
-    { id: 'pull', name: T('Татах', 'Pull'), beats: 'hook' },
-    { id: 'hook', name: T('Дэгээдэх', 'Hook'), beats: 'push' },
+    M('push', 'Түлхэх', 'Push', 'Өрсөлдөгчөө мөрөөрөө түлхэж тэнцвэрийг нь алдагдуулна.', 'Drive into your opponent with your shoulder to break their balance.'),
+    M('pull', 'Татах', 'Pull', 'Зодгоос нь татаж урагш унагана.', 'Pull them by the zodog so they fall forward.'),
+    M('hook', 'Гадуур дэгээ', 'Outside hook', 'Хөлөө өрсөлдөгчийн хөлийн гадуур дэгээдэж унагадаг.', 'Hook your leg around the outside of theirs and trip them.'),
+    M('inhook', 'Дотуур дэгээ', 'Inside hook', 'Хөлийн дотуур дэгээдэж хойш нь унагадаг мэх.', 'Hook the inside of their leg to topple them backwards.'),
+    M('hip', 'Ташаадах', 'Hip throw', 'Өрсөлдөгчөө ташаан дээгүүрээ эргүүлэн шиддэг.', 'Turn and throw them over your hip.'),
+    M('leg', 'Хөл шүүрэх', 'Leg grab', 'Бөхийн хөлийг шүүрэн авч өргөөд унагадаг.', 'Grab their leg, lift it and bring them down.'),
+    M('lift', 'Өргөж хаях', 'Lift and throw', 'Хамгийн хүчтэй мэх: өрсөлдөгчөө газраас өргөөд хаядаг.', 'The strongest move: lift them off the ground and throw.'),
   ];
+  MOVES.forEach((m, i) => { m.beats = [1, 2, 3].map((k) => MOVES[(i + k) % MOVES.length].id); });
+  const beats = (x, y) => { const m = MOVES.find((q) => q.id === x); return !!m && m.beats.includes(y); };
   function exchange(ma, pa, mb, pb) {
-    const base = (x, y) => (x === y ? 0.3 : (MOVES.find((m) => m.id === x) || {}).beats === y ? 0.6 : 0);
+    const base = (x, y) => (x === y ? 0.3 : beats(x, y) ? 0.6 : 0);
     const A = base(ma, mb) + 0.8 * Math.max(0, Math.min(1, pa || 0)), B = base(mb, ma) + 0.8 * Math.max(0, Math.min(1, pb || 0));
     return Math.abs(A - B) < 0.04 ? 0 : A > B ? 1 : -1;
   }
@@ -75,10 +83,12 @@
   ];
   const LOOKS = {
     title: TITLES.map((t) => t.id),
-    hat: ['mongol', 'flower', 'cap', 'loovuuz', 'crown'],
+    hat: ['mongol', 'flower', 'cap', 'loovuuz', 'crown', 'kazakh', 'buriad', 'oirat', 'fur'],
     face: ['glasses', 'sun'],
     neck: ['scarf', 'khadag', 'medal'],
     pet: ['lamb', 'puppy', 'kitten', 'camel', 'foal'],
+    ride: ['horse'],
+    coat: ['bay', 'black', 'white', 'chestnut', 'gray'],
   };
 
   // Shop catalogue (seeds are generated from CROPS).
@@ -162,5 +172,5 @@
     return out;
   }
 
-  return { W, H, PLOTS, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, exchange, titleFor, ROOF, DOOR, FURNITURE, CROPS, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, normalize, needsWater, mature, stageLeft, applyAction, level, cleanLook, now };
+  return { W, H, PLOTS, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, CROPS, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, normalize, needsWater, mature, stageLeft, applyAction, level, cleanLook, now };
 });

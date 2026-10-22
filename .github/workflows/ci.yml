@@ -29,19 +29,22 @@ jobs:
 
       - name: JavaScript syntax
         run: |
-          for f in $(find js -name '*.js') sw.js server.js; do node --check "$f"; done
+          for f in $(find js -name '*.js') sw.js server.js basar-ai.js; do node --check "$f"; done
           echo "All JavaScript files parse."
 
       - name: Every referenced file exists and is cached offline
         run: node tests/check-assets.mjs
 
-      - name: Browser smoke test (every game and puzzle level)
+      - name: Browser smoke test (register, Нутаг, Basar, every lesson)
         run: |
           npm install --no-save --no-package-lock --silent puppeteer-core@22.15.0
           node tests/smoke.mjs
 
       - name: Multiplayer test (two players in the village)
         run: node tests/multiplayer.mjs
+
+      - name: Basar AI bridge test (fake Claude API, no real key needed)
+        run: node tests/basar-api.mjs
 
   pages-status:
     name: Is GitHub Pages enabled?

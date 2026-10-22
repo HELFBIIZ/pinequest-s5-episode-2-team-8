@@ -29,17 +29,19 @@
   rect(27, 14, 27, 18, 'p');
   // ger neighborhood (south): 8 lots along a lane
   const LOT_X = [3, 7, 11, 21, 25, 29, 33, 37];
-  rect(2, 31, 40, 32, 'p');
+  rect(2, 31, 42, 32, 'p');
+  rect(41, 14, 42, 32, 'p'); // east road: closes the loop around town (used by the horse race)
   // decorative pond in the south meadow
   for (let y = 33; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (((x + 0.5 - 30.5) / 4.2) ** 2 + ((y + 0.5 - 35.8) / 2.2) ** 2 <= 1) set(x, y, 'w');
   // Naadam wrestling arena (east): sand ring, reached from the main road
   const ARENA = { cx: 47.5, cy: 12.5, rx: 6, ry: 4.6 };
   for (let y = 2; y < H - 1; y++) for (let x = 36; x < W - 1; x++) if (((x + 0.5 - ARENA.cx) / ARENA.rx) ** 2 + ((y + 0.5 - ARENA.cy) / ARENA.ry) ** 2 <= 1) set(x, y, 'a');
   rect(46, 18, 47, 24, 'p');
+  rect(48, 20, 50, 20, 'p'); // lane to the Mongol script academy
 
   const objects = [
     { id: 'home', kind: 'ger', x: 3, y: 3, w: 3, h: 3, door: { x: 4, y: 6 }, accent: '#2F6BFF', sign: '🏠' },
-    { id: 'arcade', kind: 'ger', x: 10, y: 3, w: 3, h: 3, door: { x: 11, y: 6 }, accent: '#7A5AF8', sign: '🎮' },
+    { id: 'arcade', kind: 'ger', x: 10, y: 3, w: 3, h: 3, door: { x: 11, y: 6 }, accent: '#E9A91F', sign: '📚' },
     { id: 'shop', kind: 'shop', x: 21, y: 8, w: 4, h: 3, door: { x: 22, y: 11 } },
     { id: 'board', kind: 'board', x: 19, y: 10, w: 2, h: 1, door: { x: 19, y: 11 } },
     { id: 'well', kind: 'well', x: 12, y: 17, w: 1, h: 1, door: { x: 12, y: 18 } },
@@ -49,6 +51,17 @@
     { id: 'bleachers', kind: 'bleachers', x: 42, y: 5, w: 12, h: 2 },
     { id: 'zasuul', kind: 'npc', x: 47, y: 8, w: 1, h: 1, door: { x: 47, y: 9 } },
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
+    { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
+    { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
+    { id: 'academy', kind: 'academy', x: 49, y: 17, w: 4, h: 3, door: { x: 50, y: 20 } }, // Mongol script academy
+    { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
+    // townspeople with quests (see NPCS in village.js)
+    { id: 'herder', kind: 'npcq', x: 25, y: 16, w: 1, h: 1, door: { x: 25, y: 17 } },
+    { id: 'fisher', kind: 'npcq', x: 23, y: 6, w: 1, h: 1, door: { x: 23, y: 7 } },
+    { id: 'farmer', kind: 'npcq', x: 12, y: 14, w: 1, h: 1, door: { x: 12, y: 13 } },
+    { id: 'teacher', kind: 'npcq', x: 13, y: 6, w: 1, h: 1, door: { x: 13, y: 7 } },
+    { id: 'trainer', kind: 'npcq', x: 38, y: 15, w: 1, h: 1, door: { x: 38, y: 16 } },
+    { id: 'archer', kind: 'npcq', x: 44, y: 32, w: 1, h: 1, door: { x: 44, y: 31 } },
     { id: 'lantern4', kind: 'lantern', x: 40, y: 11, w: 1, h: 1 },
     { id: 'lantern5', kind: 'lantern', x: 40, y: 14, w: 1, h: 1 },
     ...LOT_X.map((x, i) => ({ id: 'lot' + i, kind: 'lot', i, x, y: 28, w: 3, h: 3, door: { x: x + 1, y: 31 } })),
@@ -57,12 +70,17 @@
   const occ = {};
   for (const o of objects) for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) { set(x, y, 'B'); occ[x + ',' + y] = o; }
   const DOCK = { x: 26, y: 5 };
+  // Horse race: from the Naadam arena west along the main road, south down the long road, east to the finish by the gers
+  // points are in feet coordinates (tile units, centre of the two-tile-wide roads)
+  const RACE = [{ x: 50, y: 13 }, { x: 34, y: 13 }, { x: 18, y: 13 }, { x: 18, y: 22 }, { x: 18, y: 32 }, { x: 28, y: 32 }, { x: 39.5, y: 32 }];
+  // Naadam race loop around town (one lap ≈ 86 tiles): start line on the main road, east road, south lane, west road
+  const LAP = [{ x: 30, y: 13 }, { x: 42, y: 13 }, { x: 42, y: 22 }, { x: 42, y: 32 }, { x: 30, y: 32 }, { x: 18, y: 32 }, { x: 18, y: 22 }, { x: 18, y: 13 }];
 
   // trees, flowers, rocks
   const trees = [], flowers = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y][x] === 'T') trees.push({ x, y, pine: hash(x, y) > 0.7 });
   const clearAround = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const c = (g[y + dy] || [])[x + dx]; if (c && c !== 'g' && c !== 'T') return false; } return true; };
-  const reserved = (x, y) => (x >= 13 && x <= 22 && y >= 9 && y <= 16) || (y >= 2 && y <= 7 && x >= 2 && x <= 14) || (x >= 22 && x <= 33 && y >= 18 && y <= 25) || (x >= 3 && x <= 14 && y >= 14 && y <= 24) || (x >= 38 && y >= 3 && y <= 19) || (x >= 1 && x <= 41 && y >= 26 && y <= 33) || (x >= 43 && x <= 50 && y >= 22 && y <= 28);
+  const reserved = (x, y) => (x >= 13 && x <= 22 && y >= 9 && y <= 16) || (y >= 2 && y <= 7 && x >= 2 && x <= 14) || (x >= 22 && x <= 33 && y >= 18 && y <= 25) || (x >= 3 && x <= 14 && y >= 14 && y <= 24) || (x >= 38 && y >= 3 && y <= 19) || (x >= 1 && x <= 41 && y >= 26 && y <= 33) || (x >= 43 && x <= 50 && y >= 22 && y <= 28) || (x >= 43 && x <= 54 && y >= 30 && y <= 37);
   for (let y = 2; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
     if (g[y][x] !== 'g' || reserved(x, y) || !clearAround(x, y)) continue;
     const r = rnd();
@@ -107,7 +125,7 @@
   }
 
   // drawing lives in pixel.js (16-pixel tiles, pure pixel art)
-  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, lots, blocked, plotAt, findPath, nearestOpen, hash };
+  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, RACE, LAP, lots, blocked, plotAt, findPath, nearestOpen, hash };
   api.renderStatic = () => TG.pixel.renderStatic(api);
   TG.vworld = api;
 })(window.TG);
