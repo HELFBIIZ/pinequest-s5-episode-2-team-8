@@ -17,6 +17,7 @@
       const j = await r.json();
       tracks = (j.tracks || []).filter((t) => t && typeof t.file === 'string' && /^[\w.\- ()]+\.(mp3|ogg|m4a|wav)$/i.test(t.file));
     } catch (e) { tracks = []; }
+    if (!tracks.length) loaded = false; // e.g. the server was off: try again on the next tap instead of staying silent
     order = tracks.map((_, i) => i).sort(() => Math.random() - 0.5);
     emit();
     return tracks.length > 0;
