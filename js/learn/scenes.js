@@ -92,10 +92,19 @@
       if (s === 5) { x.fillStyle = `rgba(20,24,70,${0.55 * (1 - Math.abs(q * 2 - 1))})`; x.fillRect(0, 0, W, H); if (q > 0.2 && q < 0.8) { blob(x, 20, 12, 4, 4, '#fff3c4', '#e6d8a0'); } }
     } else if (s === 6) {
       R(x, 40, 56, 40, 4, K.woodD); const sq = Math.min(5, Math.round(5 * q + pull * 1.5));
+      if (st.molding) {   // a carved wooden mould: push the curd into each hole by hand, a patterned piece forms
+        const k = Math.round((st.mold || 0) * 3);
+        for (let i = 0; i < 3; i++) {
+          const mx = 44 + i * 11; R(x, mx, 44, 10, 11, K.out); R(x, mx + 1, 45, 8, 9, K.woodD); R(x, mx + 2, 46, 6, 7, i < k ? '#f3e6c4' : '#5a3a20');
+          if (i < k) for (const [px, py] of [[4, 48], [3, 49], [5, 49], [4, 50], [4, 49]]) P(x, mx + px, py, '#d8c69c');
+        }
+        if (k < 3) { const cx0 = 49 + k * 11, dy = Math.round(pull * 6); blob(x, cx0, 40 + dy, 4, 3, '#f4efe3', '#b6a68a'); if (pull > 0) { R(x, cx0 - 5, 35 + dy, 11, 3, '#edbb93'); R(x, cx0 - 5, 35 + dy, 11, 1, '#c98a5a'); } }
+        if (since < 0.4) { P(x, 44 + (k - 1) * 11 + 1, 43, K.light); P(x, 44 + (k - 1) * 11 + 8, 43, K.light); }
+        return dog(x, 92, 46);
+      }
       blob(x, 60, 50 + Math.round(sq / 2), 12, 6 - Math.round(sq / 2), '#f4efe3', '#b6a68a');
-      if (st.cutting) { for (let i = 0; i < Math.round((st.cut || 0) * 5); i++) R(x, 50 + i * 4, 47, 1, 7, '#b6a68a'); if (since < 0.25) R(x, 44, 50, 32, 1, '#d8d8e0'); }
-      else { R(x, 46, 36 + sq, 28, 8, K.rock); R(x, 47, 37 + sq, 26, 2, K.rockL); }
-      if (!st.cutting && (since < 0.5 || (q > 0 && Math.floor(t * 6) % 2))) { P(x, 50, 61, K.light); P(x, 70, 62, K.light); if (since < 0.5) { P(x, 47, 58 + Math.floor(since * 8), K.light); P(x, 73, 58 + Math.floor(since * 8), K.light); } }
+      R(x, 46, 36 + sq, 28, 8, K.rock); R(x, 47, 37 + sq, 26, 2, K.rockL);
+      if (since < 0.5 || (q > 0 && Math.floor(t * 6) % 2)) { P(x, 50, 61, K.light); P(x, 70, 62, K.light); if (since < 0.5) { P(x, 47, 58 + Math.floor(since * 8), K.light); P(x, 73, 58 + Math.floor(since * 8), K.light); } }
     } else {
       R(x, 28, 44, 64, 3, K.woodD); R(x, 30, 47, 2, 16, K.woodD); R(x, 88, 47, 2, 16, K.woodD);
       for (let i = 0; i < 12; i++) { const ax = 32 + (i % 6) * 9, ay = 38 + Math.floor(i / 6) * 3; R(x, ax, ay, 6, 4, '#f3e6c4'); R(x, ax, ay + 3, 6, 1, '#d8c69c'); P(x, ax + 1, ay, '#ffffff'); }

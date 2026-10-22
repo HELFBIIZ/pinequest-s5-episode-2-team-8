@@ -60,9 +60,9 @@
         { type: 'tap', stage: 5, n: 4, label: T('Дулаан боох', 'Wrap warm'), title: T('6. Дулаан боож хонуул', '6. Wrap it warm overnight'), text: T('Савыг дээл, хөнжлөөр боож дулаан газар хонуулна.', 'Wrap the pot in a deel or blanket and leave it somewhere warm overnight.'), after: T('Өглөө боллоо — тараг бэлэн! 🌞', 'Morning — the yogurt is ready! 🌞') },
         { type: 'drag', stage: 6, dir: 'down', n: 4, icon: '🪨', label: T('Чулуугаар дарах', 'Press with the stone'), title: T('7. Ааруул хийцгээе', '7. Let’s make aaruul'),
           text: T('Тарагаа халааж ээдэм гаргаад даавуунд хийнэ. Дээр нь хавтгай чулуу тавиад доош нь дарж усыг нь шахаж гаргана.', 'Heat the yogurt until curds form and put them in a cloth. Lay a flat stone on top and press down to squeeze out the water.'), low: T('Хүчтэй дар!', 'Press harder!') },
-        { type: 'drag', dir: 'side', n: 5, field: 'cut', set: { cutting: true }, icon: '🔪', label: T('Хажуу тийш шудрах', 'Swipe sideways'), title: T('Ааруулаа хэрчинэ', 'Cut the aaruul'),
-          text: T('Шахсан ээдмээ утас эсвэл хутгаар жижиг хэсэг болгон хэрчинэ. Хажуу тийш шудар!', 'Cut the pressed curd into small pieces with a thread or a knife. Swipe sideways!'), low: T('Бүтэн шудраарай!', 'Swipe all the way!'),
-          after: T('Ааруулыг янз бүрийн хэлбэрээр хэрчдэг: дөрвөлжин, урт, хээтэй.', 'Aaruul is cut into all sorts of shapes: squares, sticks, patterned pieces.') },
+        { type: 'drag', dir: 'down', n: 3, field: 'mold', set: { molding: true }, icon: '👐', label: T('Хэвэнд дарах', 'Press into the mould'), title: T('Ааруулаа хэвэнд хийж дар', 'Press the aaruul into a mould'),
+          text: T('Шахсан ээдмээ модон хэвэнд хийгээд гараараа доош нь дарж хэлбэржүүлнэ. Хэвний нүх бүрийг дүүргээрэй!', 'Put the pressed curd into a wooden mould and push it down with your hands. Fill every hole!'), low: T('Хүчтэй дар!', 'Press harder!'),
+          after: T('Хэвний сийлсэн хээ ааруулан дээр тод гарна. Ааруулыг дөрвөлжин, дугуй, цэцэг хэлбэртэй хэвээр хийдэг.', 'The carved pattern shows on each piece. Aaruul moulds come in squares, circles and flower shapes.') },
         { type: 'pick', stage: 7, title: T('8. Ааруулаа хаана хатаах вэ?', '8. Where do we dry the aaruul?'), text: T('Хэрчсэн ааруулаа…', 'Cut the curd into pieces and…'),
           options: [O('Нар, салхинд', 'In the sun and wind', 1), O('Хөргөгчинд', 'In the fridge'), O('Усанд', 'In water')], after: T('Гэрийн дээвэр эсвэл тавиур дээр наранд хатаадаг. Хатуу, амттай ааруул бэлэн!', 'Dried on the ger roof or a rack in the sun. Crunchy aaruul is ready!') },
       ],
@@ -359,7 +359,7 @@
         return panel.replaceChildren(...head, btn, out);
       }
       if (s.type === 'drag') {
-        // a hand gesture: pull the teat down, lift the ladle high and let go, press the stone, swipe to cut
+        // a hand gesture: pull the udder down, lift the ladle high and let go, press the stone
         const LEN = 80, ARROW = { down: '⬇', up: '⬆', side: '⬅ ➡' };
         let n = 0, g = null, lastSide = null;
         const knob = h('i', { class: 'l-drag-knob' }, s.icon || '✋'), count = h('small', null, `0 / ${s.n}`);
