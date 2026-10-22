@@ -121,9 +121,14 @@
     const skyBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const spriteTex = new Map(), texOf = (canvas) => { if (!spriteTex.has(canvas)) spriteTex.set(canvas, texFrom(canvas)); return spriteTex.get(canvas); };
     const sunCanvas = (() => { const c = document.createElement('canvas'); c.width = c.height = 8; const x = c.getContext('2d'); x.fillStyle = '#fff6c8'; x.fillRect(0, 0, 8, 8); x.fillStyle = '#ffffff'; x.fillRect(2, 2, 4, 4); return c; })();
-    const snowing = (cfg.map && cfg.map.snow) || (TG.seasons && TG.seasons.current().id === 'winter');
-    const SKY = snowing ? { lo: [0.86, 0.9, 0.95], hi: [0.55, 0.68, 0.85] } : (cfg.map && cfg.map.desert) ? { lo: [0.93, 0.86, 0.72], hi: [0.36, 0.62, 0.92] } : { lo: [0.78, 0.88, 0.97], hi: [0.3, 0.56, 0.92] };
-    const FOG = SKY.lo, FAR = 150;
+    const moonCanvas = (() => { const c = document.createElement('canvas'); c.width = c.height = 8; const x = c.getContext('2d'); x.fillStyle = '#dfe6f5'; x.fillRect(1, 1, 6, 6); x.fillStyle = '#b9c3da'; x.fillRect(2, 3, 2, 2); x.fillRect(5, 5, 1, 1); return c; })();
+    // the same season and clock as the top view (cfg.season lets Нутаг pass the season it is showing)
+    const season = () => (cfg.season ? cfg.season() : TG.seasons && TG.seasons.current().id);
+    const isNight = () => !!(TG.seasons && TG.seasons.night && TG.seasons.night());
+    const snowing = (cfg.map && cfg.map.snow) || season() === 'winter';
+    const DAY = snowing ? { lo: [0.86, 0.9, 0.95], hi: [0.55, 0.68, 0.85] } : (cfg.map && cfg.map.desert) ? { lo: [0.93, 0.86, 0.72], hi: [0.36, 0.62, 0.92] } : { lo: [0.78, 0.88, 0.97], hi: [0.3, 0.56, 0.92] };
+    const NIGHT = { lo: [0.16, 0.18, 0.34], hi: [0.03, 0.04, 0.13] };
+    let SKY = DAY, FOG = SKY.lo; const FAR = 150;
 
     // the player (block units: x east, z south, y up)
     const [sx0, sz0] = toB(cfg.start.x, cfg.start.y);
@@ -234,6 +239,7 @@
     function render(t) {
       const asp = cv.width / cv.height, riding = cfg.riding && cfg.riding(), bob = P.ground ? Math.sin(P.bob * 2) * (riding ? 0.12 : 0.05) : 0;
       eye = [P.x, P.y + (riding ? 2.55 : 1.62) + bob, P.z];
+      SKY = isNight() ? NIGHT : DAY; FOG = SKY.lo;
       const fwd = [Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), -Math.cos(P.yaw) * Math.cos(P.pitch)];
       viewProj = mul(persp(P.fov, asp, 0.05, 260), lookAt(eye, [eye[0] + fwd[0], eye[1] + fwd[1], eye[2] + fwd[2]]));
       gl.viewport(0, 0, cv.width, cv.height);
@@ -243,9 +249,9 @@
       gl.uniform1f(gl.getUniformLocation(sky, 'u_h'), -Math.tan(P.pitch) / Math.tan(P.fov / 2)); gl.uniform3fv(gl.getUniformLocation(sky, 'u_lo'), SKY.lo); gl.uniform3fv(gl.getUniformLocation(sky, 'u_hi'), SKY.hi);
       gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf); const sp = gl.getAttribLocation(sky, 'a_p'); gl.enableVertexAttribArray(sp); gl.vertexAttribPointer(sp, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.disableVertexAttribArray(sp);
       gl.useProgram(prog); gl.enable(gl.DEPTH_TEST); gl.uniformMatrix4fv(U.mvp, false, viewProj); gl.uniform3fv(U.cam, eye); gl.uniform3fv(U.fog, FOG); gl.uniform1i(U.tex, 0); gl.activeTexture(gl.TEXTURE0);
-      // the sun, far away and unfogged
+      // the sun (or the moon at night), far away and unfogged
       gl.uniform2f(U.fr, 1e5, 2e5); gl.uniform1f(U.a, 1); gl.uniform3f(U.off, 0, 0, 0); gl.depthMask(false);
-      billboard(texOf(sunCanvas), eye[0] + 70, eye[1] + 95, eye[2] - 110, 16, 16, false, 1, true);
+      billboard(texOf(SKY === NIGHT ? moonCanvas : sunCanvas),eye[0] + 70, eye[1] + 95, eye[2] - 110, 16, 16, false, 1, true);
       gl.depthMask(true);
       // the land
       gl.uniform2f(U.fr, FAR * 0.38, FAR); gl.bindTexture(gl.TEXTURE_2D, atlasTex); gl.uniform1f(U.a, 1);
@@ -283,6 +289,12 @@
     }
     function overlay(t) { // crosshair, floating markers over people and places, what you're facing
       const x = hud.getContext('2d'), Wd = hud.width, Hd = hud.height; x.clearRect(0, 0, Wd, Hd);
+      // season tint and evening darkness, matching the top view
+      const sid = season();
+      if (sid === 'winter') { x.fillStyle = 'rgba(235,242,250,.16)'; x.fillRect(0, 0, Wd, Hd); }
+      else if (sid === 'autumn') { x.fillStyle = 'rgba(255,190,110,.14)'; x.fillRect(0, 0, Wd, Hd); }
+      else if (sid === 'spring') { x.fillStyle = 'rgba(255,200,230,.06)'; x.fillRect(0, 0, Wd, Hd); }
+      if (SKY === NIGHT) { x.fillStyle = 'rgba(18,22,70,.38)'; x.fillRect(0, 0, Wd, Hd); }
       if (cfg.riding && cfg.riding()) { // your horse’s neck, mane and ears in front of you, bobbing as it moves
         const u = Math.max(6, Math.round(Math.min(Wd, Hd) / 70)), bob = Math.round(Math.sin(P.bob * 2) * u), cxh = Wd / 2, by = Hd + u * 2 + bob;
         const coat = (cfg.horseCoat && cfg.horseCoat()) || '#8a5a33', dk = (cfg.horseMane && cfg.horseMane()) || '#2b1e14';
@@ -309,6 +321,13 @@
       }
       if (near) { x.font = `800 ${Math.round(14 * dpr)}px Rubik, sans-serif`; const label = near.label() + (coarse() ? '' : ' · E'), tw = x.measureText(label).width + 16 * dpr; x.fillStyle = 'rgba(43,30,46,.75)'; x.fillRect(cx - tw / 2, cy + 18 * dpr, tw, 24 * dpr); x.fillStyle = '#f7c646'; x.fillText(label, cx, cy + 35 * dpr); }
       if (snowing) { x.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 70; i++) { const fx = ((i * 97 + Math.sin(t + i) * 20 - P.yaw * 300) % Wd + Wd) % Wd, fy = ((i * 53 + t * (40 + (i % 5) * 12) * dpr) % Hd); x.fillRect(fx, fy, 2 * dpr, 2 * dpr); } }
+      else if (sid === 'autumn' || sid === 'spring') { // falling leaves or blossom petals, like the top view
+        const cols = sid === 'autumn' ? ['#e8752a', '#c9461e', '#f2b33d'] : ['#ffb7d5', '#ffffff', '#ff8fb1'], u = 2 * dpr;
+        for (let i = 0; i < 40; i++) { const fx = ((i * 97 + Math.sin(t * 0.8 + i) * 30 - P.yaw * 300) % Wd + Wd) % Wd, fy = ((i * 53 + t * (24 + (i % 4) * 8) * dpr) % Hd); x.fillStyle = cols[i % 3]; x.fillRect(fx, fy, sid === 'autumn' ? u * 2 : u, u); }
+      } else if (sid === 'summer' && Hd) { // butterflies fluttering low over the grass
+        for (let i = 0; i < 10; i++) { const fx = ((i * 131 + Math.sin(t * 0.8 + i) * 40 - P.yaw * 300) % Wd + Wd) % Wd, fy = Hd * (0.62 + ((i * 37) % 30) / 100) + Math.sin(t * 1.7 + i) * 10 * dpr, u = 2 * dpr, on = Math.floor(t * 6 + i) % 2;
+          x.fillStyle = '#ffffff'; x.fillRect(fx, fy, u, u); if (on) { x.fillStyle = i % 2 ? '#ffd34e' : '#b49cff'; x.fillRect(fx - u, fy, u, u); x.fillRect(fx + u, fy, u, u); } }
+      }
     }
     function project(wx, wy, wz) { const m = viewProj, Wd = hud.width, Hd = hud.height, X = m[0] * wx + m[4] * wy + m[8] * wz + m[12], Y = m[1] * wx + m[5] * wy + m[9] * wz + m[13], Wc = m[3] * wx + m[7] * wy + m[11] * wz + m[15]; if (Wc <= 0.1) return null; return [(X / Wc * 0.5 + 0.5) * Wd, (1 - (Y / Wc * 0.5 + 0.5)) * Hd, Wc]; }
     function drawMini() {

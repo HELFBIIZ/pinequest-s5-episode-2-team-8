@@ -1,0 +1,14 @@
+# Vercel hosts the app as static files (solo play; Basar uses his offline knowledge).
+# The Node server (multiplayer + Basar AI) needs a long-running host, so its files stay out.
+server.js
+basar-ai.js
+data/
+tests/
+.github/
+.vscode/
+.env
+.env.*
+start.bat
+start.command
+node_modules/
+.vercel/
