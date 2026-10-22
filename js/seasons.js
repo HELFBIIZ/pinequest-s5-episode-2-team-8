@@ -10,7 +10,7 @@
       todo: [T('Төл бойжуулах: хурга, ишиг, тугал, ботго, унагыг дулаахан байлгаж асрах', 'Raise the newborns: keep lambs, kids, calves, camel calves and foals warm'), T('Ямааны ноолуур самнах', 'Comb cashmere from the goats'), T('Хүйтэн, шороон шуурганаас малаа хамгаалах', 'Protect the herd from cold winds and dust storms'), T('Хотын айлууд мод тарьж, газар хагалж эхэлдэг', 'Families plant trees and start ploughing fields')],
       facts: [T('Монголд 60 гаруй сая мал бий. Ихэнх төл нь хавар төрдөг.', 'Mongolia has over 60 million livestock, and most young animals are born in spring.'), T('Хавар Монголд шороон шуурга олонтаа болдог.', 'Spring in Mongolia often brings dust storms.'), T('Ноолуур Монголын хамгийн алдартай экспортын нэг.', 'Cashmere is one of Mongolia’s most famous exports.')],
       history: [T('Малчид хаваржаагаа уулын энгэр, салхинаас хоргодсон газар сонгодог уламжлалтай.', 'Herders traditionally choose spring camps on sunny slopes sheltered from the wind.'), T('Төлийг “ирээдүйн баялаг” гэж эрхэмлэдэг.', 'Newborn animals are cherished as “the wealth of the future”.')],
-      tasks: ['pet', 'plant'], game: T('Нутагт: хонь, хургаа илбэж, цэцэрлэгтээ үр тариарай.', 'In Nutag: pet the sheep and lambs, and plant seeds in the garden.'),
+      tasks: ['pet', 'milk'], game: T('Нутагт: хонь, хургаа илбэж, төлөө тойлж, хот айлдаа мал саагаарай.', 'In Nutag: pet the sheep and the newborn lambs, and milk the animals in the dairy yard.'),
     },
     {
       id: 'summer', icon: '☀️', color: '#f7c646', name: T('Зун', 'Summer'), months: T('6–8-р сар', 'June–August'), camp: T('Зуслан', 'Summer camp (zuslan)'),
@@ -26,7 +26,7 @@
       todo: [T('Өвс, тэжээл бэлтгэх', 'Cut and store hay for the animals'), T('Төмс, лууван, улаан буудай хураах', 'Harvest potatoes, carrots and wheat'), T('Өвлийн идэш бэлтгэх', 'Prepare the winter food stores'), T('Намаржаа, дараа нь өвөлжөөндөө нүүх', 'Move to the autumn camp, then on to the winter camp')],
       facts: [T('Малчин айл жилд дунджаар 4 удаа нүүдэг: хаваржаа, зуслан, намаржаа, өвөлжөө.', 'Herding families usually move about 4 times a year: spring, summer, autumn and winter camps.'), T('Намар мал хамгийн тарган, хүчтэй байдаг.', 'In autumn the animals are at their fattest and strongest.'), T('Сэлэнгэ аймаг Монголын үр тарианы гол бүс.', 'Selenge province is Mongolia’s main grain-growing region.')],
       history: [T('“Намрын тарган мал өвлийн аюулыг даана” гэсэн үг бий.', 'A saying goes: “Fat animals in autumn survive the dangers of winter.”'), T('Эрт цагт айлууд намар хамтдаа өвс хадаж, бие биедээ тусалдаг байжээ.', 'In the past, families cut hay together in autumn and helped each other.')],
-      tasks: ['harvest', 'sell'], game: T('Нутагт: ургацаа хурааж, дэлгүүрт зараарай.', 'In Nutag: harvest your crops and sell them at the shop.'),
+      tasks: ['dairy', 'sell'], game: T('Нутагт: өвөлдөө зориулж ааруул, өрөм хийж, илүүг нь зараарай.', 'In Nutag: make aaruul and öröm for the winter and sell them at the shop.'),
     },
     {
       id: 'winter', icon: '❄️', color: '#93d4f6', name: T('Өвөл', 'Winter'), months: T('12–2-р сар', 'December–February'), camp: T('Өвөлжөө', 'Winter camp (övöljöö)'),

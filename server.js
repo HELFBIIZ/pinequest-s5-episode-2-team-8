@@ -57,27 +57,25 @@ function serveStatic(req, res) {
   });
 }
 
-// ---------------------------------------------------------------- rooms + saved gardens
-const rooms = new Map(); // code -> { code, players: Map(id -> player), plots: [] }
+// ---------------------------------------------------------------- rooms + saved gers
+const rooms = new Map(); // code -> { code, players: Map(id -> player), lots: [] }
 let saved = {};
 try { saved = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { saved = {}; }
 let dirty = false;
 function room(code) {
   if (!rooms.has(code)) {
-    const plots = Array.isArray(saved[code] && saved[code].plots) ? saved[code].plots.slice(0, R.PLOTS) : [];
-    while (plots.length < R.PLOTS) plots.push(null);
     const lots = Array.isArray(saved[code] && saved[code].lots) ? saved[code].lots.slice(0, R.LOTS) : [];
     while (lots.length < R.LOTS) lots.push(null);
-    rooms.set(code, { code, players: new Map(), plots, lots, matches: new Map() });
+    rooms.set(code, { code, players: new Map(), lots, matches: new Map() });
   }
   return rooms.get(code);
 }
 function persist() {
   if (!dirty) return;
   dirty = false;
-  for (const r of rooms.values()) saved[r.code] = { plots: r.plots, lots: r.lots, t: Date.now() };
+  for (const r of rooms.values()) saved[r.code] = { lots: r.lots, t: Date.now() };
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(DATA_FILE + '.tmp', JSON.stringify(saved)); fs.renameSync(DATA_FILE + '.tmp', DATA_FILE); }
-  catch (e) { console.error('Could not save gardens:', e.message); }
+  catch (e) { console.error('Could not save the rooms:', e.message); }
 }
 setInterval(persist, 5000).unref();
 process.on('SIGINT', () => { persist(); process.exit(0); });
@@ -163,8 +161,7 @@ function onMessage(conn, text) {
     if (old) { old.conn.player = null; old.conn.room = null; old.conn.send({ t: 'replaced' }); setTimeout(() => old.conn.socket.destroy(), 50); } // same player in another tab: keep the newest, and tell the old one why
     const p = { id, conn, name: cleanName(m.name), look: R.cleanLook(m.look), lvl: num(m.lvl, 1, 99), x: numf(m.x, 0.5, R.W - 2), y: numf(m.y, 0.5, R.H - 2), dir: num(m.dir, 0, 3) };
     r.players.set(id, p); conn.player = p; conn.room = r;
-    r.plots.forEach((pl) => R.normalize(pl, t));
-    conn.send({ t: 'welcome', now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), plots: r.plots, lots: r.lots });
+    conn.send({ t: 'welcome', now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), lots: r.lots });
     broadcast(r, { t: 'join', p: pub(p) }, conn);
     census();
     return;
@@ -189,13 +186,6 @@ function onMessage(conn, text) {
       const kind = m.k === 'e' ? 'e' : 'p', max = kind === 'e' ? R.EMOTES.length : R.PHRASES.length;
       if (!Number.isInteger(m.i) || m.i < 0 || m.i >= max) return;
       broadcast(r, { t: 'say', id: p.id, k: kind, i: m.i });   // to everyone, including the sender
-      break;
-    }
-    case 'plant': case 'water': case 'harvest': {
-      const res = R.applyAction(r.plots, m.t, m.i, { c: m.c }, { id: p.id, name: p.name }, t);
-      if (!res.ok) return conn.send({ t: 'deny', act: m.t, i: m.i, why: res.why });
-      dirty = true;
-      broadcast(r, { t: 'plot', act: m.t, i: m.i, plot: res.plot, by: p.id, byName: p.name, crop: res.crop, helped: !!res.helped, planter: res.planter || (res.plot && res.plot.by) });
       break;
     }
     // ---- own ger

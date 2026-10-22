@@ -77,12 +77,42 @@
     if (left) { R(x, X, Y, 1, 16, K.foam); R(x, X + 1, Y, 1, 16, K.waterL); }
     if (right) { R(x, X + 15, Y, 1, 16, K.foam); R(x, X + 14, Y, 1, 16, K.waterL); }
   }
-  function soil(x, X, Y, tx, ty) {
-    R(x, X, Y, 16, 16, K.soil);
-    for (let r = 0; r < 3; r++) { R(x, X + 1, Y + 3 + r * 5, 14, 1, K.soilD); for (let i = 0; i < 3; i++) P(x, X + 2 + Math.floor(hash(tx + r, ty + i) * 12), Y + 1 + r * 5, K.dirtD); }
-    R(x, X, Y, 16, 1, K.soilD); R(x, X, Y, 1, 16, K.soilD); R(x, X + 15, Y, 1, 16, '#9c6a40'); R(x, X, Y + 15, 16, 1, '#9c6a40');
+  /** Trampled earth of a herding yard, with scattered straw and dung. */
+  function yard(x, X, Y, tx, ty, nb) {
+    R(x, X, Y, 16, 16, '#b89462');
+    for (let py = 0; py < 16; py++) for (let px = 0; px < 16; px++) { const n = hash(tx * 16 + px + 333, ty * 16 + py); if (n < 0.06) P(x, X + px, Y + py, '#9a7a4e'); else if (n > 0.97) P(x, X + px, Y + py, '#cfae7a'); }
+    for (let i = 0; i < 3; i++) { const sx = X + 2 + Math.floor(hash(tx + i, ty * 3) * 12), sy = Y + 2 + Math.floor(hash(ty + i, tx * 5) * 12); line(x, sx, sy, sx + 3, sy - 1, '#e8c86a'); }   // straw
+    if (hash(tx, ty + 9) < 0.3) { R(x, X + 9, Y + 10, 3, 2, '#6b4a2a'); P(x, X + 10, Y + 9, '#6b4a2a'); }                                   // dried dung (аргал), the old fuel of the steppe
+    nb.forEach((isGrass, side) => { if (!isGrass) return; for (let i = 0; i < 16; i++) { const [px, py] = side === 0 ? [i, 0] : side === 1 ? [i, 15] : side === 2 ? [0, i] : [15, i]; P(x, X + px, Y + py, hash(i, side + tx) > 0.5 ? K.grass : K.grassD); } });
   }
-  function fence(x, X, Y, nb) {
+  /** зэл: the rope line between two posts where the foals are tied while their mothers are milked. */
+  function zel(x, o) {
+    const X = o.x * 16, Y = o.y * 16, w = o.w * 16;
+    R(x, X + 2, Y - 2, 3, 16, K.out); R(x, X + 3, Y - 1, 1, 15, K.wood); R(x, X + w - 5, Y - 2, 3, 16, K.out); R(x, X + w - 4, Y - 1, 1, 15, K.wood);
+    for (let i = X + 4; i < X + w - 4; i++) P(x, i, Y + 1 + Math.round(Math.sin(((i - X) / w) * Math.PI) * 2), '#8a7a64');
+  }
+  /** хөхүүр: the leather airag bag on its wooden stand, with the churning stick. */
+  function churn(x, o) {
+    const X = o.x * 16, Y = o.y * 16;
+    R(x, X + 3, Y + 12, 10, 3, K.out); R(x, X + 4, Y + 12, 8, 2, K.wood);
+    blob(x, X + 8, Y + 6, 5, 6, '#6b4220', K.out); ell(x, X + 6, Y + 4, 2, 3, '#8a5a33'); P(x, X + 5, Y + 2, '#a46d3b');
+    R(x, X + 9, Y - 8, 2, 10, K.out); R(x, X + 9, Y - 7, 1, 9, K.woodL); R(x, X + 7, Y - 9, 6, 2, K.woodD);
+  }
+  /** тулга: the outdoor iron stove with a big pot, for boiling milk. */
+  function tulga(x, o) {
+    const X = o.x * 16, Y = o.y * 16;
+    for (const lx of [3, 8, 12]) line(x, X + lx, Y + 15, X + 8, Y + 6, K.out);
+    R(x, X + 5, Y + 10, 6, 3, '#f39b2c'); P(x, X + 7, Y + 9, '#f7c646'); P(x, X + 9, Y + 11, '#fff2c8');
+    blob(x, X + 8, Y + 4, 6, 3, '#77778a', K.out); ell(x, X + 8, Y + 2, 5, 1, '#f6f2e9'); P(x, X + 5, Y + 3, '#a5a5b0');
+  }
+  /** тавиур: the wooden drying rack with pieces of aaruul drying in the sun. */
+  function rack(x, o) {
+    const X = o.x * 16, Y = o.y * 16, w = o.w * 16;
+    for (const lx of [2, w - 4]) { R(x, X + lx, Y - 4, 2, 18, K.out); R(x, X + lx, Y - 3, 1, 17, K.wood); }
+    R(x, X + 1, Y - 2, w - 2, 6, K.out); R(x, X + 2, Y - 1, w - 4, 4, '#c99257');
+    for (let i = 4; i < w - 4; i += 3) for (let j = 0; j < 2; j++) { R(x, X + i, Y - 1 + j * 2, 2, 1, '#fff6dc'); P(x, X + i + 1, Y + j * 2, '#e8d6b0'); }
+  }
+    function fence(x, X, Y, nb) {
     const [up, down, left, right] = nb;
     if (left) { R(x, X, Y + 5, 8, 3, K.woodD); R(x, X, Y + 5, 8, 2, K.wood); R(x, X, Y + 10, 8, 3, K.woodD); R(x, X, Y + 10, 8, 2, K.wood); }
     if (right) { R(x, X + 8, Y + 5, 8, 3, K.woodD); R(x, X + 8, Y + 5, 8, 2, K.wood); R(x, X + 8, Y + 10, 8, 3, K.woodD); R(x, X + 8, Y + 10, 8, 2, K.wood); }
@@ -500,34 +530,17 @@
       if (ch === 'p') dirt(x, X, Y, tx, ty, nb4.map(grassy));
       else if (ch === 's' || (ch === 'B' && inPlaza)) plaza(x, X, Y, tx, ty);
       else if (ch === 'w' || ch === 'd') { water(x, X, Y, tx, ty, nb4.map((n) => n && n !== 'w' && n !== 'd')); if (ch === 'd') dock(x, X, Y); }
-      else if (ch === 'o') soil(x, X, Y, tx, ty);
+      else if (ch === 'k' || (ch === 'B' && tx >= 4 && tx <= 13 && ty >= 16 && ty <= 22)) yard(x, X, Y, tx, ty, nb4.map((n) => n !== 'k' && n !== 'B'));
       else if (ch === 'a') sand(x, X, Y, tx, ty, nb4.map((n) => n !== 'a'));
       else { grass(x, X, Y, tx, ty); if (ch === 'f') fence(x, X, Y, nb4.map((n) => n === 'f')); if (ch === 'r') rock(x, X, Y); }
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery, academy })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq', 'cow', 'goat'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery, academy, zel, churn, tulga, rack })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
 
-  // ------------------------------------------------------------ crops (drawn every frame on the pixel buffer)
-  function crop(x, X, Y, c, s, wetSoil, blink) {
-    if (wetSoil && s < 3) { x.fillStyle = 'rgba(55,28,10,.38)'; x.fillRect(X + 1, Y + 1, 14, 14); }
-    if (s === 0) { P(x, X + 4, Y + 9, K.wetD); P(x, X + 8, Y + 6, K.wetD); P(x, X + 11, Y + 10, K.wetD); return; }
-    if (s === 1) { R(x, X + 7, Y + 8, 1, 4, K.cropD); P(x, X + 6, Y + 8, K.crop); P(x, X + 5, Y + 7, K.cropL); P(x, X + 8, Y + 8, K.crop); P(x, X + 9, Y + 7, K.cropL); return; }
-    if (s === 2) { blob(x, X + 8, Y + 9, 4, 2, K.crop, K.cropD); P(x, X + 6, Y + 8, K.cropL); P(x, X + 10, Y + 8, K.cropL); return; }
-    switch (c) {
-      case 'carrot': for (let i = 0; i < 5; i++) line(x, X + 8, Y + 9, X + 4 + i * 2, Y + 3 + (i % 2), i % 2 ? K.crop : K.cropL); R(x, X + 6, Y + 9, 5, 3, K.orangeD); R(x, X + 6, Y + 9, 4, 2, K.orange); break;
-      case 'potato': blob(x, X + 8, Y + 7, 5, 3, K.crop, K.cropD); P(x, X + 6, Y + 6, K.cropL); R(x, X + 3, Y + 11, 3, 2, '#c8a26b'); R(x, X + 10, Y + 12, 3, 2, '#c8a26b'); P(x, X + 4, Y + 11, '#e0c08a'); break;
-      case 'sunflower': R(x, X + 7, Y + 2, 2, 12, K.cropD); P(x, X + 5, Y + 8, K.crop); P(x, X + 6, Y + 9, K.crop); P(x, X + 10, Y + 9, K.crop); P(x, X + 9, Y + 10, K.crop); blob(x, X + 8, Y + 2, 3, 3, K.gold, K.goldD); ell(x, X + 8, Y + 2, 1, 1, K.brown); break;
-      case 'cabbage': blob(x, X + 8, Y + 9, 5, 4, '#9fd67a', K.cropD); ell(x, X + 8, Y + 9, 3, 2, '#c6eba5'); line(x, X + 8, Y + 6, X + 8, Y + 12, K.crop); break;
-      case 'tomato': R(x, X + 7, Y + 1, 1, 13, K.woodD); for (let i = 0; i < 4; i++) { P(x, X + 6, Y + 3 + i * 3, K.crop); P(x, X + 9, Y + 4 + i * 3, K.crop); } [[4, 5], [10, 7], [5, 10], [10, 11]].forEach(([a, b]) => { R(x, X + a, Y + b, 2, 2, K.red); P(x, X + a, Y + b, '#ff8a7a'); }); break;
-      case 'strawberry': blob(x, X + 8, Y + 9, 5, 2, K.crop, K.cropD); [[3, 11], [8, 12], [11, 10]].forEach(([a, b]) => { R(x, X + a, Y + b, 2, 2, '#e8445a'); P(x, X + a + 1, Y + b, K.gold); }); break;
-      case 'seabuckthorn': line(x, X + 8, Y + 14, X + 8, Y + 2, K.woodD); line(x, X + 8, Y + 8, X + 3, Y + 4, K.woodD); line(x, X + 8, Y + 6, X + 13, Y + 3, K.woodD); P(x, X + 5, Y + 3, K.cropL); P(x, X + 11, Y + 2, K.cropL); [[4, 5], [5, 6], [7, 3], [9, 5], [11, 4], [12, 5], [7, 9], [9, 10], [8, 7]].forEach(([a, b]) => P(x, X + a, Y + b, K.orange)); [[5, 5], [12, 4], [9, 9]].forEach(([a, b]) => P(x, X + a, Y + b, K.gold)); break;
-    }
-    if (blink) { P(x, X + 13, Y + 2, K.white); P(x, X + 12, Y + 2, K.gold); P(x, X + 14, Y + 2, K.gold); P(x, X + 13, Y + 1, K.gold); P(x, X + 13, Y + 3, K.gold); }
-  }
   function drop(x, X, Y) { R(x, X + 1, Y, 1, 1, K.out); R(x, X, Y + 1, 3, 1, K.out); R(x, X - 1, Y + 2, 5, 3, K.out); R(x, X, Y + 5, 3, 1, K.out); R(x, X, Y + 2, 3, 3, K.blue); P(x, X + 1, Y + 1, K.blue); P(x, X, Y + 2, K.light); }
 
   // ------------------------------------------------------------ characters (16×28, feet at y=27), cached per look/dir/frame
@@ -588,18 +601,95 @@
     return c;
   }
   // animals (facing right; flipped by the caller)
-  const ANIMALS = {
-    sheep: { w: 16, h: 13, draw: (x, f) => { blob(x, 7, 6, 5, 3, K.white, '#8a8274'); ell(x, 7, 8, 4, 1, K.felt); R(x, 11, 3, 4, 4, '#3b3236'); P(x, 13, 4, K.white); R(x, 10, 3, 1, 2, '#3b3236'); [3, 6, 8, 11].forEach((lx, i) => R(x, lx, 10 + ((f + i) % 2 ? 0 : 0), 1, 3 - ((f + i) % 2), '#3b3236')); } },
-    lamb: { w: 12, h: 11, draw: (x, f) => { blob(x, 5, 5, 3, 2, K.white, '#8a8274'); R(x, 8, 2, 3, 3, '#f0d8c0'); P(x, 10, 3, K.eye); [2, 4, 6, 7].forEach((lx, i) => R(x, lx, 8, 1, 3 - ((f + i) % 2), '#8a6a5a')); } },
-    puppy: { w: 12, h: 11, draw: (x, f) => { R(x, 1, 4, 8, 4, K.out); R(x, 2, 4, 6, 3, '#2d2629'); R(x, 7, 1, 4, 4, '#2d2629'); P(x, 7, 0, '#2d2629'); P(x, 9, 2, K.white); P(x, 8, 1, K.woodL); P(x, 10, 1, K.woodL); P(x, 11, 3, K.woodL); P(x, 0, 2 + f % 2, '#2d2629'); P(x, 1, 3, '#2d2629'); [2, 3, 6, 7].forEach((lx, i) => R(x, lx, 8, 1, 3 - ((f + i) % 2), '#2d2629')); P(x, 3, 7, K.woodL); } },
-    kitten: { w: 12, h: 11, draw: (x, f) => { R(x, 1, 5, 7, 3, K.orange); R(x, 2, 5, 1, 3, K.orangeD); R(x, 4, 5, 1, 3, K.orangeD); R(x, 7, 2, 4, 4, K.orange); P(x, 7, 1, K.orange); P(x, 10, 1, K.orange); P(x, 9, 3, K.eye); P(x, 0, 3 + f % 2, K.orange); P(x, 0, 4, K.orange); [2, 3, 5, 6].forEach((lx, i) => R(x, lx, 8, 1, 3 - ((f + i) % 2), K.orangeD)); } },
-    camel: { w: 14, h: 13, draw: (x, f) => { R(x, 2, 6, 8, 3, '#d9a86a'); ell(x, 4, 5, 1, 1, '#d9a86a'); ell(x, 8, 5, 1, 1, '#d9a86a'); R(x, 10, 2, 2, 6, '#d9a86a'); R(x, 10, 1, 4, 2, '#d9a86a'); P(x, 12, 1, K.eye); [3, 4, 8, 9].forEach((lx, i) => R(x, lx, 9, 1, 4 - ((f + i) % 2), '#b98a50')); } },
-    foal: { w: 14, h: 13, draw: (x, f) => { R(x, 2, 5, 8, 3, K.wood); R(x, 9, 2, 2, 5, K.wood); R(x, 10, 1, 4, 3, K.wood); P(x, 12, 2, K.eye); R(x, 8, 1, 2, 4, K.woodD); P(x, 1, 5, K.woodD); P(x, 1, 6 + f % 2, K.woodD); [3, 4, 8, 9].forEach((lx, i) => R(x, lx, 8, 1, 5 - ((f + i) % 2), K.woodD)); } },
-  };
-  function animal(kind, frame) {
-    const key = 'a:' + kind + frame; if (cache.has(key)) return cache.get(key);
-    const A = ANIMALS[kind]; const { c, x } = mk(A.w, A.h); A.draw(x, frame); cache.set(key, c); return c;
+  // ------------------------------------------------------------ animals, drawn with care (facing right; frame 0 stands, 1 and 2 walk)
+  // Mongolian breeds: fat-tailed sheep with dark heads, long-haired goats, short sturdy horses, shaggy yaks, two-humped camels.
+  const BEAST = {};
+  const hooves = (x, f, legs, top, len, col, hoof, dark) => legs.forEach((lx, i) => { const lift = f && (i + f) % 2 ? 1 : 0, sw = f ? ((i + f) % 2 ? 1 : -1) * (i < 2 ? 1 : -1) : 0; R(x, lx + sw, top, 2, len - lift, K.out); R(x, lx + sw, top, 1, len - lift - 1, i % 2 ? dark : col); P(x, lx + sw, top + len - lift - 1, hoof); });
+  const eye = (x, X, Y) => { P(x, X, Y, K.eye); P(x, X, Y - 1, shade(K.eye, 0.5)); };
+  const wool = (x, cx, cy, rx, ry, base, s) => { for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) if ((dx / (rx + 0.5)) ** 2 + (dy / (ry + 0.5)) ** 2 <= 1 && hash(dx + s, dy + 7 * s) < 0.3) P(x, cx + dx, cy + dy, (dx + dy) % 2 ? shade(base, -0.12) : shade(base, 0.25)); };
+  BEAST.sheep = { w: 20, h: 16, draw: (x, f) => { // fat-tailed Mongolian sheep: cream wool, dark brown head
+    hooves(x, f, [5, 8, 12, 14], 10, 6, '#3b3236', '#1e1a1e', '#2b2427');
+    blob(x, 9, 7, 6, 4, '#efe6d4', '#6a5e52'); ell(x, 9, 9, 5, 1, '#d8ccb6'); ell(x, 8, 5, 4, 1, '#fbf6ec'); wool(x, 9, 7, 6, 4, '#efe6d4', 3);
+    blob(x, 3, 9, 2, 2, '#e6dcc6', '#6a5e52'); P(x, 2, 10, '#c9bda6');                                  // the fat tail
+    blob(x, 16, 5, 2, 3, '#3b3236', K.out); R(x, 17, 6, 2, 2, '#4a4044'); P(x, 18, 7, '#2b2427'); eye(x, 17, 4); R(x, 14, 3, 2, 1, '#2b2427'); P(x, 14, 4, '#3b3236'); // head, ear
+  } };
+  BEAST.lamb = { w: 14, h: 12, draw: (x, f) => { hooves(x, f, [3, 5, 8, 10], 8, 4, '#c9bda6', '#6a5e52', '#b6a890'); blob(x, 6, 5, 4, 3, '#fbf6ec', '#8a8274'); wool(x, 6, 5, 4, 3, '#fbf6ec', 5); blob(x, 11, 3, 2, 2, '#f2dcc8', '#8a8274'); eye(x, 12, 2); P(x, 13, 4, '#e8a0a0'); R(x, 9, 1, 2, 1, '#e8c8b0'); } };
+  BEAST.goat = { w: 18, h: 16, draw: (x, f) => { // long-haired white goat with a beard and swept-back horns
+    hooves(x, f, [4, 6, 10, 12], 10, 6, '#8a7a64', '#3a3030', '#6a5a4a');
+    blob(x, 8, 7, 5, 3, '#f2eee4', '#7a7064'); for (let i = 3; i < 14; i++) if (i % 2) R(x, i, 10, 1, 2 + (i % 3), '#e2dccc');   // shaggy fringe
+    ell(x, 7, 5, 3, 1, '#ffffff'); P(x, 2, 4, '#f2eee4'); P(x, 2, 3, '#f2eee4');                          // tail up
+    R(x, 12, 4, 3, 3, '#f2eee4'); blob(x, 15, 4, 2, 2, '#f2eee4', K.out); R(x, 16, 7, 1, 3, '#d8d0c0'); eye(x, 15, 3); // neck, head, beard
+    P(x, 14, 1, '#8a7a64'); P(x, 13, 0, '#8a7a64'); P(x, 13, 1, '#6a5a4a'); P(x, 12, 0, '#6a5a4a');           // horns
+  } };
+  BEAST.cow = { w: 24, h: 18, draw: (x, f) => { // brown and white cow with an udder
+    hooves(x, f, [5, 8, 15, 18], 12, 6, '#5a3a22', '#1e1a1e', '#4a2e1a');
+    blob(x, 11, 8, 8, 4, '#8a5a33', K.out); ell(x, 10, 6, 6, 1, '#a46d3b'); blob(x, 8, 8, 3, 2, '#f2eee4'); blob(x, 14, 9, 2, 2, '#f2eee4');
+    R(x, 11, 12, 3, 2, '#f2a0a0'); P(x, 11, 14, '#e88080'); P(x, 13, 14, '#e88080');                   // udder
+    R(x, 2, 6, 1, 7, '#5a3a22'); R(x, 1, 12, 3, 2, '#2b1e14');                                          // tail with tuft
+    blob(x, 20, 7, 3, 3, '#8a5a33', K.out); R(x, 21, 9, 3, 2, '#f2d8c8'); P(x, 23, 10, '#5a3a22'); eye(x, 21, 6); R(x, 18, 4, 2, 1, '#6b4220'); R(x, 21, 3, 1, 2, '#e8dcc0'); R(x, 23, 3, 1, 2, '#e8dcc0'); // head, ear, horns
+  } };
+  BEAST.yak = { w: 24, h: 18, draw: (x, f) => { // shaggy yak: hump, long skirt of hair, pale horns
+    hooves(x, f, [6, 9, 15, 18], 13, 5, '#2b2222', '#14100f', '#201a1a');
+    blob(x, 12, 8, 8, 4, '#3a2c2c', K.out); blob(x, 15, 5, 4, 2, '#3a2c2c'); ell(x, 13, 5, 5, 1, '#5a4848');
+    for (let i = 4; i < 21; i++) R(x, i, 11, 1, 3 + ((i * 7) % 3), i % 2 ? '#2b2222' : '#4a3c3c');      // the hair skirt
+    for (let i = 0; i < 6; i++) P(x, 3 - (i % 2), 6 + i, i % 2 ? '#f2eee4' : '#d8d0c0');                // white tail plume
+    blob(x, 20, 8, 2, 3, '#3a2c2c', K.out); R(x, 21, 10, 2, 2, '#2b2222'); eye(x, 21, 7); R(x, 19, 4, 1, 2, '#e8dcc0'); R(x, 22, 4, 1, 2, '#e8dcc0'); P(x, 18, 4, '#e8dcc0'); P(x, 23, 4, '#e8dcc0');
+  } };
+  // a Mongolian horse, hand-placed pixel by pixel: o outline, b coat, l light, d shade, m mane, e eye, n muzzle
+  const HORSE_ART = [
+    '.................om.....',
+    '................ombo....',
+    '...............mmbbbo...',
+    '..............mmbbebbo..',
+    '.............mmbbbbbbbo.',
+    '............mmbbbo.obbno',
+    '...........mmbbbo...onno',
+    '..oo......mmbbbbo....oo.',
+    '.ommo.oooobbbbbbo.......',
+    '.mmooblllllllbbbo.......',
+    '.m..obbbbbbbbbbbbo......',
+    '.m..obbbbbbbbbbbbo......',
+    '....obdddddddddddo......',
+    '.....odddddddddddo......',
+  ];
+  const horseBeast = (coat, mane) => ({ w: 24, h: 20, draw: (x, f) => {
+    const C = { o: K.out, b: coat, l: shade(coat, 0.22), d: shade(coat, -0.28), m: mane, e: K.eye, n: shade(coat, -0.45) };
+    hooves(x, f, [6, 8, 14, 16], 13, 7, coat, '#1e1a1e', C.d);
+    HORSE_ART.forEach((row, y) => [...row].forEach((ch, i) => { if (C[ch]) P(x, i, y + (f && y > 7 && y < 2 ? 0 : 0), C[ch]); }));
+    if (f) { P(x, 1, 12, mane); P(x, 2, 13, mane); } else { P(x, 1, 12, mane); P(x, 1, 13, shade(mane, 0.2)); }   // tail swish
+  } });
+  BEAST.horse = horseBeast('#8a5a33', '#2b1e14');
+  BEAST.mare = horseBeast('#b5652e', '#5a2a10');
+  BEAST.takhi = horseBeast('#c99a5a', '#3a2516');
+  BEAST.foal = { w: 16, h: 15, draw: (x, f) => { hooves(x, f, [4, 6, 10, 11], 9, 6, '#a46d3b', '#2b1e14', '#8a5a33'); blob(x, 7, 7, 4, 2, '#b98a55', K.out); ell(x, 6, 6, 3, 1, '#d0a46a'); R(x, 10, 3, 2, 4, '#b98a55'); blob(x, 13, 3, 2, 1, '#b98a55', K.out); eye(x, 13, 2); R(x, 10, 1, 1, 3, '#6b4220'); P(x, 2, 6, '#6b4220'); P(x, 2, 7, '#6b4220'); } };
+  BEAST.camel = { w: 26, h: 22, draw: (x, f) => { // two-humped Bactrian camel: woolly humps, long neck, shaggy throat
+    const C = '#c99a5a', D = '#a07444', W = '#7a4f2c';
+    hooves(x, f, [6, 9, 16, 19], 14, 8, C, '#6b4220', D);
+    // body and humps as one outline, so the humps grow out of the back
+    for (const [hx, hh] of [[8, 5], [15, 5]]) for (let i = -3; i <= 3; i++) { const top = 9 - Math.round(hh * Math.cos((i / 3.6) * (Math.PI / 2))); R(x, hx + i, top - 1, 1, 6, K.out); }
+    blob(x, 12, 11, 8, 4, C, K.out);
+    for (const [hx, hh] of [[8, 5], [15, 5]]) for (let i = -3; i <= 3; i++) { const top = 9 - Math.round(hh * Math.cos((i / 3.6) * (Math.PI / 2))); R(x, hx + i, top, 1, 5, C); P(x, hx + i, top, W); if (Math.abs(i) < 2) P(x, hx + i, top + 1, W); }
+    ell(x, 12, 13, 6, 1, D); ell(x, 11, 9, 2, 0, shade(C, 0.15));
+    for (let r = 0; r < 8; r++) { R(x, 19 + Math.round(r * 0.55), 11 - r, 3, 2, K.out); }
+    for (let r = 0; r < 8; r++) { R(x, 20 + Math.round(r * 0.55), 11 - r, 2, 2, C); }                       // long curved neck
+    for (let i = 0; i < 4; i++) { P(x, 19, 11 + i, W); P(x, 20, 12 + i, shade(W, 0.2)); }                     // woolly beard
+    R(x, 23, 2, 4, 3, K.out); R(x, 23, 2, 3, 2, C); P(x, 26, 4, K.out); eye(x, 24, 2); P(x, 23, 1, K.out);     // head
+    P(x, 2, 10, W); P(x, 2, 11, W); P(x, 3, 12, W);
+  } };
+  BEAST.botgo = { w: 16, h: 15, draw: (x, f) => { hooves(x, f, [4, 6, 10, 11], 9, 6, '#d9b07a', '#8a5a33', '#c99a5a'); blob(x, 7, 7, 4, 2, '#e2c08a', K.out); P(x, 5, 4, '#c99a5a'); P(x, 9, 4, '#c99a5a'); R(x, 11, 2, 2, 5, '#e2c08a'); blob(x, 14, 2, 2, 1, '#e2c08a', K.out); eye(x, 14, 1); } };
+  BEAST.reindeer = { w: 20, h: 18, draw: (x, f) => { hooves(x, f, [5, 7, 12, 14], 11, 7, '#6a5240', '#2b1e14', '#5a4232'); blob(x, 9, 9, 5, 3, '#8a6a4a', K.out); ell(x, 9, 11, 4, 1, '#e8dcc0'); R(x, 13, 6, 3, 4, '#e8dcc0'); blob(x, 16, 5, 2, 2, '#8a6a4a', K.out); eye(x, 16, 4); P(x, 18, 6, '#2b2222');
+    for (const [a, b] of [[14, 3], [14, 2], [13, 1], [15, 1], [16, 0], [17, 2], [18, 1], [18, 3], [19, 2]]) P(x, a, b, '#c9a87a'); P(x, 3, 8, '#e8dcc0'); } };
+  BEAST.gazelle = { w: 18, h: 15, draw: (x, f) => { hooves(x, f, [5, 7, 11, 12], 9, 6, '#a07444', '#3a2516', '#8a5a33'); blob(x, 8, 7, 5, 2, '#d8a868', K.out); ell(x, 8, 9, 4, 0, '#f6ecd8'); R(x, 4, 8, 9, 1, '#6b4220'); R(x, 3, 6, 2, 3, '#ffffff');
+    R(x, 12, 3, 2, 4, '#d8a868'); blob(x, 14, 2, 2, 1, '#d8a868', K.out); eye(x, 14, 1); P(x, 13, 0, '#3a2516'); P(x, 12, 0, '#3a2516'); } };
+  BEAST.puppy = { w: 13, h: 11, draw: (x, f) => { hooves(x, f, [3, 4, 8, 9], 7, 4, '#2d2629', '#1a1618', '#3a3235'); blob(x, 6, 5, 4, 2, '#2d2629', K.out); ell(x, 6, 4, 2, 0, '#4a4044'); blob(x, 10, 3, 2, 2, '#2d2629', K.out); P(x, 11, 2, '#c98a4a'); P(x, 9, 2, '#c98a4a'); P(x, 12, 4, '#c98a4a'); eye(x, 11, 3); P(x, 9, 0, '#2d2629'); P(x, 1, 3, '#2d2629'); P(x, 1, 2, '#2d2629'); } };
+  BEAST.kitten = { w: 12, h: 10, draw: (x, f) => { hooves(x, f, [3, 4, 7, 8], 6, 4, '#f39b2c', '#c46d12', '#e08a20'); blob(x, 5, 4, 3, 2, '#f39b2c', K.out); P(x, 4, 3, '#c46d12'); P(x, 6, 3, '#c46d12'); blob(x, 9, 3, 2, 2, '#f39b2c', K.out); P(x, 8, 0, '#f39b2c'); P(x, 10, 0, '#f39b2c'); eye(x, 10, 3); P(x, 1, 2, '#f39b2c'); P(x, 1, 1, '#c46d12'); } };
+  /** Any animal sprite, cached. */
+  function beast(kind, frame = 0) {
+    const key = 'b:' + kind + frame; if (cache.has(key)) return cache.get(key);
+    const A = BEAST[kind] || BEAST.sheep, { c, x } = mk(A.w, A.h); A.draw(x, frame); cache.set(key, c); return c;
   }
+  const ANIMALS = { sheep: 'sheep', lamb: 'lamb', puppy: 'puppy', kitten: 'kitten', camel: 'botgo', foal: 'foal' }; // pets and village animals use the same drawings
+  function animal(kind, frame) { return beast(ANIMALS[kind] || kind, frame); }
 
   // Mongolian horse for riding and racing (28×22, facing right). frame 0 stands, 1–4 gallop. saddle: draw a saddle.
   const COATS = { bay: ['#8a5a33', '#6b4220', '#2b1e14'], black: ['#3a2c2c', '#241a1a', '#120c0c'], white: ['#ece4d4', '#c9bda6', '#8a7a64'], chestnut: ['#b5652e', '#8a4a1e', '#5a2a10'], gray: ['#a0a0aa', '#7a7a86', '#3a3a44'] };
@@ -703,15 +793,16 @@
   function iconCanvas(key) {
     const { c, x } = mk(16, 16);
     const [kind, id] = key.split(':');
-    if (kind === 'crop') {
+    if (kind === 'beast') { const a = beast(id, 0), k = Math.min(16 / a.width, 16 / a.height); x.drawImage(a, Math.round((16 - a.width * k) / 2), Math.round((16 - a.height * k) / 2), Math.round(a.width * k), Math.round(a.height * k)); }
+    else if (kind === 'dairy') {
+      const bowl = (fill, top) => { R(x, 2, 8, 12, 5, K.out); R(x, 3, 8, 10, 4, '#f6f2e9'); R(x, 3, 11, 10, 1, '#d8cfba'); R(x, 2, 7, 12, 2, K.out); R(x, 3, 7, 10, 1, fill); if (top) top(); R(x, 5, 13, 6, 1, K.out); };
       ({
-        carrot: () => { for (let i = 0; i < 3; i++) line(x, 9, 6, 7 + i * 3, 1, K.crop); for (let r = 0; r < 9; r++) R(x, 7 + Math.round(r / 3), 6 + r, 5 - Math.round(r / 2.2), 1, r % 3 ? K.orange : K.orangeD); },
-        potato: () => { blob(x, 8, 9, 5, 4, '#c8a26b', '#7a5a33'); P(x, 6, 8, '#7a5a33'); P(x, 10, 10, '#7a5a33'); P(x, 6, 7, '#e8cc98'); },
-        sunflower: () => { R(x, 7, 9, 2, 6, K.cropD); P(x, 9, 12, K.crop); for (let a = 0; a < 8; a++) { const ax = Math.round(8 + Math.cos(a * 0.785) * 4), ay = Math.round(6 + Math.sin(a * 0.785) * 4); R(x, ax - 1, ay - 1, 2, 2, K.gold); } blob(x, 8, 6, 2, 2, K.brown); },
-        cabbage: () => { blob(x, 8, 9, 6, 5, '#9fd67a', K.cropD); ell(x, 8, 9, 3, 3, '#c6eba5'); line(x, 8, 5, 8, 13, K.crop); },
-        tomato: () => { blob(x, 8, 9, 5, 5, K.red, K.redD); P(x, 6, 7, '#ff9a8a'); R(x, 6, 3, 5, 2, K.crop); P(x, 8, 2, K.cropD); },
-        strawberry: () => { for (let r = 0; r < 8; r++) R(x, 4 + Math.round(r / 2), 6 + r, 9 - Math.round(r / 1), 1, '#e8445a'); [[6, 8], [9, 8], [7, 10], [10, 10], [8, 12]].forEach(([a, b]) => P(x, a, b, K.gold)); R(x, 5, 4, 7, 2, K.crop); },
-        seabuckthorn: () => { line(x, 3, 14, 12, 2, K.woodD); [[6, 9], [7, 10], [8, 8], [9, 7], [10, 6], [5, 11], [9, 5], [11, 4], [7, 7], [10, 8]].forEach(([a, b]) => R(x, a, b, 2, 2, K.orange)); P(x, 8, 8, K.gold); P(x, 10, 6, K.gold); },
+        milk: () => bowl('#ffffff', () => P(x, 6, 7, '#e8f0ff')),
+        mare: () => { R(x, 4, 3, 8, 11, K.out); R(x, 5, 4, 6, 9, '#a46d3b'); R(x, 5, 4, 6, 2, '#ffffff'); R(x, 6, 1, 4, 3, K.out); R(x, 7, 2, 2, 1, '#6b4220'); P(x, 6, 7, '#c99257'); },
+        aaruul: () => { for (const [ax, ay] of [[2, 8], [7, 9], [5, 4], [10, 5]]) { R(x, ax, ay, 5, 4, K.out); R(x, ax + 1, ay + 1, 3, 2, '#fff6dc'); P(x, ax + 1, ay + 1, '#ffffff'); } },
+        urum: () => bowl('#f7d071', () => { R(x, 4, 6, 8, 1, '#f2c45a'); P(x, 6, 6, '#fde08a'); }),
+        tarag: () => bowl('#f6f2e9', () => { P(x, 7, 6, '#ffffff'); P(x, 8, 6, '#ffffff'); }),
+        airag: () => bowl('#efe8d4', () => { P(x, 5, 6, '#ffffff'); P(x, 9, 6, '#ffffff'); P(x, 7, 5, '#ffffff'); }),
       })[id]();
     } else if (kind === 'fish') {
       const col = { perch: ['#8fbf4a', '#5e8a2a', '#3a5a1a'], pike: ['#7a9a5a', '#4e6e36', '#2e4a20'], lenok: ['#c49a6a', '#8a6a42', '#5a3a1e'], taimen: ['#d9705a', '#a8483a', '#6e2a20'] }[id];
@@ -780,5 +871,5 @@
     return img;
   }
 
-  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler, beast, BEAST };
 })(window.TG);

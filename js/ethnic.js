@@ -86,7 +86,7 @@
         wrap.replaceChildren(prog(), a ? landCanvas(a.id, 180, 80) : null,
           h('div', { class: 'create-welcome' }, charCanvas(d.look, 80), h('div', null,
             h('h2', null, L(`Сайн уу, ${p.name}!`, `Hello, ${p.name}!`)),
-            h('p', null, L(`Чи ${a ? tx(a.name) : ''}-д төрсөн ${e ? tx(e.name) : ''} ${p.age} настай хүүхэд.`, `You are a ${p.age}-year-old ${e ? tx(e.name) : ''} child born in ${a ? tx(a.name) : ''}.`)),
+            h('p', null, L(`Чи ${a ? tx(a.name) : ''}-д төрсөн ${e ? tx(e.name) : ''} ${p.age} настай ${p.age >= 18 ? 'хүн' : 'хүүхэд'}.`, `You are a ${p.age}-year-old ${e ? tx(e.name) : ''} ${p.age >= 18 ? 'person' : 'child'} born in ${a ? tx(a.name) : ''}.`)),
             a ? h('small', { class: 'muted' }, a.icon, ' ', tx(a.fact)) : null)),
           basar(L('Нутагт хамтдаа явцгаая! Аймгийн паспортоор Монголоор аялж, нутгаа ч бас олоорой.', 'Let’s go to Nutag together! Travel Mongolia with your aimag passport and find your home province too.')),
           nav(2, finish, L('Нутаг руу орох ▶', 'Enter Nutag ▶')));

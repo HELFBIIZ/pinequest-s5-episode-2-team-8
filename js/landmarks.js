@@ -211,10 +211,7 @@
     R(x, 5, 7, 9, 4, OUT); R(x, 6, 8, 7, 2, c); R(x, 5, 8, 2, 2, '#ffffff'); R(x, 7, 10, 5, 1, '#f3e6c4'); legs(x, f, [6, 8, 11, 12], 11, '#8a5a33', 4); R(x, 13, 4, 2, 5, c); R(x, 14, 3, 3, 2, c); P(x, 14, 1, '#3a2516'); P(x, 14, 2, '#3a2516'); };
   CR.sheep = (x, f) => { x.drawImage(TG.pixel.animal('sheep', f), 0, 0); };
   const crCache = new Map();
-  function critter(kind, f) {
-    const key = kind + f; if (crCache.has(key)) return crCache.get(key);
-    const c = document.createElement('canvas'); c.width = 20; c.height = 16; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; (CR[kind] || CR.sheep)(x, f); crCache.set(key, c); return c;
-  }
+  function critter(kind, f) { return TG.pixel.beast(kind, f); }   // the detailed shared animal drawings
 
   function draw(x, kind, X, Y) { (D[kind] || D.sacredmtn)(x, X, Y); }
   TG.landmarks = { KIND, draw, kinds: Object.keys(D), critter, critters: Object.keys(CR), khadag, stupa };

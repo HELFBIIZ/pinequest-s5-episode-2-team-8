@@ -1460,3 +1460,14 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .fp-stick.on { display: block; }
 .fp-stick i { position: absolute; left: 28px; top: 28px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, .7); }
 .pp-fp { margin-top: 8px; }
+
+.age-label { margin: 12px 0 6px; font-family: var(--font-display); font-weight: 800; color: #7a5432; font-size: .9rem; }
+.age-grown .age-btn { font-size: 1rem; }
+.age-other { margin-top: 8px; text-align: center; font-size: 1.1rem; }
+
+.v-milk { width: 100%; image-rendering: pixelated; display: block; box-shadow: inset 0 0 0 2px #c99a5a, 0 0 0 2px #8a4b1f; margin-bottom: 8px; }
+.v-milk-msg { font-weight: 700; color: #5a2d10; min-height: 2.6em; }
+.v-steps { margin: 8px 0 12px; padding-left: 22px; display: grid; gap: 6px; font-weight: 700; color: #7a5432; }
+.v-steps li.on { color: #3a1e08; }
+.v-steps li.done { color: #5c9a36; text-decoration: line-through; }
+.v-own { color: #2b52a5; font-weight: 800; }

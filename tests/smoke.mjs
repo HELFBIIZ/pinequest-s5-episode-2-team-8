@@ -103,9 +103,26 @@ try {
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
   if (!(await page.evaluate(() => !!TG._village.dog()))) errors.push('village: Basar the dog is not following the player');
-  await page.evaluate(() => { const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
-  await sleep(300);
-  if (!(await page.evaluate(() => { const p = TG.store.active().village.garden[0]; return p && p.c === 'carrot'; }))) errors.push('village: planting in solo mode did not work');
+  // the dairy yard: let the calf suckle, milk the cow in rhythm, then make aaruul at the rack
+  step = 'dairy yard';
+  if (await page.evaluate(() => !!TG.store.active().village.garden)) errors.push('dairy yard: the old garden data was not removed');
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.milk('cow1'); }); await sleep(300);
+  await check('milking', '.modal .v-milk');
+  await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(1600);   // the calf suckles first
+  for (let i = 0; i < 5; i++) { await page.waitForFunction(() => { const m = TG._village.milkNow(); return m.phase === 'milk' && m.pos > 0.42 && m.pos < 0.58; }, { timeout: 5000 }); await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(60); }
+  if ((await page.evaluate(() => TG.store.active().village.produce.milk || 0)) < 2) errors.push('dairy yard: milking the cow gave no milk');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => TG._village.station('rack')); await sleep(250);
+  await check('aaruul rack', '.modal .v-list .v-row');
+  await page.evaluate(() => document.querySelector('.modal .v-row .btn.primary').click()); await sleep(150);
+  for (let i = 0; i < 6; i++) { await page.evaluate(() => { const b = document.querySelector('.modal .btn.primary.big'); if (b) b.click(); }); await sleep(120); }
+  const yard = await page.evaluate(() => { const p = TG.store.active().village.produce; return { milk: p.milk || 0, aaruul: p.aaruul || 0 }; });
+  if (yard.aaruul !== 3 || yard.milk !== 0) errors.push(`dairy yard: making aaruul did not work ${JSON.stringify(yard)}`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => { const v = TG.store.active().village, e0 = v.energy = 50; TG.villageEat('aaruul'); }); await sleep(150);
+  const ate = await page.evaluate(() => { const v = TG.store.active().village; return { aaruul: v.produce.aaruul, energy: v.energy }; });
+  if (ate.aaruul !== 2 || ate.energy <= 50) errors.push(`dairy yard: eating your own aaruul did not work ${JSON.stringify(ate)}`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
   for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(300); await check(`village ${btn} panel`, '.modal'); }
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.arena(); }); await sleep(300); await check('village wrestling panel', '.v-wr-head');
@@ -308,7 +325,7 @@ try {
   await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
   await check('townsperson dialogue', '.npc-talk .npc-head');
   await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(200);
-  await page.evaluate(() => TG.villageQuest('plant', 4)); await sleep(200);
+  await page.evaluate(() => TG.villageQuest('milk', 3)); await sleep(200);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
   await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(250);
