@@ -44,8 +44,8 @@
       steps: [
         { type: 'learn', stage: 0, title: T('Цагаан идээ гэж юу вэ?', 'What is “white food”?'), text: T('Монголчууд зун сүүгээр тараг, өрөм, ааруул, бяслаг, шар тос, айраг хийдэг. Үүнийг цагаан идээ гэнэ. Цагаан сараар ширээний тэргүүнд тавьдаг.', 'In summer Mongols make yogurt, cream, aaruul, cheese, butter and airag from milk. These are “white foods”, placed first on the Tsagaan Sar table.') },
         { type: 'drag', stage: 0, dir: 'down', alt: true, n: 8, icon: '✊', label: T('Доош нь татаж саа', 'Pull down to milk'), title: T('1. Үнээгээ саа!', '1. Milk the cow!'),
-          text: T('Хөхийг нь атгаад доош нь тат. Хоёр гараараа ээлжлэн саана: зүүн, баруун, зүүн…', 'Hold a teat and pull it down. Use both hands in turn: left, right, left…'),
-          altHint: T('Ээлжлэн саа! Одоо нөгөө талын хөхийг тат.', 'Take turns! Now pull the other teat.'), low: T('Доош нь бүр татаарай!', 'Pull all the way down!'),
+          text: T('Үхрийн дэлэнг атгаад доош нь тат. Хоёр гараараа ээлжлэн саана: зүүн, баруун, зүүн…', 'Hold a teat and pull it down. Use both hands in turn: left, right, left…'),
+          altHint: T('Ээлжлэн саа! Одоо нөгөө талын дэлэнг тат.', 'Take turns! Now pull the other teat.'), low: T('Доош нь бүр татаарай!', 'Pull all the way down!'),
           after: T('Хувин дүүрлээ! Саахдаа үнээгээ зөөлөн илж, аялгуулан дуулж тайвшруулдаг.', 'The bucket is full! Herders stroke the cow and sing softly to keep her calm.') },
         { type: 'drag', dir: 'up', release: true, need: 0.8, n: 3, field: 'flick', set: { tsatsal: true }, icon: '🥄', label: T('Дээш цацах', 'Flick up'), title: T('Сүүний дээж өргө', 'Offer the first milk'),
           text: T('Шанагаар сүүний дээжийг авч тэнгэр өөд гурван удаа цацал өргө. Дээш нь шидэх шиг өргөөд тавиарай.', 'Scoop the first milk and flick it up to the sky three times. Swing up and let go.'), low: T('Илүү өндөр өргө!', 'Higher!'),
