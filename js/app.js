@@ -6,7 +6,7 @@
   let cleanup = null, screen = 'village', params = {}, parentUntil = 0;
 
   // ---------------- navigation ----------------
-  const NAV_ORDER = ['village', 'learn', 'passport', 'aimag', 'tree', 'achievements', 'family', 'memories'];
+  const NAV_ORDER = ['village', 'learn', 'bichig', 'passport', 'aimag', 'tree', 'achievements', 'family', 'memories'];
   const calm = () => S.state.settings.reduceMotion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function transition(kind, update) {
     document.documentElement.dataset.vt = kind;
@@ -60,7 +60,7 @@
   const NAV = [['village', 'sprout', 'Нутаг', 'Nutag'], ['learn', 'book', 'Сурах', 'Learn'], ['basar', 'heart', 'Басар', 'Basar'], ['achievements', 'sparkles', 'Амжилт', 'Badges'], ['family', 'users', 'Гэр бүл', 'Family']];
   function bottomNav() {
     return h('nav', { class: 'bottom-nav' }, NAV.map(([id, icon, mn, en]) => h('button', {
-      class: 'nav-btn' + (screen === id || (id === 'learn' && screen === 'lesson') ? ' active' : ''),
+      class: 'nav-btn' + (screen === id || (id === 'learn' && (screen === 'lesson' || screen === 'bichig')) ? ' active' : ''),
       onclick: () => (id === 'family' ? openFamily() : id === 'basar' ? TG.basar.open() : TG.go(id)),
     }, id === 'basar' ? TG.basar.face(0, 26) : TG.icon(icon, 'ni'), h('span', null, L(mn, en)))));
   }
@@ -80,6 +80,7 @@
       h('div', { class: 'menu-list' },
         item('⛺', L('Нутаг', 'Nutag'), () => TG.go('village')),
         item('📚', L('Өв соёлын сургууль', 'Heritage school'), () => TG.go('learn')),
+        item('✍️', L('Монгол бичгийн академи', 'Mongol script academy'), () => TG.go('bichig')),
         item('🐕', L('Басартай ярилцах', 'Talk with Basar'), () => TG.basar.open()),
         item('🏅', L('Миний амжилтууд', 'My achievements'), () => TG.go('achievements')),
         item('🛂', L('Аймгийн паспорт', 'Aimag passport'), () => TG.go('passport')),
@@ -196,6 +197,7 @@
   SCREENS.lesson = (p) => TG.learn.lesson({ ...p, shell, setCleanup });
   SCREENS.tree = () => TG.familyTree.screen({ shell, rerender: () => render() });
   SCREENS.passport = () => TG.passport.screen({ shell });
+  SCREENS.bichig = () => TG.bichig.screen({ shell });
   SCREENS.aimag = (p) => TG.passport.visit({ ...p, shell });
   SCREENS.create = () => TG.ethnic.screen({ onDone: () => { TG.toast(L('Нутагт тавтай морил! 🐕', 'Welcome to Nutag! 🐕')); TG.go('village'); } });
 

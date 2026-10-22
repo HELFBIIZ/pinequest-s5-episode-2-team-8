@@ -7,12 +7,17 @@
   const CATS = { learn: T('Сурах', 'Learning'), family: T('Гэр бүл, найз', 'Family & friends'), nutag: T('Нутаг', 'Nutag'), naadam: T('Наадам', 'Naadam') };
   const lessons = (c) => (TG.learn ? TG.learn.LESSONS : []).filter((l) => c.learn[l.id] && c.learn[l.id].done).length;
   const famDone = (c) => (TG.learn ? TG.learn.LESSONS : []).filter((l) => c.learn[l.id] && c.learn[l.id].family).length;
+  const bc = (c, unit) => (TG.bichig ? TG.bichig.ALL : []).filter((it) => (!unit || it.unit === unit) && c.p.bichig && c.p.bichig.s[it.id]).length;
   const lvl = (c) => (TG.vrules ? TG.vrules.level(c.v.xp || 0).l : 1);
   // A(id, category, icon, name mn, name en, how mn, how en, test, progress?)
   const A = (id, cat, icon, nm, ne, dm, de, test, prog) => ({ id, cat, icon, name: T(nm, ne), desc: T(dm, de), test, prog });
   const LIST = [
     A('first_lesson', 'learn', '📚', 'Анхны хичээл', 'First lesson', 'Өв соёлын анхны хичээлээ дуусгах', 'Finish your first heritage lesson', (c) => lessons(c) >= 1),
     A('all_lessons', 'learn', '🎓', 'Өв соёлын сурагч', 'Heritage scholar', 'Бүх хичээлийг дуусгах', 'Finish every lesson', (c) => TG.learn && lessons(c) >= TG.learn.LESSONS.length, (c) => [lessons(c), TG.learn ? TG.learn.LESSONS.length : 4]),
+    A('bichig_first', 'learn', '✍️', 'Анхны үсэг', 'First letter', 'Монгол бичгээр анхны үсгээ бичих', 'Write your first letter in Mongol script', (c) => bc(c) >= 1),
+    A('bichig_vowels', 'learn', '🔤', 'Эгшиг мэддэг', 'Vowel writer', 'Монгол бичгийн 7 эгшгийг бичих', 'Write all 7 vowels in Mongol script', (c) => bc(c, 'vowel') >= 7, (c) => [bc(c, 'vowel'), 7]),
+    A('bichig_master', 'learn', '📜', 'Бичээч', 'Scribe', 'Академийн бүх үсэг, үгийг бичих', 'Write every letter and word in the academy', (c) => TG.bichig && bc(c) >= TG.bichig.ALL.length, (c) => [bc(c), TG.bichig ? TG.bichig.ALL.length : 27]),
+    A('bichig_memory', 'learn', '🧠', 'Санаж бичигч', 'From memory', '5 үсгийг загваргүй санаж бичих', 'Write 5 letters from memory', (c) => Object.keys((c.p.bichig || {}).mem || {}).length >= 5, (c) => [Object.keys((c.p.bichig || {}).mem || {}).length, 5]),
     A('ger_master', 'learn', '⛺', 'Гэрийн эзэн', 'Ger builder', 'Монгол гэр барьж сурах', 'Learn to build a Mongol ger', (c) => !!(c.learn.ger && c.learn.ger.done)),
     A('dairy', 'learn', '🥛', 'Цагаан идээчин', 'Dairy maker', 'Цагаан идээ хийж сурах', 'Learn to make dairy foods', (c) => !!(c.learn.idee && c.learn.idee.done)),
     A('manners', 'learn', '🙏', 'Ёсон дагуу', 'Good manners', 'Гэрийн ёс заншил сурах', 'Learn ger manners', (c) => !!(c.learn.customs && c.learn.customs.done)),

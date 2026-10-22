@@ -7,6 +7,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const Tx = (mn, en) => ({ mn, en });
   let live = null;
+  const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
 
   // ================================================================ saved data (per child profile)
   function V() {
@@ -68,7 +69,11 @@
       pick.push('help');
       // one extra quest from today's season, worth +50%
       const sea = TG.seasons ? TG.seasons.current() : null, list = pick.map((k) => ({ k, p: 0, done: false }));
-      if (sea) { const opts = sea.tasks.filter((k) => !pick.includes(k)); if (opts.length) list.unshift({ k: opts[hs % opts.length], p: 0, done: false, season: sea.id }); }
+      if (sea) {
+        const opts = sea.tasks.filter((k) => !pick.includes(k));
+        if (opts.length) list.unshift({ k: opts[hs % opts.length], p: 0, done: false, season: sea.id });
+        else { const q = list.find((x) => sea.tasks.includes(x.k)); if (q) q.season = sea.id; } // every season task was already picked: make one of them the season quest
+      }
       v.quests = { d, list };
       v.pets = {};
       S.save();
@@ -154,6 +159,7 @@
       case 'lot': onLot(m); break;
       case 'wr-invite': case 'wr-declined': case 'wr-start': case 'wr-wait': case 'wr-result': case 'wr-end': onWrestleMsg(m); break;
       case 'move': { const o = live.others.get(m.id); if (o) { o.x = m.x; o.y = m.y; o.dir = m.dir; } break; }
+      case 'jump': { const o = live.others.get(m.id); if (o) o.jt = performance.now(); break; }
       case 'look': { const o = live.others.get(m.id); if (o) { o.look = m.look; o.lvl = m.lvl; } break; }
       case 'say': {
         const who = m.id === v.id ? live.me : live.others.get(m.id);
@@ -225,12 +231,14 @@
       sprint: h('button', { class: 'v-sprint px-frame hidden', 'aria-label': L('Чү! (Shift)', 'Chü! (Shift)'),
         onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
+      mini: h('canvas', { class: 'v-mini px-frame', width: WD.W * 3, height: WD.H * 3, 'aria-label': L('Газрын зураг', 'Map'), title: L('Газрын зураг: дарж томруулна', 'Map: tap to enlarge') }),
+      jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        h('div', { class: 'v-mecol' }, els.me, els.loc), h('div', { class: 'v-pills' }, els.coins, els.water, els.season, els.net)),
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.water, els.season, els.net)),
       els.race,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
@@ -241,7 +249,7 @@
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
           els.music),
-        els.hotbar, els.ctx, els.sprint));
+        els.hotbar, els.jump, els.ctx, els.sprint));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -264,6 +272,8 @@
     canvas.addEventListener('pointerdown', onTap);
     window.addEventListener('keydown', onKey, true); window.addEventListener('keyup', onKeyUp, true); window.addEventListener('blur', clearKeys);
     root.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }); // HUD buttons never keep focus
+    live.miniBase = miniBase();
+    els.mini.addEventListener('pointerdown', onMiniTap);
     net.connect(); hud(); updateCtx();
     live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
     live.raf = requestAnimationFrame(frame);
@@ -346,6 +356,7 @@
       }
       case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
       case 'arcade': return ['ui:book', L('Сурах', 'Learn')];
+      case 'academy': return ['ui:book', L('Монгол бичиг', 'Mongol script')];
       case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
       case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
       case 'well': return ['ui:drop', L('Ус авах', 'Get water')];
@@ -365,7 +376,7 @@
     if (!live) return;
     const a = contextAction(), b = live.els.ctx;
     b.classList.toggle('hidden', !a);
-    if (a) { const [k, t] = labelFor(a); rc(b, pic(k, 36), h('span', null, t)); }
+    if (a) { const [k, t] = labelFor(a); rc(b, pic(k, 36), h('span', null, t), coarse ? null : h('kbd', { class: 'v-key' }, 'E')); }
   }
   function doAction(a) {
     if (!a || !live || live.race) return; // no shops or menus in the middle of a race
@@ -373,6 +384,7 @@
       case 'plot': return plotAction(a.i);
       case 'home': return wardrobe();
       case 'arcade': return TG.go('learn');
+      case 'academy': return TG.go('bichig');
       case 'shop': return shopModal();
       case 'board': return questModal();
       case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `${v.water}/${v.can}`, '#93d4f6'); hud(); return; }
@@ -392,6 +404,7 @@
   function onTap(e) {
     if (!live) return;
     e.preventDefault();
+    if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
@@ -420,16 +433,25 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
-    if (!live || document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && live.race) { live.race.sprint = true; return; }
     if (e.code === 'Space' || e.code === 'KeyE') {
-      // Space is only ever the action button: it never re-presses a focused HUD button
+      // Space jumps, E uses what is next to you; neither ever re-presses a focused HUD button
       e.preventDefault(); e.stopPropagation();
       if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-      if (!e.repeat) { const a = contextAction(); if (a) doAction(a); }
+      if (e.repeat) return;
+      if (e.code === 'Space') jump();
+      else { const a = contextAction(); if (a) doAction(a); }
     }
+  }
+  const JUMP_MS = 460;
+  const jumpZ = (o, pn) => { const q = (pn - (o.jt || -1e9)) / JUMP_MS; return q >= 0 && q < 1 ? Math.round(Math.sin(q * Math.PI) * (o.look && o.look.ride ? 7 : 9)) : 0; };
+  function jump() {
+    if (!live) return;
+    const pn = performance.now(); if (pn - (live.me.jt || -1e9) < JUMP_MS) return;
+    live.me.jt = pn; TG.sfx.pop && TG.sfx.pop(); net.send({ t: 'jump' });
   }
   function onKeyUp(e) {
     if (!live) return;
@@ -438,11 +460,49 @@
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
   }
 
+  // ---------------------------------------------------------------- minimap
+  const MINI = { g: '#76b947', T: '#3f7a2c', p: '#d8ab6c', s: '#d9cdb5', w: '#4aa6e2', d: '#a46d3b', o: '#8c5a33', f: '#a46d3b', r: '#a5a5b0', a: '#e8c994' };
+  const MINI_OBJ = { ger: '#f4efe3', shop: '#e14b3d', board: '#a46d3b', well: '#77778a', lot: '#c8a06a', bleachers: '#a46d3b', ovoo: '#a5a5b0', uya: '#8a5a33', archery: '#e9a91f', academy: '#2f7d5b' };
+  /** One pixel per tile: ground, roads, water, buildings. */
+  function miniBase() {
+    const m = PX.mk(WD.W, WD.H);
+    for (let y = 0; y < WD.H; y++) for (let x = 0; x < WD.W; x++) {
+      const c = WD.g[y][x], o = c === 'B' ? WD.occ[x + ',' + y] : null;
+      PX.R(m.x, x, y, 1, 1, o ? MINI_OBJ[o.kind] || MINI.g : MINI[c] || MINI.g);
+    }
+    return m.c;
+  }
+  function drawMini() {
+    const cv = live.els.mini, m = cv.getContext('2d'), s = cv.width / WD.W, pn = performance.now(), dot = (x, y, col, r = 2) => { m.fillStyle = '#2b1e2e'; m.fillRect(Math.round(x * s) - r - 1, Math.round(y * s) - r - 1, r * 2 + 3, r * 2 + 3); m.fillStyle = col; m.fillRect(Math.round(x * s) - r, Math.round(y * s) - r, r * 2 + 1, r * 2 + 1); };
+    m.imageSmoothingEnabled = false; m.drawImage(live.miniBase, 0, 0, cv.width, cv.height);
+    lotsArr().forEach((l, i) => { if (l) { const o = WD.lots[i]; PX.R(m, o.x * s + 2, o.y * s + 2, 3 * s - 4, 3 * s - 4, R.ROOF[l.roof] || R.ROOF.blue); } });
+    for (const np of WD.objects) {
+      if (np.kind === 'npcq' && npcMark(np.id)) dot(np.x + 0.5, np.y + 0.5, npcMark(np.id) === '?' ? '#7fe07a' : '#f7c646');
+      if (np.kind === 'emee' && !(V().emee && V().emee.visits)) dot(np.x + 0.5, np.y + 0.5, '#f492ba');
+    }
+    for (const o of live.others.values()) dot(o.px + 0.5, o.py + 0.8, '#ffffff');
+    if (Math.floor(pn / 450) % 2) dot(live.me.px + 0.5, live.me.py + 0.8, '#ffffff', 3);
+    dot(live.me.px + 0.5, live.me.py + 0.8, '#e14b3d');
+    const { bw, bh } = live.view, c = cam(); m.strokeStyle = 'rgba(255,255,255,.85)'; m.lineWidth = 1;
+    m.strokeRect(Math.round((c.x / T) * s) + 0.5, Math.round((c.y / T) * s) + 0.5, Math.round((bw / T) * s) - 1, Math.round((bh / T) * s) - 1);
+  }
+  /** First tap opens the big map; on the big map, tap a place to walk there. */
+  function onMiniTap(e) {
+    e.preventDefault(); e.stopPropagation();
+    const cv = live.els.mini;
+    if (!cv.classList.contains('big')) { cv.classList.add('big'); TG.sfx.tap(); return; }
+    const r = cv.getBoundingClientRect(), tx0 = Math.floor(((e.clientX - r.left) / r.width) * WD.W), ty0 = Math.floor(((e.clientY - r.top) / r.height) * WD.H);
+    cv.classList.remove('big');
+    const t = !WD.blocked(tx0, ty0) ? { x: tx0, y: ty0 } : WD.nearestOpen(tx0, ty0, live.me.x, live.me.y);
+    if (t) goTo(t, null);
+  }
+
   // ---------------------------------------------------------------- update + draw
   function frame(ts) {
     if (!live) return;
     const dt = Math.min(0.05, (ts - live.last) / 1000); live.last = ts;
-    update(dt); draw(ts / 1000);
+    update(dt);
+    if (!(TG.scene && TG.scene.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
     live.raf = requestAnimationFrame(frame);
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
@@ -565,14 +625,15 @@
     if (live.season === 'spring') live.sheep.forEach((q) => ents.push({ y: q.py + 0.3, f: () => sprite(PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.flip) })); // spring: the lambs are born
     const person = (o) => {
       if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const a = PX.animal(o.look.pet, frame(o)); shadow(o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.px > o.petPos.x + 0.05); } });
-      if (o.look.ride) ents.push({ y: o.py, f: () => drawRider(o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py) });
-      else ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, frame(o)), o.px * T, o.py * T - 12); } });
+      const z = jumpZ(o, pn);
+      if (o.look.ride) ents.push({ y: o.py, f: () => drawRider(o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py, z) });
+      else ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, z ? 0 : frame(o)), o.px * T, o.py * T - 12 - z); } });
     };
     // a rider on a Mongolian horse; face 1 = left, 2 = right
-    const drawRider = (look, face, moving, wx, wy) => {
-      const hf = moving ? 1 + (Math.floor(t * 12) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
-      const HX = wx * T - 6, HY = wy * T + 16 - hs.height;
-      ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(SX(HX + 4), SY(HY + 21), 20 * k, 2 * k);
+    const drawRider = (look, face, moving, wx, wy, z = 0) => {
+      const hf = z ? 2 : moving ? 1 + (Math.floor(t * 12) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
+      const HX = wx * T - 6, HY = wy * T + 16 - hs.height - z;
+      ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(SX(HX + 4), SY(HY + 21 + z), 20 * k, 2 * k);
       sprite(PX.char({ ...look, pet: null }, left ? 1 : 2, 0), HX + 6, HY - 15);
       sprite(hs, HX, HY, left);
     };
@@ -1213,32 +1274,33 @@
     const l = lotsArr()[i]; if (!l) return;
     const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id), today = S.dkey();
     v.homeDay = v.homeDay || {};
-    const W2 = 240, H2 = 170, cx = 120;
-    const base = document.createElement('canvas'); base.width = W2; base.height = H2; PX.interior(base, R.ROOF[l.roof] || R.ROOF.blue, furn);
-    { const b2 = base.getContext('2d'); PX.R(b2, 64, 52, 26, 14, '#2b1e2e'); PX.R(b2, 65, 53, 24, 12, '#c98a4b'); PX.R(b2, 65, 53, 24, 2, '#e5a157'); PX.R(b2, 70, 55, 6, 4, '#ffffff'); PX.R(b2, 80, 56, 5, 3, '#f3e6c4'); } // low table with a bowl and aaruul
-    const cv = h('canvas', { class: 'ger-cv', width: W2, height: H2 }), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
-    const say = h('div', { class: 'ger-say' }), act = h('button', { class: 'btn primary block ger-act', disabled: true });
-    const me = { x: cx, y: 150, tx: cx, ty: 150, dir: 3, moving: false }, dog = { x: cx + 18, y: 156 }, fx = { steam: 0, zzz: 0, notes: 0 };
-    const keys = new Set();
-    const floor = (px, py) => ((px - cx) / 100) ** 2 + ((py - 98) / 60) ** 2 <= 1;
-    const spot = (id, sx, sy, mn, en, run, need) => ({ id, x: sx, y: sy, name: Tx(mn, en), run, need });
+    const room = PX.gerRoom(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red, furn), cx = PX.ROOM.cx;
+    const fx = { steam: -1e9, zzz: -1e9, notes: -1e9, churn: -1e9 };
     const dayOnce = (k) => { if (!own || v.homeDay[k] === today) return false; v.homeDay[k] = today; S.save(); return true; };
-    const sayIt = (txt) => { rc(say, h('p', null, txt)); };
-    const spots = [
-      spot('door', cx, 152, 'Гарах', 'Leave', () => close()),
-      spot('table', 77, 70, 'Ааруул идэх', 'Eat aaruul', () => { TG.sfx.pop && TG.sfx.pop(); sayIt('🧀 ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); }),
-      spot('khoimor', cx, 44, 'Хойморт суух', 'Sit in the khoimor', () => sayIt(L('Хоймор бол гэрийн хамгийн хүндэт газар. Гэрийн эзэн тань зочдоо, ахмадуудаа энд урьдаг.', 'The khoimor is the place of honour. As the host, you invite elders and guests to sit here.'))),
+    const sayIt = (txt) => sc.say(h('p', null, txt));
+    const spot = (id, x, y, mn, en, run) => ({ id, x, y, label: () => L(mn, en), run });
+    const things = [
+      spot('door', cx, 192, 'Гарах', 'Go outside', () => sc.close()),
+      spot('khoimor', cx, 105, 'Хойморт суух', 'Sit in the khoimor', () => sayIt(L('Хоймор бол гэрийн хамгийн хүндэт газар. Гэр бүлийн шүтээн, зураг энд байдаг. Ахмад хүн, хүндтэй зочныг хойморт урьдаг.', 'The khoimor, opposite the door, is the place of honour. The family shrine and photos are kept here, and elders and honoured guests are invited to sit here.'))),
+      spot('table', 138, 118, 'Ааруул идэх', 'Eat aaruul', () => { TG.sfx.pop && TG.sfx.pop(); sayIt('🧀 ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); }),
+      spot('bagana', 184, 132, 'Баганыг харах', 'Look at the posts', () => sayIt(L('Хоёр багана тоноо даадаг. Хоёр баганын дундуур гарч болохгүй, баганыг түшиж болохгүй гэдэг ёс бий.', 'The two bagana posts hold up the toono. By custom you never walk between the two posts and never lean on them.'))),
+      spot('toono', 132, 168, 'Тооно руу харах', 'Look up at the toono', () => sayIt(L('Тооноор тусах нарны гэрэл униар гулсаж явдгаар малчид цагийг мэддэг байжээ. Тооно бол гэрийн нар цаг!', 'Herders told the time by the patch of sunlight from the toono creeping across the roof poles. The toono is the ger’s sun clock!'))),
+      spot('saddle', 90, 176, 'Эмээл үзэх', 'Look at the saddle', () => sayIt(L('Баруун тал бол эрэгтэй хүний тал: эмээл, хазаар, уурга энд байна. Монгол эмээл өндөр бүүрэгтэй, мөнгөн товруудтай.', 'The west side is the men’s side: the saddle, bridle and lasso pole live here. A Mongol saddle has a high front and back and silver studs.'))),
+      spot('khukhuur', 60, 158, 'Айраг бүлэх', 'Churn the airag', () => { fx.churn = performance.now(); TG.sfx.scrub && TG.sfx.scrub(); sayIt(L('🥛 Хөхүүрт гүүний сүүг мянга гаруй удаа бүлж айраг исгэдэг. Гэрт орж ирсэн хүн бүр бүлүүрээр хэдэн удаа бүлээд өгдөг заншилтай!', '🥛 Mare’s milk is churned more than a thousand times in the khukhuur to make airag. Everyone who comes in gives it a few stirs!')); if (dayOnce('churn')) reward(0, 5); }),
+      spot('cupboard', 244, 178, 'Аяга таваг үзэх', 'Look at the cupboard', () => sayIt(L('Зүүн тал бол эмэгтэй хүний тал: аяга таваг, тогоо шанага, хоол хүнс энд байдаг.', 'The east side is the women’s side: bowls, pots, ladles and food are kept here.'))),
+      spot('water', 210, 190, 'Ус утгах', 'Scoop some water', () => { TG.sfx.pour && TG.sfx.pour(0.5); sayIt(L('💧 Усыг худаг, булгаас зөөж авчирдаг. Усыг хэзээ ч бохирдуулдаггүй, хайрлан гамнадаг.', '💧 Water is carried in from the well or spring. It is never wasted or made dirty.')); }),
     ];
-    if (has('tulga')) spots.push(spot('tulga', cx, 86, 'Цай чанах', 'Make milk tea', () => { fx.steam = performance.now(); TG.sfx.pour ? TG.sfx.pour(0.6) : TG.sfx.tap(); sayIt('🍵 ' + tx(TG.pick(GER_TEA))); if (dayOnce('tea')) reward(5, 10); }));
-    if (has('or')) spots.push(spot('or', 40, 96, 'Унтаж амрах', 'Sleep and rest', () => {
-      fx.zzz = performance.now(); TG.sfx.chime && TG.sfx.chime();
+    if (has('tulga')) things.push(spot('tulga', cx, 158, 'Цай чанах', 'Make milk tea', () => { fx.steam = performance.now(); TG.sfx.pour ? TG.sfx.pour(0.6) : TG.sfx.tap(); sayIt('🍵 ' + tx(TG.pick(GER_TEA))); if (dayOnce('tea')) reward(5, 10); }));
+    else things.push(spot('tulga', cx, 158, 'Голомт', 'The hearth', () => sayIt(L('Гал голомт бол гэрийн зүрх. Тулга авбал энд цай чанаж болно.', 'The hearth is the heart of the ger. Get a stove and you can make tea here.'))));
+    if (has('or')) for (const [bx, side] of [[48, 'w'], [272, 'e']]) things.push(spot('or' + side, bx, 140, 'Унтаж амрах', 'Sleep and rest', () => {
+      fx.zzz = performance.now(); fx.zx = bx; TG.sfx.chime && TG.sfx.chime();
       if (own && v.rest !== today) { v.rest = today; v.water = v.can; S.save(); reward(5, 10); sayIt(L('😴 Сайхан амарлаа! Усны сав дүүрч, +10 XP.', '😴 A good rest! Water refilled, +10 XP.')); hud(); }
       else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
     }));
-    if (has('avdar')) spots.push(spot('avdar', cx, 40, 'Авдраа нээх', 'Open the chest', () => chestModal()));
-    if (has('morinkhuur')) spots.push(spot('morinkhuur', 148, 46, 'Морин хуур тоглох', 'Play the morin khuur', () => { fx.notes = performance.now(); playMelody(); sayIt(L('🎻 Морин хуурын аялгуу гэрийг дүүргэлээ. Хөөрхөн Намжилын морь сонсож байгаа юм шиг…', '🎻 The fiddle’s tune fills the ger, as if Khökhöö Namjil’s horse were listening…')); if (dayOnce('music')) reward(0, 8); }));
-    if (has('shirdeg')) spots.push(spot('shirdeg', cx, 118, 'Басартай суух', 'Sit with Basar', () => { dog.x = me.x + 14; dog.y = me.y + 2; sayIt('🐕 ' + tx(TG.pick(TG.BASAR.FACTS))); }));
-    if (has('shagai')) spots.push(spot('shagai', 154, 144, 'Шагай хаях', 'Throw shagai', () => {
+    if (has('avdar')) things.push(spot('avdar', 206, 106, 'Авдраа нээх', 'Open the chest', () => chestModal()));
+    if (has('morinkhuur')) things.push(spot('morinkhuur', 104, 110, 'Морин хуур тоглох', 'Play the morin khuur', () => { fx.notes = performance.now(); playMelody(); sayIt(L('🎻 Морин хуурын аялгуу гэрийг дүүргэлээ. Морин хуурыг хойморын баруун талд хүндэтгэн байрлуулдаг.', '🎻 The fiddle’s tune fills the ger. The morin khuur is honoured with a place on the west of the khoimor.')); if (dayOnce('music')) reward(0, 8); }));
+    if (has('shirdeg')) things.push(spot('shirdeg', 96, 150, 'Басартай суух', 'Sit with Basar', () => sayIt('🐕 ' + tx(TG.pick(TG.BASAR.FACTS)))));
+    if (has('shagai')) things.push(spot('shagai', 214, 170, 'Шагай хаях', 'Throw shagai', () => {
       const S4 = ['🐎', '🐫', '🐑', '🐐'], roll = [0, 1, 2, 3].map(() => Math.floor(Math.random() * 4)), horses = roll.filter((r) => r === 0).length;
       TG.sfx.roll ? TG.sfx.roll() : TG.sfx.tap();
       sayIt(`🦴 ${roll.map((r) => S4[r]).join(' ')}  ·  ${horses === 4 ? L('Дөрвөн морь! Маш ховор!', 'Four horses! Very rare!') : L(`${horses} морь буулаа.`, `${horses} horse side(s).`)}`);
@@ -1256,47 +1318,27 @@
           v.horse && v.horse.wins ? h('div', { class: 'v-row' }, pic('ui:trophy'), h('div', { class: 'v-row-b' }, h('b', null, L('Түрүү морь', 'Race wins')), h('small', null, String(v.horse.wins)))) : null,
           ...(v.owned || []).slice(0, 12).map((id) => { const it = R.ITEMS.find((q) => q.id === id); return it ? h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name)))) : null; }))), { cls: 'v-modal' });
     }
-    let raf = 0, last = performance.now(), near = null;
-    const loop = (ts) => {
-      const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-      let ix = (keys.has('r') ? 1 : 0) - (keys.has('l') ? 1 : 0), iy = (keys.has('d') ? 1 : 0) - (keys.has('u') ? 1 : 0);
-      if (ix || iy) { const n = Math.hypot(ix, iy); me.tx = me.x + (ix / n) * 6; me.ty = me.y + (iy / n) * 6; }
-      const dx = me.tx - me.x, dy = me.ty - me.y, d = Math.hypot(dx, dy);
-      me.moving = d > 1;
-      if (me.moving) { const sp = 62 * dt, nx = me.x + (dx / d) * Math.min(sp, d), ny = me.y + (dy / d) * Math.min(sp, d); if (floor(nx, ny)) { me.x = nx; me.y = ny; } else { me.tx = me.x; me.ty = me.y; } me.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 1 : 2) : (dy < 0 ? 3 : 0); }
-      dog.x += (me.x + 14 - dog.x) * Math.min(1, dt * 2.5); dog.y += (me.y + 4 - dog.y) * Math.min(1, dt * 2.5);
-      near = null; let bd = 22; for (const s2 of spots) { const dd = Math.hypot(s2.x - me.x, s2.y - me.y); if (dd < bd) { bd = dd; near = s2; } }
-      act.disabled = !near; act.textContent = near ? `${tx(near.name)} (Space)` : L('Тавилга руу ойртоорой', 'Walk up to something');
-      x.drawImage(base, 0, 0);
-      if (near && near.id !== 'door') { x.strokeStyle = `rgba(247,198,70,${0.6 + 0.3 * Math.sin(ts / 150)})`; x.lineWidth = 1; x.beginPath(); x.ellipse(near.x, near.y + 4, 14, 6, 0, 0, Math.PI * 2); x.stroke(); }
-      const ft = (k, dur) => ts - fx[k] < dur;
-      if (ft('steam', 3000)) for (let k = 0; k < 4; k++) { const q = ((ts / 900 + k / 4) % 1); x.fillStyle = `rgba(255,255,255,${0.7 - q * 0.6})`; x.fillRect(Math.round(cx - 2 + Math.sin(ts / 300 + k) * 3), Math.round(80 - q * 26), 2, 2); }
-      if (ft('zzz', 2500)) { x.fillStyle = '#ffffff'; x.font = '700 9px Rubik, sans-serif'; x.fillText('z', 46, 80 - ((ts / 60) % 14)); x.fillText('Z', 52, 72 - ((ts / 50) % 16)); }
-      if (ft('notes', 3600)) for (let k = 0; k < 3; k++) { const q = ((ts / 1200 + k / 3) % 1); x.fillStyle = '#f7c646'; x.fillRect(Math.round(154 + k * 6 + Math.sin(ts / 200 + k) * 3), Math.round(44 - q * 30), 2, 2); x.fillRect(Math.round(156 + k * 6 + Math.sin(ts / 200 + k) * 3), Math.round(39 - q * 30), 1, 5); }
-      const ents = [{ y: dog.y, f: () => x.drawImage(PX.bankhar(Math.hypot(me.x + 14 - dog.x, me.y + 4 - dog.y) > 3 ? 1 + Math.floor(ts / 120) % 2 : 3), Math.round(dog.x - 11), Math.round(dog.y - 16)) },
-        { y: me.y, f: () => x.drawImage(PX.char({ ...v.look, ride: null }, me.dir, me.moving ? 1 + Math.floor(ts / 125) % 2 : 0), Math.round(me.x - 8), Math.round(me.y - 26)) }];
-      ents.sort((a, b) => a.y - b.y).forEach((e) => e.f());
-      raf = requestAnimationFrame(loop);
-    };
-    cv.addEventListener('pointerdown', (e) => {
-      const r = cv.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W2, py = (e.clientY - r.top) / r.height * H2;
-      const hit = spots.find((s2) => Math.hypot(s2.x - px, s2.y - py) < 16);
-      if (hit && Math.hypot(hit.x - me.x, hit.y - me.y) < 24) return hit.run();
-      me.tx = hit ? hit.x : px; me.ty = hit ? hit.y + 8 : py;
+    const since = (k, dur, ts) => ts - fx[k] < dur;
+    const buttons = own
+      ? [h('button', { class: 'btn scene-side', onclick: () => homeModal(i) }, '🛋️ ', L('Тохижуулах', 'Decorate'), missing.length ? ` (${missing.length})` : ''), h('button', { class: 'btn scene-side', onclick: () => wardrobe() }, '👘 ', L('Хувцас', 'Wardrobe'))]
+      : [h('button', { class: 'btn scene-side', onclick: () => { if (live && live.online) net.send({ t: 'say', k: 'p', i: 0 }); else if (live) live.me.bubble = { text: tx(R.PHRASES[0]), t0: performance.now() }; sc.close(); } }, L('Мэндлээд гарах', 'Say hi and leave'))];
+    const sc = TG.scene.open({
+      cls: 'ger-scene', W: room.W, H: room.H, fit: 'contain', bg: '#1e140c', look: v.look, start: { x: cx, y: 186 }, speed: 62,
+      title: own ? L('Миний гэр', 'My ger') : `${l.n} · ${L('гэр', 'ger')}`, sub: own ? `${furn.length}/${R.FURNITURE.length} ${L('тавилга', 'furniture')}` : L('Зочилж байна', 'Visiting'),
+      free: room.free, things, buttons,
+      drawBg: (b) => b.drawImage(room.bg, 0, 0),
+      ents: () => room.props.map((p) => ({ y: p.base, f: (b) => b.drawImage(p.c, p.x, p.y) })),
+      drawTop: (b, t) => {
+        const ts = t * 1000;
+        if (since('steam', 3000, ts)) for (let k = 0; k < 5; k++) { const q = (ts / 900 + k / 5) % 1; b.fillStyle = `rgba(255,255,255,${0.75 - q * 0.6})`; b.fillRect(Math.round(cx - 3 + Math.sin(ts / 300 + k) * 4), Math.round(128 - q * 28), 2, 2); }
+        if (since('zzz', 2500, ts)) { b.fillStyle = '#ffffff'; b.font = '700 10px Rubik, sans-serif'; b.fillText('z', fx.zx - 4, 116 - ((ts / 60) % 14)); b.fillText('Z', fx.zx + 3, 108 - ((ts / 50) % 16)); }
+        if (since('notes', 3600, ts)) for (let k = 0; k < 3; k++) { const q = (ts / 1200 + k / 3) % 1; b.fillStyle = '#f7c646'; b.fillRect(Math.round(110 + k * 7 + Math.sin(ts / 200 + k) * 3), Math.round(70 - q * 30), 2, 2); b.fillRect(Math.round(112 + k * 7 + Math.sin(ts / 200 + k) * 3), Math.round(65 - q * 30), 1, 5); }
+        if (since('churn', 1500, ts)) { b.fillStyle = '#fff6e0'; for (let k = 0; k < 3; k++) b.fillRect(40 + k * 4, Math.round(128 - ((ts / 90 + k * 5) % 10)), 2, 2); }
+      },
+      info: h('p', null, own ? L('Гэртээ тавтай морил! Босгыг алхаж давлаа ✓. Тавилга руу ойртоод E дар, Space дарвал үсэрнэ.', 'Welcome home! You stepped over the threshold ✓. Walk up to things and press E. Space makes you jump.') : L(`${l.n}-ийн гэрт зочиллоо. Нар зөв, баруун гар талаараа эргэж ажиглаарай.`, `You are visiting ${l.n}'s ger. Look around moving sunwise, to your left first.`)),
+      onClose: () => { if (live) { live.keys.clear(); updateCtx(); } },
     });
-    act.addEventListener('click', () => near && near.run());
-    const KEY = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
-    const kd = (e) => { if (document.querySelectorAll('.modal-back').length > 1) return; if (KEY[e.code]) { e.preventDefault(); keys.add(KEY[e.code]); } else if (e.code === 'Space' || e.code === 'KeyE') { e.preventDefault(); e.stopPropagation(); if (!e.repeat && near) near.run(); } };
-    const ku = (e) => { if (KEY[e.code]) keys.delete(KEY[e.code]); };
-    window.addEventListener('keydown', kd, true); window.addEventListener('keyup', ku, true);
-    sayIt(own ? L('Гэртээ тавтай морил! Босгоо алхаж давлаа ✓. Тавилга руу ойртоод дараарай.', 'Welcome home! You stepped over the threshold ✓. Walk up to the furniture and press.') : L(`${l.n}-ийн гэрт зочиллоо. Эргэн тойрноо нар зөв ажиглаарай.`, `You are visiting ${l.n}'s ger. Look around, moving sunwise.`));
-    const close = TG.modal(h('div', { class: 'ger-inside' },
-      h('div', { class: 'ger-top' }, h('h2', null, own ? L('Миний гэр', 'My ger') : `${l.n} · ${L('гэр', 'ger')}`), own ? h('small', { class: 'muted' }, `${furn.length}/${R.FURNITURE.length} ${L('тавилга', 'furniture')}`) : null),
-      cv, say, act,
-      own ? h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { homeModal(i); } }, '🛋️ ', L('Тохижуулах', 'Decorate'), missing.length ? ` (${missing.length})` : ''), h('button', { class: 'btn', onclick: () => { wardrobe(); } }, '👘 ', L('Хувцас', 'Wardrobe')))
-        : h('div', { class: 'row-btns' }, h('button', { class: 'btn primary', onclick: () => { if (live.online) net.send({ t: 'say', k: 'p', i: 0 }); else live.me.bubble = { text: tx(R.PHRASES[0]), t0: performance.now() }; close(); } }, L('Мэндлээд гарах', 'Say hi and leave')))),
-      { cls: 'v-modal ger-modal', onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', kd, true); window.removeEventListener('keyup', ku, true); } });
-    raf = requestAnimationFrame(loop);
+    TG._village.ger = sc; // used by automated tests
   }
 
   function openBasar() {

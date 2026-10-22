@@ -22,7 +22,7 @@ let actualPort = PORT;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png',
+  '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.webmanifest': 'application/manifest+json', '.json': 'application/json', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png',
   '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' };
 const BLOCKED = [/^\/data(\/|$)/, /^\/\.git/, /^\/\.env/, /^\/server\.js$/, /^\/basar-ai\.js$/, /^\/node_modules/];
 
@@ -42,7 +42,7 @@ function serveStatic(req, res) {
   fs.stat(file, (err, st) => {
     if (err || !st.isFile()) { res.writeHead(404); return res.end('Not found'); }
     const type = TYPES[path.extname(file)] || 'application/octet-stream';
-    const cache = /\.(woff2|m4a|mp3|ogg|wav)$/.test(file) ? 'public, max-age=604800' : 'no-cache';
+    const cache = /\.(woff2|ttf|m4a|mp3|ogg|wav)$/.test(file) ? 'public, max-age=604800' : 'no-cache';
     // byte ranges: Safari and iPhones refuse to play audio from servers without them
     const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
     if (m && (m[1] || m[2])) {
@@ -171,6 +171,11 @@ function onMessage(conn, text) {
       p.x = numf(m.x, 0.5, R.W - 2); p.y = numf(m.y, 0.5, R.H - 2); p.dir = num(m.dir, 0, 3);
       broadcast(r, { t: 'move', id: p.id, x: p.x, y: p.y, dir: p.dir }, conn);
       break;
+    case 'jump': { // show other players your jump, at most a few times a second
+      const t = Date.now(); if (t - (p.jt || 0) < 300) return; p.jt = t;
+      broadcast(r, { t: 'jump', id: p.id }, conn);
+      break;
+    }
     case 'look':
       p.look = R.cleanLook(m.look); p.lvl = num(m.lvl, 1, 99);
       broadcast(r, { t: 'look', id: p.id, look: p.look, lvl: p.lvl }, conn);
