@@ -42,6 +42,8 @@
   const current = (d) => SEASONS[day(d) % 4];
   /** The real season in Mongolia right now, by month. */
   const real = (d = new Date()) => SEASONS[[3, 3, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3][d.getMonth()]];
+  /** Evening in Нутаг (19:00–6:00 local time): the top view and first person both go dark together. */
+  const night = (d = new Date()) => { const hr = d.getHours(); return hr >= 19 || hr < 6; };
 
   function wheel(cur) {
     return h('div', { class: 'season-wheel' }, SEASONS.map((s) => h('div', { class: 'sw-i' + (s === cur ? ' on' : ''), style: { '--sc': s.color } }, h('span', null, s.icon), h('b', null, tx(s.name)), h('small', null, tx(s.camp)))));
@@ -60,5 +62,5 @@
       h('div', { class: 'season-task' }, h('b', null, '🎯 ', L('Улирлын даалгавар', 'Season task')), h('p', null, tx(s.game)), h('small', null, L('Өдрийн даалгаврын самбарт улирлын тусгай даалгавар (+50% шагнал) байна.', 'The quest board has a special season quest (+50% reward).'))),
       h('p', { class: 'muted season-foot' }, L(`Нутагт улирал өдөр бүр солигдоно. Маргааш: ${next.icon} ${tx(next.name)}. Жинхэнэ Монголд яг одоо ${r.icon} ${tx(r.name)} байна.`, `Seasons in Nutag change every day. Tomorrow: ${next.icon} ${tx(next.name)}. In real Mongolia it is ${r.icon} ${tx(r.name)} right now.`))), { cls: 'v-modal' });
   }
-  TG.seasons = { SEASONS, current, real, open, byId: (id) => SEASONS.find((s) => s.id === id) };
+  TG.seasons = { SEASONS, current, real, night, open, byId: (id) => SEASONS.find((s) => s.id === id) };
 })(window.TG);

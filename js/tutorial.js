@@ -49,7 +49,7 @@
     const name = (S.active() || {}).name || '';
     // when she points at a button in the lower half of the screen, her box moves to the top so you can see it
     const lowGlow = () => { const el = run && run.glowEl; return !!el && el.getBoundingClientRect().top > innerHeight * 0.5; };
-    const say = (face, mn, en, opts = {}) => { check(r); glow(opts.glow || null); return TG.dialog.say({ who: opts.who || 'guide', face, text: T(mn, en), top: lowGlow() }).then(() => check(r)); };
+    const say = (face, mn, en, opts = {}) => { check(r); glow(opts.glow || null); return TG.dialog.say({ who: opts.who || 'guide', face, text: T(mn, en), top: lowGlow(), free: true }).then(() => check(r)); };
     const ask = (face, mn, en, choices) => { check(r); glow(null); return TG.dialog.ask({ who: 'guide', face, text: T(mn, en), choices }).then((i) => { check(r); return i; }); };
 
     if (replay) {
@@ -76,7 +76,7 @@
 
     // Basar
     await say('happy', 'Хараач, энэ миний найз Басар! Монгол банхар нохой. Тэр маш ухаантай.', 'Look, this is my friend Basar! A Mongolian Bankhar dog. He is very clever.');
-    await TG.dialog.say({ who: 'basar', face: 'happy', text: T('Вуф! Вуф-вуф! Сайн уу! Надаас юу ч асуугаарай!', 'Woof! Woof-woof! Hi! Ask me anything!') }); check(r);
+    await TG.dialog.say({ who: 'basar', face: 'happy', text: T('Вуф! Вуф-вуф! Сайн уу! Надаас юу ч асуугаарай!', 'Woof! Woof-woof! Hi! Ask me anything!'), free: true }); check(r);
     await say('wink', coarse ? 'Басар дээр эсвэл доод талын 🐕 товч дээр дарвал түүнтэй ярилцана. Оролдоод үз дээ!' : 'Басар дээр дарах, B товч эсвэл 🐕 товчоор түүнтэй ярилцана. Оролдоод үз дээ!', coarse ? 'Tap Basar or the 🐕 button to talk to him. Give it a try!' : 'Click Basar, press B, or use the 🐕 button to talk to him. Try it!', { glow: '.v-basar' });
     let opened = false;
     const basarDone = () => { if (document.querySelector('.modal .b-head')) opened = true; return opened && !document.querySelector('.modal-back'); };

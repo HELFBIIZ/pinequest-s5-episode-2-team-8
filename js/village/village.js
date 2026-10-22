@@ -585,7 +585,7 @@
     if (!live) return;
     e.preventDefault();
     if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
-    if (TG.dialog && TG.dialog.active()) return;
+    if (TG.dialog && TG.dialog.active() && !TG.dialog.free()) return; // the guide just talking doesn't stop you walking (tap or joystick)
     if (live.drag) return; // one finger steers, the other presses buttons
     live.drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false };
     try { live.canvas.setPointerCapture(e.pointerId); } catch (er) { /* not supported */ }
@@ -643,7 +643,9 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
-    if (!live || document.querySelector('.modal-back') || (TG.dialog && TG.dialog.active()) || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    // while someone is just talking (no answers to pick), you can still walk: only the movement keys get through
+    const talking = TG.dialog && TG.dialog.active() && !(TG.dialog.free() && (KEYS[e.code] || /Shift/.test(e.code)));
+    if (!live || document.querySelector('.modal-back') || talking || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
@@ -802,7 +804,7 @@
     const backBtn = h('button', { class: 'btn scene-side', onclick: () => sc && sc.close() }, '🗺️ ', L('Дээрээс харах', 'Top view'));
     let sc = null;
     sc = TG.fp.open({
-      cls: 'village-fp', world, scale: TG.fpworld.TILE, look: v.look,
+      cls: 'village-fp', world, scale: TG.fpworld.TILE, look: v.look, season: () => live.season,
       start: { x: m.px + 0.5, y: m.py + 0.82 }, W: WD.W, title: L('Нутаг', 'Nutag'), sub: L('Өөрийн нүдээр', 'First person'), buttons: [horseBtn, backBtn], things,
       onPrimary: (api) => { if (!live.battle || live.battle.over) return false; const d = api.dir(), n = Math.hypot(d[0], d[2]) || 1, m2 = meXY(); shootAt(m2.x + (d[0] / n) * 10, m2.y + (d[2] / n) * 10); return true; },
       onKey: (code) => { if (code === 'KeyF' && live.battle) { shootNearest(); return true; } return false; },
@@ -1084,8 +1086,7 @@
     for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
     // 4) evening: dark tint + stepped lantern glow
-    const hr = new Date().getHours();
-    if (hr >= 19 || hr < 6) {
+    if (TG.seasons.night()) {
       ctx.fillStyle = 'rgba(18,22,70,.38)'; ctx.fillRect(0, 0, devW, devH);
       ctx.globalCompositeOperation = 'lighter';
       const glow = (cx, cy, rx, ry, col) => { ctx.fillStyle = col; for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy * dy) / ((ry + 0.5) * (ry + 0.5))))); ctx.fillRect(SX(cx - hw), SY(cy + dy), (hw * 2 + 1) * k, k); } };

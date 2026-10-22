@@ -331,6 +331,7 @@
     if (!cur || document.querySelector('.modal-back')) return; // a window opened on top of the dialogue gets the keys
     if (/INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     const c = cur, isAdv = ADV.includes(e.code), isUp = UP.includes(e.code), isDown = DOWN.includes(e.code);
+    if (free() && (isUp || isDown || /Arrow/.test(e.code))) return; // a free line lets the player keep walking
     if (!isAdv && !isUp && !isDown && e.code !== 'KeyX' && !/^Digit[1-4]$/.test(e.code) && !/Shift/.test(e.code) && e.code !== 'KeyB' && e.code !== 'KeyF') return;
     e.preventDefault(); e.stopPropagation();
     if (e.repeat && isAdv) return;
@@ -342,7 +343,7 @@
     }
     if (isAdv) press();
   }
-  function swallowUp(e) { if (cur && !document.querySelector('.modal-back') && [...ADV, ...UP, ...DOWN].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } }
+  function swallowUp(e) { if (cur && !free() && !document.querySelector('.modal-back') && [...ADV, ...UP, ...DOWN].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } }
 
   function speakerName(sp, line) { const n = line.name || sp.name; return typeof n === 'function' ? n() : TG.tx(n); }
   /** Show one line. line: { who, face, text, choices?: [text…], name?, top?: show the box at the top }. Resolves on tap/key (or with the chosen index). */
@@ -351,6 +352,7 @@
     c.line = line; c.sp = sp; c.spId = line.who; c.lastDraw = '';
     c.root.classList.toggle('portrait-tall', sp.art[1] > sp.art[0]);
     c.root.classList.toggle('at-top', !!line.top); // move out of the way of something at the bottom of the screen
+    c.root.classList.toggle('free', !!line.free && !line.choices); // free: the world behind stays playable (walk, tap) while she talks
     c.name.textContent = speakerName(sp, line);
     c.opts = []; c.choices.replaceChildren(); c.root.classList.remove('asking', 'ready');
     const text = TG.tx(line.text);
@@ -380,5 +382,7 @@
     c.root.classList.remove('show'); setTimeout(() => c.root.remove(), 200);
     if (c.waiting) { const r = c.waiting; c.waiting = null; r(c.opts.length ? -1 : undefined); }
   }
-  TG.dialog = { SPEAKERS, register, say, ask, run, close, active: () => !!cur, choose: (i) => choose(i), press: () => press() };
+  /** The current line lets the player walk while it is shown (no answers to pick). */
+  function free() { return !!(cur && cur.line && cur.line.free && !cur.line.choices); }
+  TG.dialog = { SPEAKERS, register, say, ask, run, close, free, active: () => !!cur, choose: (i) => choose(i), press: () => press() };
 })(window.TG);

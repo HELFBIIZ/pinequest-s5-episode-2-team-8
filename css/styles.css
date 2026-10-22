@@ -1526,6 +1526,7 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .dlg-name { font-size: 16px; color: #f7c646; letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
 .dlg-text { font-size: 20px; line-height: 1.35; letter-spacing: .03em; white-space: pre-wrap; overflow-wrap: anywhere; }
 .dlg.at-top .dlg-wrap { bottom: auto; top: calc(12px + env(safe-area-inset-top)); flex-direction: column-reverse; }
+.dlg.free .dlg-catch { pointer-events: none; } /* the guide is just talking: taps and drags reach the village (walk, joystick); tap her box to go on */
 .dlg.at-top .dlg-catch { background: linear-gradient(to bottom, rgba(10, 8, 20, .35), transparent 45%); }
 .tw-rest { visibility: hidden; }
 .dlg-more { position: absolute; right: 12px; bottom: 6px; color: #fff; font-size: 14px; opacity: 0; }
