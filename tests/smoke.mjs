@@ -210,6 +210,9 @@ try {
   if (!(await page.evaluate(() => /🍵/.test(document.querySelector('.ger-scene .scene-info').textContent)))) errors.push('ger interior: pressing E at the stove did not make tea');
   await page.keyboard.down('Space'); await sleep(150); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => TG._village.ger.me.z > 0))) errors.push('ger interior: Space did not jump');
+  await page.evaluate(() => { const m = TG._village.ger.me; m.x = m.tx = 244; m.y = m.ty = 178; }); await sleep(250);
+  await page.keyboard.press('KeyE'); await sleep(300);
+  if (!(await page.evaluate(() => (TG.store.active().village.ate || {}).tsai >= 1))) errors.push('ger interior: milk tea from the cupboard did not work');
   await sleep(500); await page.keyboard.press('Escape'); await sleep(300);
   if (await page.evaluate(() => !!document.querySelector('.fscene'))) errors.push('ger interior: Escape did not leave the ger');
   // the village: Space jumps, E interacts, the minimap is shown
@@ -217,6 +220,29 @@ try {
   await check('village minimap', '.village .v-mini');
   await page.keyboard.down('Space'); await sleep(100); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => performance.now() - (TG._village.live().me.jt || 0) < 1000))) errors.push('village: Space did not jump');
+  // running (Shift, or the 🏃 button on phones) is faster and uses energy; food fills it back up
+  step = 'running + eating';
+  await page.evaluate(() => { TG.store.active().village.energy = 60; const l = TG._village.live(); l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; });
+  await page.evaluate(() => document.querySelector('.v-run').click());
+  await page.evaluate(() => TG._village.goTo({ x: 30, y: 13 }, null)); await sleep(500);
+  const ran = await page.evaluate(() => ({ running: TG._village.live().me.running, sp: Math.hypot(TG._village.live().me.vx, TG._village.live().me.vy) }));
+  await sleep(1200);
+  await page.evaluate(() => document.querySelector('.v-run').click());
+  if (!ran.running || ran.sp < 6) errors.push(`running: the run toggle did not make you run (${JSON.stringify(ran)})`);
+  if (!(await page.evaluate(() => TG.store.active().village.energy < 60))) errors.push('running: energy did not go down');
+  await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyS'); await sleep(400);
+  if (!(await page.evaluate(() => TG._village.live().me.running))) errors.push('running: holding Shift did not run');
+  await page.keyboard.up('KeyS'); await page.keyboard.up('ShiftLeft'); await sleep(200);
+  const e0 = await page.evaluate(() => ({ en: TG.store.active().village.energy, coins: TG.store.active().village.coins }));
+  await page.evaluate(() => document.querySelector('.v-energy').click()); await sleep(250);
+  await check('food panel', '.modal .v-list .v-row');
+  await page.evaluate(() => [...document.querySelectorAll('.modal .v-row')].find((r) => /Бууз/.test(r.textContent)).querySelector('.btn').click()); await sleep(250);
+  const e1 = await page.evaluate(() => ({ en: TG.store.active().village.energy, coins: TG.store.active().village.coins, ate: (TG.store.active().village.ate || {}).buuz }));
+  if (!(e1.en > e0.en && e1.coins === e0.coins - 12 && e1.ate === 1)) errors.push(`eating: buuz did not work ${JSON.stringify([e0, e1])}`);
+  await page.evaluate(() => [...document.querySelectorAll('.modal .chip')].find((c) => /Уух/.test(c.textContent)).click()); await sleep(200);
+  await page.evaluate(() => [...document.querySelectorAll('.modal .v-row')].find((r) => /Айраг/.test(r.textContent)).querySelector('.btn').click()); await sleep(250);
+  if (!(await page.evaluate(() => (TG.store.active().village.ate || {}).airag === 1))) errors.push('drinking: airag did not work');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
   // horse riding and the Naadam horse race
   step = 'horse riding';
@@ -323,6 +349,17 @@ try {
   await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel-scene .scene-act').click()); await sleep(250);
   await page.evaluate(() => [...document.querySelectorAll('.travel-scene .scene-info .l-opt')].find((x) => /Өргөө/.test(x.textContent)).click()); await sleep(400);
   if (!(await page.evaluate(() => !!(TG.store.active().passport || { stamps: {} }).stamps.ub))) errors.push('travel: the guide did not give the Ulaanbaatar stamp');
+  // the herder family offers their local food
+  await page.evaluate(() => { const c = TG.travel._cur, t = c.things.find((q) => q.kind === 'family'); c.me.x = c.me.tx = t.x; c.me.y = c.me.ty = t.y + 2; }); await sleep(300);
+  await page.keyboard.press('KeyE'); await sleep(250);
+  await page.evaluate(() => [...document.querySelectorAll('.travel-scene .scene-info .btn')].find((b) => /амсах|Taste/.test(b.textContent)).click()); await sleep(250);
+  if (!(await page.evaluate(() => !!(TG.store.active().travelFam || {}).ub && (TG.store.active().village.ate || {}).buuz >= 2))) errors.push('travel: the herder family did not share their food');
+  await check('travel herds', '.travel-scene .scene-cv');
+  if (!(await page.evaluate(() => TG.travel._cur.things.filter((q) => q.kind === 'animal').length >= 3))) errors.push('travel: no herd animals on the map');
+  await page.evaluate(() => { const c = TG.travel._cur, t = c.things.find((q) => q.kind === 'animal'); c.me.x = c.me.tx = t.x; c.me.y = c.me.ty = t.y; }); await sleep(150);
+  await page.keyboard.press('KeyE'); await sleep(250);
+  await check('travel animal fact', '.travel-scene .scene-info');
+  if (!(await page.evaluate(() => /Адуу/.test(document.querySelector('.travel-scene .scene-info').textContent)))) errors.push('travel: talking to a horse did not show its name and fact');
   await page.evaluate(() => TG.travel._cur.close()); await sleep(400);
   await page.evaluate(() => TG.go('aimag', { id: 'tuv' })); await sleep(700);
   await check('next province unlocked after the stamp', '.pp-visit + .card .pp-go, .pp-visit ~ .pp-go');

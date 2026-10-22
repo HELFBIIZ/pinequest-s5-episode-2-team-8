@@ -73,6 +73,23 @@
     if (strokeW) { x.strokeStyle = style; x.lineWidth = strokeW / lay.s; x.lineJoin = 'round'; x.strokeText(text, 0, 0); }
     x.restore();
   }
+  /** Pixel-art version of anything drawn at full size: draw it small (1/cell), keep hard edges in one colour. */
+  function pixLayer(lw, lh, cell, draw, color) {
+    const c = document.createElement('canvas'); c.width = lw; c.height = lh;
+    const x = c.getContext('2d'); x.save(); x.scale(1 / cell, 1 / cell); draw(x); x.restore();
+    const img = x.getImageData(0, 0, lw, lh), d = img.data, n = parseInt(color.slice(1, 7), 16), a = color.length > 7 ? parseInt(color.slice(7), 16) : 255;
+    for (let i = 0; i < d.length; i += 4) { if (d[i + 3] > 96) { d[i] = n >> 16; d[i + 1] = (n >> 8) & 255; d[i + 2] = n & 255; d[i + 3] = a; } else d[i + 3] = 0; }
+    x.putImageData(img, 0, 0); return c;
+  }
+  const fontOk = () => !document.fonts || !document.fonts.check || document.fonts.check(`20px ${FONT}`, 'ᠠ');
+  /** A small pixel-art glyph (letter tiles, headers): w×h CSS pixels, drawn on a grid of `cell` pixels. */
+  function pixelGlyph(text, w, h, cell = 2, color = '#2b1e2e') {
+    const lw = Math.ceil(w / cell), lh = Math.ceil(h / cell), cv = document.createElement('canvas');
+    cv.width = lw; cv.height = lh; cv.className = 'bc-pix'; cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    const paint = () => { const lay = layout(text, lw, lh); if (!lay) return; const layer = pixLayer(lw, lh, 1, (x) => drawGlyph(x, text, lay, lw, lh, '#000'), color); const x = cv.getContext('2d'); x.clearRect(0, 0, lw, lh); x.drawImage(layer, 0, 0); };
+    if (fontOk()) paint(); else if (document.fonts) document.fonts.load(`20px ${FONT}`, 'ᠠ').then(paint);
+    return cv;
+  }
   const mask = (W, H, paint) => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); paint(x); return x.getImageData(0, 0, W, H).data; };
   const BRUSH = 13, TOL = 9;
 
@@ -103,30 +120,35 @@
     const btnShow = h('button', { class: 'btn' }, '▶ ', L('Багш үзүүлэх', 'Show me')), btnClear = h('button', { class: 'btn' }, '↺ ', L('Арилгах', 'Clear'));
     const btnCheck = h('button', { class: 'btn primary' }, '✓ ', L('Шалгах', 'Check')), btnMode = h('button', { class: 'btn' });
     let W = 300, H = 420, dpr = 1, lay = null, strokes = [], cur = null, demoT = -1, raf = 0, item = ALL[idx];
+    let cell = 4, lw = 75, lh = 105, guideL = null;          // the writing area is drawn as pixel art on a grid of `cell` CSS pixels
     const say = (txt) => { bubble.textContent = txt; };
 
     function size() {
       const r = cv.getBoundingClientRect(); W = Math.max(200, Math.round(r.width || 300)); H = Math.round(W * 1.3); dpr = Math.min(3, devicePixelRatio || 1);
       cv.style.height = H + 'px'; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-      lay = layout(item.g, W, H); paint();
+      lay = layout(item.g, W, H);
+      cell = Math.max(3, Math.round(W / 70)); lw = Math.ceil(W / cell); lh = Math.ceil(H / cell);
+      guideL = lay ? pixLayer(lw, lh, cell, (x) => drawGlyph(x, item.g, lay, W, H, '#000'), '#5a3c2833') : null;
+      paint();
     }
     function paint(ts) {
       const x = cx; x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
       x.fillStyle = '#fffaf0'; x.fillRect(0, 0, W, H);
-      x.strokeStyle = 'rgba(201,154,90,.35)'; x.lineWidth = 1; for (let gy = 24; gy < H; gy += 24) { x.beginPath(); x.moveTo(0, gy + 0.5); x.lineTo(W, gy + 0.5); x.stroke(); }
+      x.fillStyle = 'rgba(201,154,90,.35)'; for (let gy = cell * 6; gy < H; gy += cell * 6) x.fillRect(0, gy, W, Math.max(1, Math.round(cell / 3)));   // paper lines on the pixel grid
+      x.imageSmoothingEnabled = false;
+      const blit = (layer) => x.drawImage(layer, 0, 0, lw * cell, lh * cell);
       if (!lay) { x.fillStyle = '#7a5432'; x.font = '700 15px sans-serif'; x.fillText(L('Үсэг ачаалж байна…', 'Loading the letter…'), 20, 40); return; }
       // the spine (нуруу) every letter hangs from, and a "start here" arrow at the top
-      x.setLineDash([6, 6]); x.strokeStyle = 'rgba(225,75,61,.45)'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(Math.round(lay.spine) + 0.5, 8); x.lineTo(Math.round(lay.spine) + 0.5, H - 8); x.stroke(); x.setLineDash([]);
+      x.fillStyle = 'rgba(225,75,61,.5)'; const sx0 = Math.floor(lay.spine / cell) * cell; for (let gy = cell * 2; gy < H - cell * 2; gy += cell * 3) x.fillRect(sx0, gy, cell, cell * 2);   // the spine, as a dashed pixel line
       x.fillStyle = '#e14b3d'; x.font = '800 13px sans-serif'; x.textAlign = 'center'; x.fillText(L('эхлэл ↓', 'start ↓'), Math.min(W - 34, lay.right + 34), lay.top + 10); x.textAlign = 'left';
-      if (mode === 'trace') drawGlyph(x, item.g, lay, W, H, 'rgba(90,60,40,.16)', 2);
+      if (mode === 'trace' && guideL) blit(guideL);
       if (demoT >= 0) { // the master writes it from the top down
         const q = Math.min(1, ((ts || performance.now()) - demoT) / 2200), yy = lay.top - 6 + (lay.bot - lay.top + 12) * q;
-        x.save(); x.beginPath(); x.rect(0, 0, W, yy); x.clip(); drawGlyph(x, item.g, lay, W, H, '#2b1e2e'); x.restore();
-        x.fillStyle = '#e14b3d'; x.beginPath(); x.arc(lay.spine, yy, 6, 0, Math.PI * 2); x.fill();
+        blit(pixLayer(lw, lh, cell, (q) => { q.beginPath(); q.rect(0, 0, W, yy); q.clip(); drawGlyph(q, item.g, lay, W, H, '#000'); }, '#2b1e2e'));
+        x.fillStyle = '#e14b3d'; const by = Math.floor(yy / cell) * cell; x.fillRect(sx0 - cell, by - cell, cell * 3, cell * 3);   // the master's brush
         if (q >= 1) { demoT = -1; setTimeout(paint, 500); }
       }
-      x.strokeStyle = '#1d1a2a'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = BRUSH;
-      for (const s of strokes) { x.beginPath(); s.forEach((pt, i) => (i ? x.lineTo(pt.x, pt.y) : x.moveTo(pt.x, pt.y))); if (s.length === 1) x.lineTo(s[0].x + 0.1, s[0].y); x.stroke(); }
+      if (strokes.length) blit(pixLayer(lw, lh, cell, (q) => { q.strokeStyle = '#000'; q.lineCap = 'round'; q.lineJoin = 'round'; q.lineWidth = BRUSH; for (const s of strokes) { q.beginPath(); s.forEach((pt, i) => (i ? q.lineTo(pt.x, pt.y) : q.moveTo(pt.x, pt.y))); if (s.length === 1) q.lineTo(s[0].x + 0.1, s[0].y); q.stroke(); } }, '#1d1a2a'));
     }
     const loop = (ts) => { if (!cv.isConnected) return; if (demoT >= 0) paint(ts); raf = requestAnimationFrame(loop); };
     // pointer drawing: finger, pen, mouse or trackpad
@@ -144,16 +166,16 @@
     }
     function renderHead() {
       const st = starsOf(p, item.id);
-      rc(head, h('span', { class: 'bc-big', lang: 'mn-Mong', style: { fontSize: item.g.length > 2 ? '24px' : item.g.length > 1 ? '34px' : '46px' } }, item.g),
+      rc(head, pixelGlyph(item.g, 44, 96, 2),
         h('div', null, h('b', null, item.cyr, ' · ', item.lat), h('small', null, tx(UNITS.find((u) => u.id === item.unit).name), ' · ', `${idx + 1}/${ALL.length}`),
           h('span', { class: 'bc-stars' }, '★'.repeat(st) + '☆'.repeat(3 - st), data(p).mem[item.id] ? ' 🧠' : '')));
       btnMode.textContent = mode === 'trace' ? L('🧠 Санаж бичих', '🧠 From memory') : L('✍️ Даган бичих', '✍️ Trace');
     }
     function renderTiles() {
-      rc(tiles, UNITS.map((u) => h('section', { class: 'bc-unit' }, h('h3', null, h('span', { class: 'bc-mini', lang: 'mn-Mong' }, u.icon), ' ', tx(u.name)),
+      rc(tiles, UNITS.map((u) => h('section', { class: 'bc-unit' }, h('h3', null, pixelGlyph(u.icon, 22, 44, 2), ' ', tx(u.name)),
         h('div', { class: 'bc-tiles' }, u.items.map((it) => { const i = ALL.findIndex((q) => q.id === it.id), st = starsOf(p, it.id), lock = !unlocked(p, i);
           return h('button', { class: 'bc-tile' + (i === idx ? ' on' : '') + (lock ? ' lock' : '') + (st ? ' done' : ''), onclick: () => select(i), 'aria-label': it.cyr },
-            h('span', { class: 'bc-g', lang: 'mn-Mong' }, it.g), h('small', null, lock ? '🔒' : it.cyr), st ? h('i', null, '★'.repeat(st)) : null); })))));
+            pixelGlyph(it.g, 32, 60, 2), h('small', null, lock ? '🔒' : it.cyr), st ? h('i', null, '★'.repeat(st)) : null); })))));
     }
     btnShow.addEventListener('click', () => { strokes = []; rc(result); demoT = performance.now(); TG.sfx.whoosh && TG.sfx.whoosh(); say(L('Хараарай: дээрээс эхлээд нуруугаа даган доош бичнэ. Монгол бичгийн мөр зүүнээс баруун тийш явдаг.', 'Watch: start at the top and write down along the spine. Columns of Mongol script go from left to right.')); });
     btnClear.addEventListener('click', () => { strokes = []; rc(result); paint(); });
@@ -208,5 +230,5 @@
     return shell(page);
   }
   function rc(el, ...kids) { el.replaceChildren(...kids); }
-  TG.bichig = { screen, UNITS, ALL, done, score, layout, drawGlyph };
+  TG.bichig = { screen, UNITS, ALL, done, score, layout, drawGlyph, pixelGlyph };
 })(window.TG);

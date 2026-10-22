@@ -17,16 +17,18 @@
     const buf = TG.pixel.mk(cfg.W, cfg.H), b = buf.x;
     const info = h('div', { class: 'scene-info px-frame' }), act = h('button', { class: 'btn primary scene-act', disabled: true });
     const jump = h('button', { class: 'scene-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)') }, '⤒');
+    const runBtn = h('button', { class: 'scene-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)') }, '🏃');
     const mini = cfg.mini ? h('canvas', { class: 'scene-mini px-frame', width: cfg.mini.w, height: cfg.mini.h, 'aria-hidden': 'true' }) : null;
     const back = h('button', { class: 'scene-x px-frame', 'aria-label': L('Гарах', 'Leave') }, '✕');
     const root = h('div', { class: 'fscene ' + (cfg.cls || '') },
       cv,
       h('div', { class: 'scene-top' }, back, h('div', { class: 'scene-title px-frame' }, h('b', null, cfg.title), cfg.sub ? h('small', null, cfg.sub) : null), cfg.right || null),
       mini,
-      h('div', { class: 'scene-bottom' }, info, h('div', { class: 'scene-btns' }, ...(cfg.buttons || []), jump, act)));
+      h('div', { class: 'scene-bottom' }, info, h('div', { class: 'scene-btns' }, ...(cfg.buttons || []), runBtn, jump, act)));
     const me = { x: cfg.start.x, y: cfg.start.y, tx: cfg.start.x, ty: cfg.start.y, dir: 3, moving: false, jt: -1e9, z: 0 };
     const dog = { x: me.x + 14, y: me.y + 4 };
     const keys = new Set();
+    let run = false, runLock = false;
     let raf = 0, last = performance.now(), near = null, pending = null, view = { k: 1, ox: 0, oy: 0, camX: 0, camY: 0 }, closed = false;
 
     function resize() {
@@ -54,7 +56,8 @@
       const dx = me.tx - me.x, dy = me.ty - me.y, d = Math.hypot(dx, dy);
       me.moving = d > 1;
       if (me.moving) {
-        const sp = (cfg.speed || 64) * dt, mx = (dx / d) * Math.min(sp, d), my = (dy / d) * Math.min(sp, d);
+        me.running = run || runLock;
+        const sp = (cfg.speed || 64) * (me.running ? 1.75 : 1) * dt, mx = (dx / d) * Math.min(sp, d), my = (dy / d) * Math.min(sp, d);
         const okX = cfg.free(me.x + mx, me.y), okY = cfg.free(me.x, me.y + my);
         if (okX) me.x += mx; if (okY) me.y += my;
         if (!okX && !okY) { me.tx = me.x; me.ty = me.y; }
@@ -63,7 +66,7 @@
       const jq = (ts - me.jt) / JUMP_MS; me.z = jq >= 0 && jq < 1 ? Math.round(Math.sin(jq * Math.PI) * JUMP_H) : 0;
       dog.x += (me.x + 14 - dog.x) * Math.min(1, dt * 2.6); dog.y += (me.y + 4 - dog.y) * Math.min(1, dt * 2.6);
       near = null; let bd = cfg.reach || 22;
-      for (const t of cfg.things) { const dd = Math.hypot(t.x - me.x, t.y - me.y); if (dd < bd) { bd = dd; near = t; } }
+      for (const t of cfg.things) { const dd = Math.hypot(t.x - me.x, t.y - me.y) + (t.penalty || 0); if (dd < bd) { bd = dd; near = t; } } // penalty: wandering animals give way to places and people
       if (pending && near === pending) { const p = pending; pending = null; me.tx = me.x; me.ty = me.y; p.run(); }
       act.disabled = !near;
       act.textContent = near ? near.label() + (coarse() ? '' : ' (E)') : (cfg.hint ? cfg.hint() : L('Ойртоод E дар', 'Walk up and press E'));
@@ -76,7 +79,7 @@
       ents.push({ y: dog.y, f: () => b.drawImage(TG.pixel.bankhar(Math.hypot(me.x + 14 - dog.x, me.y + 4 - dog.y) > 3 ? 1 + Math.floor(ts / 120) % 2 : 3), Math.round(dog.x - 11), Math.round(dog.y - 16)) });
       ents.push({ y: me.y, f: () => {
         b.fillStyle = 'rgba(30,20,10,.28)'; const sw = me.z > 4 ? 4 : 5; b.fillRect(Math.round(me.x - sw), Math.round(me.y - 1), sw * 2, 2);
-        b.drawImage(TG.pixel.char({ ...look, ride: null }, me.dir, me.moving && !me.z ? 1 + Math.floor(ts / 125) % 2 : 0), Math.round(me.x - 8), Math.round(me.y - 26 - me.z));
+        b.drawImage(TG.pixel.char({ ...look, ride: null }, me.dir, me.moving && !me.z ? 1 + Math.floor(ts / (me.running ? 75 : 125)) % 2 : 0), Math.round(me.x - 8), Math.round(me.y - 26 - me.z));
       } });
       ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f(b));
       if (near) { b.fillStyle = '#f7c646'; const bob = Math.round(Math.sin(ts / 160) * 1.5); b.fillRect(Math.round(near.x) - 1, Math.round(near.y) - 40 + bob, 3, 3); b.fillRect(Math.round(near.x), Math.round(near.y) - 36 + bob, 1, 2); }
@@ -112,6 +115,7 @@
     act.addEventListener('click', () => { act.blur(); interact(); });
     info.addEventListener('click', (e) => { if (!e.target.closest('button')) info.classList.toggle('min'); }); // tap the panel to fold it away
     jump.addEventListener('click', () => { jump.blur(); doJump(); });
+    runBtn.addEventListener('click', () => { runBtn.blur(); runLock = !runLock; runBtn.classList.toggle('on', runLock); runBtn.setAttribute('aria-pressed', String(runLock)); TG.sfx.tap(); });
     back.addEventListener('click', () => api.close());
     const busy = (e) => document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '');
     const kd = (e) => {
@@ -120,9 +124,10 @@
       else if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) doJump(); }
       else if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) interact(); }
       else if (e.code === 'Escape') { e.preventDefault(); api.close(); }
+      else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') run = true;   // hold Shift to run
     };
-    const ku = (e) => { if (KEY[e.code]) keys.delete(KEY[e.code]); if (e.code === 'Space' && !busy(e)) { e.preventDefault(); e.stopPropagation(); } };
-    const blur = () => keys.clear();
+    const ku = (e) => { if (KEY[e.code]) keys.delete(KEY[e.code]); if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') run = false; if (e.code === 'Space' && !busy(e)) { e.preventDefault(); e.stopPropagation(); } };
+    const blur = () => { keys.clear(); run = false; };
     window.addEventListener('keydown', kd, true); window.addEventListener('keyup', ku, true); window.addEventListener('blur', blur); window.addEventListener('resize', resize);
     const api = {
       me, root, info, view,
