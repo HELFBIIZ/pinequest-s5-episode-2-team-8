@@ -1508,3 +1508,57 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 
 .v-shoot { background: #8a4b1f; font-size: 30px; }
 .v-battle { top: calc(104px + env(safe-area-inset-top)); background: #fff3c4; color: #5a2d10; font-family: var(--font-display); font-weight: 800; font-size: 14px; }
+
+/* ===================================================================
+   Story dialogue box (js/dialog.js): bottom middle, black with a white pixel border, portrait on the left
+   =================================================================== */
+.dlg { position: fixed; inset: 0; z-index: 48; pointer-events: none; opacity: 0; transition: opacity .18s; font-family: 'Tiny5', monospace; }
+.dlg.show { opacity: 1; }
+.dlg:not(.show), .dlg:not(.show) * { pointer-events: none !important; } /* a closing box never eats taps meant for the map */
+.dlg-catch { position: absolute; inset: 0; pointer-events: auto; background: linear-gradient(to top, rgba(10, 8, 20, .35), transparent 45%); }
+.dlg-wrap { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(760px, calc(100% - 16px)); display: flex; flex-direction: column; align-items: stretch; gap: 8px; pointer-events: none; }
+.dlg-box { position: relative; pointer-events: auto; display: flex; gap: 14px; align-items: center; min-height: 132px; padding: 14px 18px 14px 14px; background: #08060e; color: #fff;
+  border: 4px solid #fff; box-shadow: 0 0 0 4px #08060e, 0 10px 0 4px rgba(0, 0, 0, .35); image-rendering: pixelated; cursor: pointer; }
+.dlg-face { flex: none; width: 112px; height: 112px; display: grid; place-items: center; background: #1a1630; box-shadow: inset 0 0 0 3px #3a3460; overflow: hidden; }
+.dlg-face-c { image-rendering: pixelated; height: 100%; width: auto; aspect-ratio: var(--ar, 1); }
+.dlg.portrait-tall .dlg-face-c { height: 96%; }
+.dlg-main { flex: 1; min-width: 0; align-self: flex-start; }
+.dlg-name { font-size: 16px; color: #f7c646; letter-spacing: .06em; margin-bottom: 6px; text-transform: uppercase; }
+.dlg-text { font-size: 20px; line-height: 1.35; letter-spacing: .03em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dlg.at-top .dlg-wrap { bottom: auto; top: calc(12px + env(safe-area-inset-top)); flex-direction: column-reverse; }
+.dlg.at-top .dlg-catch { background: linear-gradient(to bottom, rgba(10, 8, 20, .35), transparent 45%); }
+.tw-rest { visibility: hidden; }
+.dlg-more { position: absolute; right: 12px; bottom: 6px; color: #fff; font-size: 14px; opacity: 0; }
+.dlg.ready:not(.asking) .dlg-more { opacity: 1; animation: dlg-bob .7s steps(2) infinite; }
+@keyframes dlg-bob { 50% { transform: translateY(3px); } }
+.dlg-choices { display: none; pointer-events: auto; flex-direction: column; gap: 6px; align-self: flex-end; width: min(420px, 100%); }
+.dlg.asking .dlg-choices { display: flex; }
+.dlg-opt { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 14px; background: #08060e; color: #fff; border: 3px solid #fff; font: inherit; font-size: 18px; text-align: left; cursor: pointer; touch-action: manipulation; }
+.dlg-opt .dlg-heart { color: #e14b3d; visibility: hidden; font-size: 18px; }
+.dlg-opt.on { color: #f7c646; border-color: #f7c646; }
+.dlg-opt.on .dlg-heart { visibility: visible; }
+.dlg-opt:active { transform: translateY(2px); }
+@media (max-width: 560px) {
+  .dlg-box { min-height: 104px; gap: 10px; padding: 10px 12px 12px 10px; border-width: 3px; }
+  .dlg-face { width: 80px; height: 80px; }
+  .dlg-text { font-size: 16px; }
+  .dlg-name { font-size: 13px; margin-bottom: 4px; }
+  .dlg-opt { font-size: 16px; min-height: 46px; }
+}
+/* the tutorial's goal banner and the glow around the button it is talking about */
+.tut-goal { position: fixed; z-index: 47; left: 0; right: 0; margin: 0 auto; width: max-content; top: calc(110px + env(safe-area-inset-top)); max-width: calc(100% - 24px); display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 14px; background: #08060e; color: #fff; border: 3px solid #fff; font-family: 'Tiny5', monospace; font-size: 16px; animation: rise .3s var(--ease) both; }
+.tut-goal b { color: #f7c646; font-weight: 400; }
+@media (max-width: 560px) { .tut-goal { top: calc(192px + env(safe-area-inset-top)); font-size: 15px; } } /* phones: just below the map and the pills */
+.tut-goal .tut-skip { background: none; border: 2px solid #8a84b0; color: #c9c4e8; font: inherit; font-size: 13px; padding: 4px 8px; cursor: pointer; }
+/* pixel frames are clipped (clip-path), so the highlight pulses inside the frame and the button grows a little */
+.tut-glow { position: relative; z-index: 49; animation: tut-glow 1s ease-in-out infinite; }
+@keyframes tut-glow { 50% { background-color: #ffe27a; box-shadow: inset 0 0 0 3px #f7c646, inset 0 0 0 6px #e14b3d, 0 4px 0 #5a2d10; transform: scale(1.14); } }
+/* the floating joystick of the village (phones): appears where your thumb lands */
+.v-stick { position: absolute; z-index: 5; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; background: rgba(255, 255, 255, .16); box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .55), 0 0 0 3px rgba(43, 30, 46, .25); pointer-events: none; display: none; }
+.v-stick.on { display: block; }
+.v-stick i { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, .8); box-shadow: 0 3px 0 rgba(43, 30, 46, .35); }
+.v-stick-hint { position: absolute; z-index: 4; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom)); transform: translateX(-50%); pointer-events: none; font-family: 'Tiny5', monospace; font-size: 15px; color: #fff;
+  text-shadow: 1px 0 #2b1e2e, -1px 0 #2b1e2e, 0 1px #2b1e2e, 0 -1px #2b1e2e; white-space: nowrap; transition: opacity .4s; }
+.v-stick-hint.gone { opacity: 0; }
+.v-help { font-size: 22px; }

@@ -58,7 +58,9 @@
         q2.fact ? h('div', { class: 'teach' }, h('b', null, '💡 ', L('Түүх', 'History')), h('p', null, tx(q2.fact))) : null,
         h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: draw }, L('Дараагийн даалгавар', 'Next task'), ' →')));
     }
-    draw();
+    const drawRaw = draw;
+    const talk = () => { drawRaw(); const p = body.querySelector('p:not(.muted)'); if (p && TG.voice) TG.voice.babble(p.textContent, 'historian'); };
+    talk();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
   TG.history = { STEPS, open, ready, target, found, battleWon, step: () => (st() || { step: 0 }).step };

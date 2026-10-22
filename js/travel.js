@@ -239,6 +239,7 @@
         sc.say(h('b', null, '⛺ ', L('Жуулчны гэр бааз', 'Tourist ger camp')), h('p', null, L('Монголд ирсэн жуулчид гэр баазад буудаллаж, малчин айлын амьдралтай танилцдаг. Гэрийн хаалга урагшаа хардаг!', 'Visitors to Mongolia stay in ger camps and get to know herding life. Every ger door faces south!')));
       } else if (kind === 'guide') {
         const greet = L(`Сайн байна уу! ${a.name.mn} нутагт тавтай морил. Би ${eth ? tx(eth.name) : ''} хүн байна.`, `Hello! Welcome to ${a.name.en}. I am ${eth ? tx(eth.name) : ''}.`);
+        if (TG.voice) TG.voice.babble(greet, 'local');
         if (stamped()) return sc.say(h('b', null, '🧑 ', L('Нутгийн хөтөч', 'Local guide')), h('p', null, greet, ' ', tx(map.j.history)), h('small', null, '🛂 ', L('Тамга авсан', 'Already stamped')));
         if (seen.length < 3) return sc.say(h('b', null, '🧑 ', L('Нутгийн хөтөч', 'Local guide')), h('p', null, greet, ' ', L('Эхлээд манай нутгийн 3 алдартай газраар аялаад ир. Дараа нь тамга өгье!', 'First visit our 3 famous places, then I’ll give you the stamp!')));
         const q = map.j.q, opts = q.o.map((o, i2) => ({ o, ok: i2 === q.a })).sort(() => Math.random() - 0.5);

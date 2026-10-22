@@ -660,32 +660,12 @@
     for (let i = 0; i < 6; i++) P(x, 3 - (i % 2), 6 + i, i % 2 ? '#f2eee4' : '#d8d0c0');                // white tail plume
     blob(x, 20, 8, 2, 3, '#3a2c2c', K.out); R(x, 21, 10, 2, 2, '#2b2222'); eye(x, 21, 7); R(x, 19, 4, 1, 2, '#e8dcc0'); R(x, 22, 4, 1, 2, '#e8dcc0'); P(x, 18, 4, '#e8dcc0'); P(x, 23, 4, '#e8dcc0');
   } };
-  // a Mongolian horse, hand-placed pixel by pixel: o outline, b coat, l light, d shade, m mane, e eye, n muzzle
-  const HORSE_ART = [
-    '.................om.....',
-    '................ombo....',
-    '...............mmbbbo...',
-    '..............mmbbebbo..',
-    '.............mmbbbbbbbo.',
-    '............mmbbbo.obbno',
-    '...........mmbbbo...onno',
-    '..oo......mmbbbbo....oo.',
-    '.ommo.oooobbbbbbo.......',
-    '.mmooblllllllbbbo.......',
-    '.m..obbbbbbbbbbbbo......',
-    '.m..obbbbbbbbbbbbo......',
-    '....obdddddddddddo......',
-    '.....odddddddddddo......',
-  ];
-  const horseBeast = (coat, mane) => ({ w: 24, h: 20, draw: (x, f) => {
-    const C = { o: K.out, b: coat, l: shade(coat, 0.22), d: shade(coat, -0.28), m: mane, e: K.eye, n: shade(coat, -0.45) };
-    hooves(x, f, [6, 8, 14, 16], 13, 7, coat, '#1e1a1e', C.d);
-    HORSE_ART.forEach((row, y) => [...row].forEach((ch, i) => { if (C[ch]) P(x, i, y + (f && y > 7 && y < 2 ? 0 : 0), C[ch]); }));
-    if (f) { P(x, 1, 12, mane); P(x, 2, 13, mane); } else { P(x, 1, 12, mane); P(x, 1, 13, shade(mane, 0.2)); }   // tail swish
-  } });
-  BEAST.horse = horseBeast('#8a5a33', '#2b1e14');
-  BEAST.mare = horseBeast('#b5652e', '#5a2a10');
-  BEAST.takhi = horseBeast('#c99a5a', '#3a2516');
+  // every horse in the game is the same Mongolian horse you ride and race (horse() below): the ones on the зэл line,
+  // at the уяа, in 3D, in battles and on the trips. Only the coat differs. Frame 0 stands, 1–4 gallop.
+  const horseBeast = (coat, saddle) => ({ w: 28, h: 22, draw: (x, f) => x.drawImage(horse(coat, Math.min(4, f || 0), saddle), 0, 0) });
+  BEAST.horse = horseBeast('bay', true);
+  BEAST.mare = horseBeast('chestnut', false);
+  BEAST.takhi = horseBeast('dun', false);
   BEAST.foal = { w: 16, h: 15, draw: (x, f) => { hooves(x, f, [4, 6, 10, 11], 9, 6, '#a46d3b', '#2b1e14', '#8a5a33'); blob(x, 7, 7, 4, 2, '#b98a55', K.out); ell(x, 6, 6, 3, 1, '#d0a46a'); R(x, 10, 3, 2, 4, '#b98a55'); blob(x, 13, 3, 2, 1, '#b98a55', K.out); eye(x, 13, 2); R(x, 10, 1, 1, 3, '#6b4220'); P(x, 2, 6, '#6b4220'); P(x, 2, 7, '#6b4220'); } };
   BEAST.camel = { w: 26, h: 22, draw: (x, f) => { // two-humped Bactrian camel: woolly humps, long neck, shaggy throat
     const C = '#c99a5a', D = '#a07444', W = '#7a4f2c';
@@ -722,9 +702,10 @@
 
   // Mongolian horse for riding and racing (28×22, facing right). frame 0 stands, 1–4 gallop. saddle: draw a saddle.
   const COATS = { bay: ['#8a5a33', '#6b4220', '#2b1e14'], black: ['#3a2c2c', '#241a1a', '#120c0c'], white: ['#ece4d4', '#c9bda6', '#8a7a64'], chestnut: ['#b5652e', '#8a4a1e', '#5a2a10'], gray: ['#a0a0aa', '#7a7a86', '#3a3a44'] };
+  const WILD = { dun: ['#c99a5a', '#a07444', '#3a2516'] }; // the takhi (Przewalski's horse): same horse, sandy dun coat
   function horse(coat, frame, saddle) {
     const key = ['h', coat, frame, saddle].join(); if (cache.has(key)) return cache.get(key);
-    const { c, x } = mk(28, 22), [B, BD, MN] = COATS[coat] || COATS.bay, bob = frame === 2 || frame === 4 ? 1 : 0;
+    const { c, x } = mk(28, 22), [B, BD, MN] = COATS[coat] || WILD[coat] || COATS.bay, bob = frame === 2 || frame === 4 ? 1 : 0;
     const legs = [[[7, 0], [9, 0], [17, 0], [19, 0]], [[5, -2], [8, 1], [18, 2], [21, -1]], [[7, 1], [10, -1], [16, -1], [19, 1]], [[9, -1], [6, 2], [20, 1], [17, -2]], [[8, 2], [10, 0], [18, -2], [16, 1]]][frame] || [];
     legs.forEach(([lx, sw], i) => { const top = 13 + bob, len = 7 - (sw < 0 ? 1 : 0); line(x, lx, top, lx + sw, top + len, K.out); line(x, lx + 1, top, lx + 1 + sw, top + len, i % 2 ? BD : B); P(x, lx + sw, top + len, MN); P(x, lx + 1 + sw, top + len, MN); });
     const sw = frame ? (frame % 2 ? 1 : -1) : 0; // tail swish

@@ -90,7 +90,8 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
+  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+    tut: (st) => { if (live) live.tut = st; }, basar: () => openBasar(), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -395,12 +396,15 @@
       fp: h('button', { class: 'v-round px-frame v-fpbtn', 'aria-label': L('Өөрийн нүдээр', 'First person'), title: L('Өөрийн нүдээр (3D)', 'First person (3D)'), onclick: () => openFP() }, '👁'),
       jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
+      help: h('button', { class: 'v-pill px-frame v-help', 'aria-label': L('Заавар', 'Tutorial'), title: L('Заавар: хөтөчтэй хамт тоглоом сурах', 'Tutorial: learn the game with the guide'), onclick: () => TG.tutorial && TG.tutorial.start(true) }, '?'),
+      stick: h('div', { class: 'v-stick', 'aria-hidden': 'true' }, h('i')),
+      stickHint: h('div', { class: 'v-stick-hint' + (coarse && !(V() || {}).stickUsed ? '' : ' gone'), 'aria-hidden': 'true' }, L('👆 Дэлгэц дээр чирж алх', '👆 Drag on the screen to walk')),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net)),
-      els.race, els.battle,
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.help)),
+      els.race, els.battle, els.stick, els.stickHint,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
           els.fp, els.horse,
@@ -430,7 +434,8 @@
     resize();
     document.fonts && document.fonts.load('10px Tiny5', 'Нутаг ӨҮ');
     window.addEventListener('resize', resize);
-    canvas.addEventListener('pointerdown', onTap);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', onPointerUp); canvas.addEventListener('pointercancel', onPointerUp);
     window.addEventListener('keydown', onKey, true); window.addEventListener('keyup', onKeyUp, true); window.addEventListener('blur', clearKeys);
     root.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }); // HUD buttons never keep focus
     live.miniBase = miniBase();
@@ -438,13 +443,15 @@
     net.connect(); hud(); updateCtx();
     live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
     live.raf = requestAnimationFrame(frame);
-    if (!v.tips) tips();
+    if (!v.tutorial && TG.tutorial) setTimeout(() => live && live.root === root && TG.tutorial.start(false), 350); // first visit: the guide walks you through the game
+    else if (!v.tips) tips();
     setCleanup(stop);
   }
-  const clearKeys = () => { if (live) { live.keys.clear(); live.run = false; } };
+  const clearKeys = () => { if (live) { live.keys.clear(); live.run = false; endStick(); } };
   function stop() {
     if (!live) return;
     live.race = null;
+    if (TG.tutorial) TG.tutorial.stop();
     cancelAnimationFrame(live.raf);
     window.removeEventListener('resize', resize); window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
     net.close();
@@ -572,10 +579,40 @@
   }
 
   // ---------------------------------------------------------------- input
-  function onTap(e) {
+  // a finger (or mouse) that drags on the map becomes a joystick right where it landed; a quick tap walks to that spot
+  const STICK_R = 50;
+  function onPointerDown(e) {
     if (!live) return;
     e.preventDefault();
     if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
+    if (TG.dialog && TG.dialog.active()) return;
+    if (live.drag) return; // one finger steers, the other presses buttons
+    live.drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false };
+    try { live.canvas.setPointerCapture(e.pointerId); } catch (er) { /* not supported */ }
+  }
+  function onPointerMove(e) {
+    const d = live && live.drag; if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x0, dy = e.clientY - d.y0, dist = Math.hypot(dx, dy), els = live.els;
+    if (!d.on) {
+      if (dist < 12) return;
+      d.on = true; live.me.path = []; live.pending = null;
+      const r = live.root.getBoundingClientRect();
+      els.stick.style.left = d.x0 - r.left + 'px'; els.stick.style.top = d.y0 - r.top + 'px'; els.stick.classList.add('on');
+      if (!els.stickHint.classList.contains('gone')) { els.stickHint.classList.add('gone'); const v = V(); if (v) { v.stickUsed = true; S.save(); } }
+    }
+    const q = dist > STICK_R ? STICK_R / dist : 1;
+    live.stick = { x: (dx * q) / STICK_R, y: (dy * q) / STICK_R };
+    els.stick.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`;
+  }
+  function onPointerUp(e) {
+    const d = live && live.drag; if (!d || d.id !== e.pointerId) return;
+    live.drag = null;
+    if (d.on) return endStick();
+    if (e.type === 'pointerup') onTap({ clientX: d.x0, clientY: d.y0 });
+  }
+  function endStick() { if (!live) return; live.drag = null; live.stick = null; live.els.stick.classList.remove('on'); live.els.stick.firstChild.style.transform = ''; }
+  function onTap(e) {
+    if (!live) return;
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
@@ -606,7 +643,7 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
-    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (!live || document.querySelector('.modal-back') || (TG.dialog && TG.dialog.active()) || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
@@ -646,7 +683,7 @@
   function generalModal() {
     const c = camp(), chs = TG.battles.CHAPTERS;
     const close = TG.modal(h('div', null, h('div', { class: 'v-wr-head' }, portrait(GENERAL, 48), h('div', null, h('h2', null, L('Жанжин Батмөнх', 'General Batmönkh')), h('p', { class: 'muted' }, L('Эх орноо хамгаалсан түүхүүд', 'Stories of defending the homeland')))),
-      h('p', null, L('Монголчууд олон зуун жилийн турш нутаг усаа хамгаалж ирсэн. Түүх бүрийг сонсоод, нутгаа хамгаал! Дуут сум, уурга хоёр зөвхөн дайсны зоригийг мохоодог: хэн ч гэмтэхгүй.', 'For centuries Mongolians have protected their land. Hear each story, then defend the land! Whistling arrows and the lasso only break the raiders’ courage: nobody gets hurt.')),
+      (() => { const p = h('p'), t0 = L('Анхаар! Монголчууд олон зуун жилийн турш нутаг усаа хамгаалж ирсэн. Түүх бүрийг сонсоод, нутгаа хамгаал! Дуут сум, уурга хоёр зөвхөн дайсны зоригийг мохоодог: хэн ч гэмтэхгүй.', 'Attention! For centuries Mongolians have protected their land. Hear each story, then defend the land! Whistling arrows and the lasso only break the raiders’ courage: nobody gets hurt.'); TG.voice ? TG.voice.type(p, t0, 'general') : (p.textContent = t0); return p; })(),
       h('div', { class: 'v-list' }, chs.map((ch, i) => { const open = i === 0 || c.won[chs[i - 1].id], won = c.won[ch.id];
         return h('div', { class: 'v-row' + (open ? '' : ' locked') }, h('span', { class: 'v-card-e' }, won ? '🏆' : open ? '⚔️' : '🔒'), h('div', { class: 'v-row-b' }, h('b', null, tx(ch.name)), h('small', null, tx(ch.year), won ? ` · ${L('Хамгаалсан', 'Defended')} ✓` : '')),
           open ? h('button', { class: 'btn sm primary', onclick: () => { close(); battleIntro(ch.id); } }, won ? L('Дахин', 'Again') : L('Эхлэх', 'Begin')) : null); })),
@@ -672,7 +709,7 @@
   const meXY = () => ({ x: live.me.px + 0.5, y: live.me.py + 0.82 });
   function shootAt(tx0, ty0, from) {
     const bt = live.battle; if (!bt || bt.over) return false;
-    const o = from || meXY(); if (!from) { if (bt.cd > 0) return false; bt.cd = SHOOT_CD; TG.sfx.snap(); }
+    const o = from || meXY(); if (!from) { if (bt.cd > 0) return false; bt.cd = SHOOT_CD; bt.shots = (bt.shots || 0) + 1; TG.sfx.snap(); }
     const dx = tx0 - o.x, dy = ty0 - o.y, d = Math.hypot(dx, dy) || 1;
     bt.arrows.push({ x: o.x, y: o.y, dx: dx / d, dy: dy / d, life: 1.1, mine: !from });
     return true;
@@ -770,7 +807,7 @@
       onPrimary: (api) => { if (!live.battle || live.battle.over) return false; const d = api.dir(), n = Math.hypot(d[0], d[2]) || 1, m2 = meXY(); shootAt(m2.x + (d[0] / n) * 10, m2.y + (d[2] / n) * 10); return true; },
       onKey: (code) => { if (code === 'KeyF' && live.battle) { shootNearest(); return true; } return false; },
       overlay: (x, proj, t, dpr) => { if (!live.battle) return; const txt = battleLabel(); x.font = `800 ${Math.round(15 * dpr)}px Rubik, sans-serif`; x.textAlign = 'center'; const tw = x.measureText(txt).width + 24 * dpr; x.fillStyle = 'rgba(43,30,46,.75)'; x.fillRect(x.canvas.width / 2 - tw / 2, 128 * dpr, tw, 28 * dpr); x.fillStyle = '#f7c646'; x.fillText(txt, x.canvas.width / 2, 147 * dpr); },
-      riding: () => !!live.ride, horseCoat: () => (PX.COATS[V().horse.coat] || PX.COATS.bay)[0],
+      riding: () => !!live.ride, horseCoat: () => (PX.COATS[V().horse.coat] || PX.COATS.bay)[0], horseMane: () => (PX.COATS[V().horse.coat] || PX.COATS.bay)[2],
       hint: () => L('Ойртож харвал E', 'Face something and press E'),
       step: () => {
         // your position back into the village, so friends see you move and quests count where you are
@@ -795,14 +832,14 @@
         }
         for (const q of live.sheep) out.push({ img: PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), x: q.px + 0.5, y: q.py + 0.7, h: 0.95, flip: !q.flip });
         for (const o of live.others.values()) {
-          if (o.look.ride) out.push({ img: PX.beast('horse', o.moving ? 1 + (Math.floor(t * 8) % 2) : 0), x: o.px + 0.5, y: o.py + 0.82, h: 1.6, flip: o.face === 1 });
+          if (o.look.ride) out.push({ img: PX.horse(o.look.coat || 'bay', o.moving ? 1 + (Math.floor(t * 8) % 4) : 0, true), x: o.px + 0.5, y: o.py + 0.82, h: 1.6, flip: o.face === 1 });
           out.push({ img: PX.char({ ...o.look, pet: null, ride: null }, o.dir, f(o)), x: o.px + 0.5, y: o.py + 0.82, h: CHAR_H, lift: o.look.ride ? 0.9 : 0 });
         }
-        if (live.race) for (const n of live.race.npcs) out.push({ img: PX.beast('horse', 1 + (Math.floor(t * 10) % 2)), x: n.px + 0.5, y: n.py + 0.82, h: 1.6 });
+        if (live.race) for (const n of live.race.npcs) out.push({ img: PX.horse(n.look.coat || 'bay', 1 + (Math.floor(t * 10 + n.wob) % 4), true), x: n.px + 0.5, y: n.py + 0.82, h: 1.6 });
         for (const [o, lk] of [[WD.objects.find((q) => q.kind === 'general'), GENERAL], [WD.objects.find((q) => q.kind === 'historian'), HISTORIAN]]) if (o) out.push({ img: look(lk), x: o.x + 0.5, y: o.y + 0.9, h: CHAR_H });
         const bt = live.battle;
         if (bt) {
-          for (const u of [...bt.enemies, ...bt.allies]) { out.push({ img: PX.beast(u.look.coat === 'black' ? 'horse' : u.look.coat === 'white' ? 'mare' : 'horse', 1 + (Math.floor(t * 9 + u.x) % 2)), x: u.x, y: u.y, h: 1.6, flip: u.face === 1 }); out.push({ img: PX.char({ ...u.look, ride: null, pet: null }, u.face === 1 ? 1 : 2, 0), x: u.x, y: u.y, h: CHAR_H, lift: 0.85 }); }
+          for (const u of [...bt.enemies, ...bt.allies]) { out.push({ img: PX.horse(u.look.coat || 'bay', 1 + (Math.floor(t * 9 + u.x) % 4), true), x: u.x, y: u.y, h: 1.6, flip: u.face === 1 }); out.push({ img: PX.char({ ...u.look, ride: null, pet: null }, u.face === 1 ? 1 : 2, 0), x: u.x, y: u.y, h: CHAR_H, lift: 0.85 }); }
           for (const a of bt.arrows) out.push({ img: ARROW_IMG, x: a.x, y: a.y, h: 0.18, lift: 1.4 });
         }
         return out;
@@ -874,13 +911,15 @@
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
   function update(dt) {
     const m = live.me, k = live.keys, v0 = V();
-    const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || m.path.length > 0);
+    const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || !!live.stick || m.path.length > 0);
     if (wantRun && v0.energy <= 0 && !live.tiredSaid) { live.tiredSaid = true; TG.toast('😮‍💨 ' + L('Ядарчихлаа! Хоол идэж, ундаа уугаад хүчээ нөхөөрэй (🍖 дээр дар).', 'Out of energy! Eat or drink to get it back (tap 🍖).')); }
     m.running = wantRun && v0.energy > 0;
     const SP = live.ride ? (live.race ? raceSpeed() : m.running ? 11 : 7.2) : m.running ? 7.6 : SPEED;
     if (live.race && live.race.phase === 'count') { k.clear(); m.path = []; }
-    let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), tvx = 0, tvy = 0;
-    if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SP; tvy = (iy / n) * SP; }
+    let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), tvx = 0, tvy = 0, mag = 1;
+    const stk = live.stick, sm = stk ? Math.hypot(stk.x, stk.y) : 0;
+    if (!ix && !iy && sm > 0.18 && !(live.race && live.race.phase === 'count')) { ix = stk.x; iy = stk.y; mag = clamp((sm - 0.18) / 0.45, 0.45, 1); } // a gentle push walks slowly, a full push walks at full speed
+    if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SP * mag; tvy = (iy / n) * SP * mag; }
     else if (m.path.length) {
       const wp = m.path[0], dx = wp.x - m.px, dy = wp.y - m.py, d = Math.hypot(dx, dy);
       if (d < Math.max(0.06, SP * dt * 1.1)) {
@@ -903,6 +942,7 @@
     if (m.vy && freeAt(m.px + 0.5, m.py + 0.82 + m.vy * dt, over)) m.py += m.vy * dt; else m.vy = 0;
     const speed = Math.hypot(m.vx, m.vy);
     m.moving = speed > 0.3;
+    if (m.moving) live.walked = (live.walked || 0) + speed * dt;
     if (speed > 0.3) m.dir = Math.abs(m.vx) > Math.abs(m.vy) * 0.9 ? (m.vx < 0 ? 1 : 2) : (m.vy < 0 ? 3 : 0);
     if (Math.abs(m.vx) > 0.3) m.face = m.vx < 0 ? 1 : 2;
     if (live.ride && speed > 0.3) V().horse.dist += speed * dt;
@@ -930,8 +970,15 @@
       const sp2 = Math.hypot(dg.x - ox, dg.y - oy) / Math.max(dt, 1e-3); dg.moving = sp2 > 0.4; dg.idle = dg.moving ? 0 : dg.idle + dt;
       if (Math.abs(dg.x - ox) > 0.002) dg.flip = dg.x < ox; else if (!dg.moving) dg.flip = m.px + 0.2 < dg.x;
       const nowP = performance.now();
-      if (nowP > dg.nextFact && !document.querySelector('.modal-back')) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const sf = TG.seasons.current(), f = Math.random() < 0.5 ? (() => { const ff = TG.pick(sf.facts); return { mn: `${sf.icon} Мэдэх үү? ${ff.mn}`, en: `${sf.icon} Did you know? ${ff.en}` }; })() : TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); }
+      if (nowP > dg.nextFact && !document.querySelector('.modal-back') && !(TG.dialog && TG.dialog.active())) { dg.nextFact = nowP + 45000 + Math.random() * 30000; const sf = TG.seasons.current(), f = Math.random() < 0.5 ? (() => { const ff = TG.pick(sf.facts); return { mn: `${sf.icon} Мэдэх үү? ${ff.mn}`, en: `${sf.icon} Did you know? ${ff.en}` }; })() : TG.BASAR.FACTS[Math.floor(Math.random() * TG.BASAR.FACTS.length)]; dg.bubble = { fact: f, t0: nowP }; TG.sfx.pop && TG.sfx.pop(); TG.voice && TG.voice.babble(L('Вуф! Мэдэх үү?', 'Woof! Did you know?'), 'basar'); }
       if (dg.bubble && nowP - dg.bubble.t0 > 12000) dg.bubble = null;
+    }
+    const tg = live.tut && live.tut.guide;
+    if (tg) { // the tutorial guide walks along on your other side
+      const gx = m.px - 1.15, gy = m.py + 0.15, d0 = Math.hypot(gx - tg.x, gy - tg.y);
+      if (d0 > 6) { tg.x = gx; tg.y = gy; }
+      const q = d0 > 0.6 ? Math.min(1, dt * 2.6) : 0, ox = tg.x; tg.x += (gx - tg.x) * q; tg.y += (gy - tg.y) * q;
+      tg.moving = d0 > 0.6; if (Math.abs(tg.x - ox) > 0.003) tg.dir = tg.x < ox ? 1 : 2; else if (!tg.moving) tg.dir = 0;
     }
     for (const o of live.others.values()) {
       const dx = o.x - o.px, dy = o.y - o.py, d = Math.hypot(dx, dy);
@@ -1017,7 +1064,7 @@
     // the dairy yard's animals: cows and goats shift about, mares stand by their foals on the зэл
     for (const o of WD.objects) {
       if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); ents.push({ y: o.y + 0.2, f: () => { shadow(o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite(img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, turn); } }); }
-      if (o.kind === 'zel') { [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, k], i) => { const img = PX.beast(k, Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = k === 'mare' ? 0.75 : 0; ents.push({ y: o.y + my + 0.1, f: () => sprite(img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, i % 2 === 1) }); }); }
+      if (o.kind === 'zel') { [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, k], i) => { const img = PX.beast(k, k === 'foal' && Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = k === 'mare' ? 0.75 : 0; ents.push({ y: o.y + my + 0.1, f: () => sprite(img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, i % 2 === 1) }); }); }
     }
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
@@ -1031,6 +1078,8 @@
       for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
     }
     battleDraw(ents, drawRider, t);
+    const tg = live.tut && live.tut.guide;
+    if (tg && TG.tutorial) ents.push({ y: tg.y, f: () => { shadow(tg.x * T, tg.y * T); sprite(PX.char(TG.tutorial.LOOK, tg.dir || 0, tg.moving ? 1 + (Math.floor(t * 8) % 2) : 0), tg.x * T, tg.y * T - 12); } });
     const gn = WD.objects.find((q) => q.kind === 'general'), hs0 = WD.objects.find((q) => q.kind === 'historian');
     for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
@@ -1058,6 +1107,21 @@
       if (live.race.phase === 'go') for (const [nm, lx, ly] of live.race.labels) pixelText(ctx, nm, lx, ly, textSize() * 0.8, '#ffffff');
       const nx = live.race.path.P[Math.min(live.race.ci, live.race.path.P.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
       if (live.race.phase !== 'done') { const [ax, ay] = S(live.me.px * T + 8, live.me.py * T - 36), r = 7 * k; ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(r + k, 0); ctx.lineTo(-r * 0.6, -r * 0.75); ctx.lineTo(-r * 0.6, r * 0.75); ctx.fill(); ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(r - k, 0); ctx.lineTo(-r * 0.4, -r * 0.5); ctx.lineTo(-r * 0.4, r * 0.5); ctx.fill(); ctx.restore(); }
+    }
+    if (tg) { const [sx, sy] = S(tg.x * T + 8, tg.y * T - 16); pixelText(ctx, L('Номин', 'Nomin'), sx, sy, textSize() * 0.8, '#f7c646'); }
+    const tt = live.tut && live.tut.target;
+    if (tt && !live.race) { // the tutorial points at where to go: a bouncing arrow over the spot, and a compass arrow over you when it is far away
+      const bob = Math.round(Math.abs(Math.sin(pn / 220)) * 4) * k, [ax, ay] = S(tt.x * T + 8, tt.y * T - 26), r = 6 * k;
+      ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(ax, ay + r + k + bob); ctx.lineTo(ax - r - k, ay - r * 0.4 + bob); ctx.lineTo(ax + r + k, ay - r * 0.4 + bob); ctx.fill();
+      ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(ax, ay + r - k + bob); ctx.lineTo(ax - r + k, ay - r * 0.4 + k + bob); ctx.lineTo(ax + r - k, ay - r * 0.4 + k + bob); ctx.fill();
+      if (tt.label) pixelText(ctx, tt.label, ax, ay - r - 2 * k + bob, textSize() * 0.9, '#ffffff');
+      const fx = live.me.px + 0.5, fy = live.me.py + 0.82;
+      if (Math.hypot(tt.x + 0.5 - fx, tt.y + 0.5 - fy) > 3.5) {
+        const ang = Math.atan2(tt.y + 0.5 - fy, tt.x + 0.5 - fx), [px2, py2] = S(live.me.px * T + 8, live.me.py * T - 30), rr = 7 * k;
+        ctx.save(); ctx.translate(px2 + Math.cos(ang) * 10 * k, py2 + Math.sin(ang) * 6 * k); ctx.rotate(ang);
+        ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(rr + k, 0); ctx.lineTo(-rr * 0.6, -rr * 0.75); ctx.lineTo(-rr * 0.6, rr * 0.75); ctx.fill();
+        ctx.fillStyle = '#7fe07a'; ctx.beginPath(); ctx.moveTo(rr - k, 0); ctx.lineTo(-rr * 0.4, -rr * 0.5); ctx.lineTo(-rr * 0.4, rr * 0.5); ctx.fill(); ctx.restore();
+      }
     }
     { const [sx, sy] = S(dg.x * T + 8, dg.y * T - 4); pixelText(ctx, L('Басар', 'Basar'), sx, sy, textSize() * 0.8, '#f7c646');
       if (dg.bubble) { const bob = Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2; pixelText(ctx, '!', sx + 5 * live.view.k, sy - 6 * live.view.k + bob, textSize() * 1.8, '#f7c646'); } }
@@ -1408,7 +1472,7 @@
   }
   function archeryGame() {
     const v = V(), arch = v.arch = v.arch || { best: 0, hits: 0, shots: 0, games: 0 };
-    const DIST = [92, 118, 142], TOL = [10, 8, 6], X0 = 34, GROUND = 94, G = 120;
+    const DIST = [92, 118, 142], TOL = [13, 10, 8], X0 = 34, GROUND = 94, G = 120;
     const st = { round: 0, arrow: 0, hits: 0, phase: 'aim', angle: 0.3, power: 0.5, t0: performance.now(), wind: 0, shot: null, marks: [], cheer: 0, msg: '', over: false };
     const newWind = () => { const m = [6, 14, 24][st.round]; st.wind = Math.round((Math.random() * 2 - 1) * m); };
     newWind();
@@ -1427,8 +1491,8 @@
     let raf = 0;
     const loop = (ts) => {
       const k = (ts - st.t0) / 1000;
-      if (st.phase === 'aim') st.angle = (Math.sin(k * (1.6 + st.round * 0.35)) + 1) / 2;
-      if (st.phase === 'power') st.power = (Math.sin(k * (2.2 + st.round * 0.45) - Math.PI / 2) + 1) / 2;
+      if (st.phase === 'aim') st.angle = (Math.sin(k * (1.3 + st.round * 0.25)) + 1) / 2;
+      if (st.phase === 'power') st.power = (Math.sin(k * (1.8 + st.round * 0.35) - Math.PI / 2) + 1) / 2;
       if (st.phase === 'fly' && st.shot) {
         const s2 = st.shot, dt = 1 / 60;
         for (let i = 0; i < 2; i++) { s2.vx += st.wind * dt; s2.vy += G * dt; s2.x += s2.vx * dt; s2.y += s2.vy * dt; s2.trail.push([s2.x, s2.y]); }
@@ -1522,7 +1586,7 @@
     let raf = 0; const t0 = performance.now();
     const loop = () => { if (!cv.isConnected) return; TG.scenes.inside(cx2, st, (performance.now() - t0) / 1000); raf = requestAnimationFrame(loop); };
     const bubble = h('div', { class: 'emee-say' }), opts = h('div', { class: 'l-opts' }), note = h('div');
-    const sayEmee = (txt, kind) => rc(bubble, emeePic(40), h('p', { class: kind || '' }, txt));
+    const sayEmee = (txt, kind) => { const p = h('p', { class: kind || '' }); rc(bubble, emeePic(40), p); TG.voice ? TG.voice.type(p, txt, 'emee') : (p.textContent = txt); };
     function show() {
       const s = EMEE_STEPS[i]; st.hl = s.hl || null; st.hlBad = false; rc(note);
       sayEmee(tx(s.say));
@@ -1560,27 +1624,33 @@
     herder: { name: Tx('Малчин Батбаяр', 'Herder Batbayar'), look: { deel: 'brown', skin: '#D9A06E', hat: 'mongol', neck: null, face: null, pet: null },
       hello: Tx('Сайн уу, хүү/охин минь! Мал маллах амаргүй ч сайхан ажил шүү.', 'Hello, child! Herding is hard work, but wonderful.'),
       chain: [NQ('pet', 3, 'Хониддоо дасгая: тэднийг 3 удаа илбээрэй.', 'Help the sheep get to know you: pet them 3 times.', 20, 25), NQ('milk', 2, 'Хот айлд 2 удаа мал саагаад ирээрэй.', 'Milk the animals in the dairy yard twice.', 25, 30), NQ('etiquette', 1, 'Эмээгийн гэрт ёсоор зочлоод ир. Малчин хүн ёсоо мэддэг байх ёстой!', 'Visit Grandma’s ger with good manners. A herder knows the customs!', 35, 40)],
-      done: Tx('Чи жинхэнэ малчин болох нь! Малчид хонь бүрээ таньдаг, гэр бүл шиг хайрладаг.', 'You’ll make a real herder! Herders know every sheep and love them like family.') },
+      done: Tx('Чи жинхэнэ малчин болох нь! Малчид хонь бүрээ таньдаг, гэр бүл шиг хайрладаг.', 'You’ll make a real herder! Herders know every sheep and love them like family.'),
+      tic: Tx('Аа, ', 'Ah, '), bio: Tx('Аа, би 300 хоньтой. Өглөө бүр нараас өмнө босож малаа бэлчээрт гаргадаг. Хонь бүрийг нэрээр нь мэднэ шүү!', 'Ah, I have 300 sheep. Every morning I’m up before the sun to take them to pasture. I know each one by name!') },
     fisher: { name: Tx('Загасчин Дорж өвөө', 'Grandpa Dorj the fisher'), look: { deel: 'teal', skin: '#B97A4A', hat: 'cap', neck: null, face: null, pet: null },
       hello: Tx('Нуур тайван байна. Загасчлахад тэвчээр хэрэгтэй.', 'The lake is calm today. Fishing takes patience.'),
       chain: [NQ('fish', 1, 'Нэг загас барьж үзээрэй. Гүүрэн дээрээс загасчилна.', 'Catch your first fish from the dock.', 15, 20), NQ('fish', 3, 'Одоо 3 загас бариарай. Хадран барьвал буцааж тавиарай!', 'Now catch 3 fish. If you catch a taimen, let it go!', 30, 35), NQ('basar', 2, 'Басараас Монголын гол мөрөн, нууруудын тухай 2 асуулт асуу.', 'Ask Basar 2 questions about Mongolia’s rivers and lakes.', 25, 30)],
-      done: Tx('Сайн загасчин байгалиа хайрладаг. Хөвсгөл нуур бол Монголын хамгийн гүн нуур шүү!', 'A good fisher loves nature. Lake Khövsgöl is Mongolia’s deepest lake!') },
+      done: Tx('Сайн загасчин байгалиа хайрладаг. Хөвсгөл нуур бол Монголын хамгийн гүн нуур шүү!', 'A good fisher loves nature. Lake Khövsgöl is Mongolia’s deepest lake!'),
+      tic: Tx('Хм… ', 'Hmm… '), bio: Tx('Хм… Би энэ нуурын эрэг дээр жаран жил загасчилсан… Хадраныг үргэлж буцааж тавьдаг. Байгаль бидэнд зээлээр л өгдөг юм.', 'Hmm… I’ve fished this shore for sixty years… I always let the taimen go. Nature only lends to us.') },
     farmer: { name: Tx('Саальчин Сарнай эгч', 'Sarnai the milkmaid'), look: { deel: 'green', skin: '#EDBB93', hat: 'flower', neck: null, face: null, pet: null },
       hello: Tx('Хот айлд ажил их байна! Мал саахад туслах уу?', 'There’s lots to do in the dairy yard! Will you help me milk?'),
       chain: [NQ('milk', 3, 'Үнээ, ямаа, гүүгээ 3 удаа саагаарай.', 'Milk the cows, goats and mares 3 times.', 20, 25), NQ('dairy', 2, 'Ааруул, өрөм, тараг эсвэл айраг 2 удаа хийгээрэй.', 'Make aaruul, öröm, tarag or airag twice.', 25, 30), NQ('sell', 3, 'Цагаан идээгээ дэлгүүрт 3 удаа зараарай.', 'Sell your dairy foods at the shop 3 times.', 30, 35)],
-      done: Tx('Баярлалаа! Монголчууд зун цагаан идээ, өвөл улаан идээ (мах) голлон иддэг.', 'Thank you! Mongolians eat mostly white foods (dairy) in summer and red foods (meat) in winter.') },
+      done: Tx('Баярлалаа! Монголчууд зун цагаан идээ, өвөл улаан идээ (мах) голлон иддэг.', 'Thank you! Mongolians eat mostly white foods (dairy) in summer and red foods (meat) in winter.'),
+      tic: Tx('Ой! ', 'Oh! '), bio: Tx('Ой, би өдөрт хоёр удаа саадаг! Ааруулаа наранд хатаахад шувууд хулгайлах гээд байдаг юм, хи-хи!', 'Oh, I milk twice a day! When I dry aaruul in the sun the birds keep trying to steal it, hee-hee!') },
     teacher: { name: Tx('Багш Оюун', 'Teacher Oyun'), look: { deel: 'blue', skin: '#F6D3B3', hat: null, neck: 'scarf', face: 'glasses', pet: null },
       hello: Tx('Сурах бичиг уншихаас гадна тоглож сурах нь бас гоё!', 'Besides books, learning by playing is great fun!'),
       chain: [NQ('lesson', 1, 'Сургуулийн гэрт нэг хичээл дуусгаарай.', 'Finish one lesson in the school ger.', 30, 40), NQ('quiz', 3, 'Басарын 3 асуултад зөв хариулаарай.', 'Answer 3 of Basar’s questions correctly.', 25, 35), NQ('stamp', 1, 'Аймгийн паспортоороо нэг аймагт аялж тамга аваарай.', 'Travel to a province with your passport and earn a stamp.', 35, 45)],
-      done: Tx('Гайхалтай сурагч! “Эрдэм ухаан, эрдэнийн сан” гэдэг шүү.', 'An amazing student! As we say, “knowledge is a treasure”.') },
+      done: Tx('Гайхалтай сурагч! “Эрдэм ухаан, эрдэнийн сан” гэдэг шүү.', 'An amazing student! As we say, “knowledge is a treasure”.'),
+      tic: Tx('За, ', 'Now then, '), bio: Tx('За, би хөдөөний сургуульд хорин жил багшилсан. Хамгийн дуртай хичээл маань Монгол бичиг. Дээрээс доош бичдэг нь ямар гоё вэ!', 'Now then, I taught at a countryside school for twenty years. My favourite subject is the Mongol script. Writing from top to bottom is so lovely!') },
     trainer: { name: Tx('Уяач Ганбаатар', 'Horse trainer Ganbaatar'), look: { deel: 'gold', skin: '#D9A06E', hat: 'loovuuz', neck: null, face: null, pet: null },
       hello: Tx('Сайн уяач морио хайрлаж, сайн мэддэг. Хурдан морь уяачаас эхэлдэг.', 'A good trainer loves and knows their horse. Every fast horse starts with its trainer.'),
       chain: [NQ('race', 1, 'Морин уралдаанд нэг удаа оролцоорой.', 'Ride in one horse race.', 25, 30), NQ('race', 2, 'Дахиад 2 уралдаанд уралдаж мориндоо дасгал хийлгээрэй.', 'Ride 2 more races to train your horse.', 35, 40), NQ('wrestle', 1, 'Наадмын талбайд нэг даваа давж үзээрэй.', 'Win one round at the wrestling arena.', 30, 35)],
-      done: Tx('Чи морио сайн мэдэх болжээ! Уяачид морио уралдааны өмнө “сойдог”, өөрөөр хэлбэл тусгайлан бэлтгэдэг.', 'You know your horse well now! Before a race, trainers “soi” their horses: they prepare them in a special way.') },
+      done: Tx('Чи морио сайн мэдэх болжээ! Уяачид морио уралдааны өмнө “сойдог”, өөрөөр хэлбэл тусгайлан бэлтгэдэг.', 'You know your horse well now! Before a race, trainers “soi” their horses: they prepare them in a special way.'),
+      tic: Tx('Чү! ', 'Chü! '), bio: Tx('Чү! Миний хээр морь Наадамд гурван удаа түрүүлсэн! Уяач хүн морио хайрлаж, сайн арчлах ёстой.', 'Chü! My bay horse has won the Naadam three times! A trainer must love their horse and care for it well.') },
     archer: { name: Tx('Мэргэн Тулга ах', 'Tulga the archer'), look: { deel: 'red', skin: '#B97A4A', hat: 'mongol', neck: 'medal', face: null, pet: null },
       hello: Tx('Сайн харваач амьсгалаа тайвшруулж, салхиа ажигладаг.', 'A good archer breathes calmly and watches the wind.'),
       chain: [NQ('archery', 3, 'Сурын талбайд 3 бай онооорой.', 'Hit 3 targets at the archery range.', 25, 30), NQ('archery', 6, 'Одоо 6 бай онооорой. Салхийг тооцоорой!', 'Now hit 6 targets. Mind the wind!', 35, 40), NQ('together', 1, 'Гэр бүлтэйгээ нэг бодит ажил хамт хийгээрэй.', 'Do one real-life activity with your family.', 40, 45)],
-      done: Tx('Чи мэргэн болж байна! Сайн харваачийг монголчууд “мэргэн” гэж цоллодог.', 'You’re becoming a mergen! That is what Mongols call a great archer.') },
+      done: Tx('Чи мэргэн болж байна! Сайн харваачийг монголчууд “мэргэн” гэж цоллодог.', 'You’re becoming a mergen! That is what Mongols call a great archer.'),
+      tic: Tx('Ш-ш… ', 'Shh… '), bio: Tx('Ш-ш… Тайван. Сур харваа бол тэвчээрийн спорт. Аав маань надад гурван настайгаас нум заасан.', 'Shh… calm. Archery is a sport of patience. My father taught me the bow when I was three.') },
   };
   const npcState = (id) => { const v = V(); v.npc = v.npc || {}; return (v.npc[id] = v.npc[id] || { step: 0, p: 0, on: false }); };
   /** Progress the townspeople's tasks (called with every daily-quest event). */
@@ -1598,13 +1668,16 @@
   function npcTalk(id) {
     const d = NPCS[id]; if (!d) return;
     const st = npcState(id), body = h('div', { class: 'npc-talk' });
+    const speak = (text) => { const p = h('p'); TG.voice ? TG.voice.type(p, text, id) : (p.textContent = text); return p; };
+    // you can ask each person about themselves (their own story, in their own way of talking)
+    const asks = () => h('div', { class: 'b-chips npc-asks' }, h('button', { class: 'chip', onclick: () => { const b = body.querySelector('.emee-say'); if (b) rc(b, speak(tx(d.bio))); } }, '💬 ', L('Таны тухай?', 'About you?')));
     const draw = () => {
       const q = d.chain[st.step];
       const steps = h('div', { class: 'npc-steps' }, d.chain.map((_, i) => h('i', { class: i < st.step ? 'on' : i === st.step ? 'cur' : '' })));
-      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, h('p', null, tx(d.done))), h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
+      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, speak(tx(d.tic) + tx(d.done))), asks(), h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
       const ready = st.on && st.p >= q.n;
       rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)),
-        h('div', { class: 'emee-say' }, h('p', null, st.on ? (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)),
+        h('div', { class: 'emee-say' }, speak(st.on ? tx(d.tic) + (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)), asks(),
         st.on ? h('div', null, h('div', { class: 'meter' }, h('span', { style: { width: (st.p / q.n) * 100 + '%' } })), h('small', { class: 'muted' }, `${st.p}/${q.n} · 🪙 +${q.c} · ⭐ +${q.x} XP`)) : null,
         h('div', { class: 'row-btns' },
           !st.on ? h('button', { class: 'btn primary', onclick: () => { st.on = true; st.p = 0; S.save(); TG.sfx.chime && TG.sfx.chime(); draw(); } }, L('Тэгье, хийе!', 'Okay, I’ll do it!'))
@@ -1617,6 +1690,15 @@
     const close = TG.modal(body, { cls: 'v-modal' });
   }
   TG.villageNpcs = { NPCS, state: npcState };
+  if (TG.dialog) {
+    const still = (look) => () => PX.char(look, 0, 0);
+    TG.dialog.register('basar', { name: Tx('Басар', 'Basar'), voice: 'basar', art: [24, 22], portrait: (e, open, blink) => PX.bankharFace(blink ? 2 : open ? 1 : 0) });
+    for (const [id, d] of Object.entries(NPCS)) TG.dialog.register(id, { name: d.name, voice: id, portrait: still(d.look) });
+    TG.dialog.register('emee', { name: Tx('Эмээ', 'Grandma'), voice: 'emee', portrait: still(EMEE) });
+    TG.dialog.register('general', { name: Tx('Жанжин Батмөнх', 'General Batmönkh'), voice: 'general', portrait: still(GENERAL) });
+    TG.dialog.register('historian', { name: Tx('Түүхч Нарангэрэл', 'Narangerel the historian'), voice: 'historian', portrait: still(HISTORIAN) });
+    TG.dialog.register('zasuul', { name: Tx('Засуул', 'Herald'), voice: 'zasuul', portrait: still(ZASUUL) });
+  }
 
   // ================================================================ inside your own ger: walk around and use the furniture
   const GER_TEA = [Tx('Сүүтэй цайг сүү, ус, давс, цайгаар чанадаг. Зочинд хамгийн түрүүнд цай өргөдөг.', 'Milk tea is made with milk, water, salt and tea leaves. Guests are always offered tea first.'), Tx('Цайгаа шанагаар өндрөөс самарвал илүү амттай болдог гэдэг.', 'Ladling the tea from high up is said to make it tastier.')];
@@ -1966,7 +2048,7 @@
         h('div', { class: 'v-row-b' }, h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
   }
   function tournament(round) {
-    const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.15 + round * 0.085, skin: TG.pick(R.SKINS) };
+    const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.12 + round * 0.07, skin: TG.pick(R.SKINS) };
     wrestleMatch({ ai: true, round, opp }, (won) => {
       const v = V(), wr = v.wr;
       if (won) { wr.wins = (wr.wins || 0) + 1; quest('wrestle'); reward(8 + round * 2, 10 + round * 3); } else { wr.losses = (wr.losses || 0) + 1; reward(0, 5); }
@@ -1993,7 +2075,9 @@
       devee: cfg.ai ? { n: 0, good: 0, t0: performance.now(), f: 0 } : null, bonus: 0, lastMove: null, end: 0, left: false };
     // each даваа is harder: more points to win, a faster timing bar, a narrower sweet spot and a sharper opponent
     const rnd = cfg.ai ? cfg.round : 4, need = cfg.ai && cfg.round >= 7 ? 3 : 2;
-    const barSpeed = cfg.ai ? 2.7 + rnd * 0.33 : 3.6, sharp = cfg.ai ? 1 + rnd * 0.13 : 1.3;
+    const young = ((S.active() || {}).age || 10) <= 9;   // little ones get a slower marker and wider targets
+    const barSpeed = (cfg.ai ? 2.1 + rnd * 0.2 : 3) * (young ? 0.85 : 1), sharp = Math.max(1, (cfg.ai ? 1 + rnd * 0.08 : 1.15) - (young ? 0.1 : 0));
+    const grunt = (k, pitch) => TG.voice && TG.voice.grunt(k, pitch); // wrestlers grunt, huff and scuff the sand
     const cv = h('canvas', { class: 'v-wr-canvas', width: 192, height: 108 }), cx = cv.getContext('2d');
     const score = h('div', { class: 'v-wr-score' }), msg = h('div', { class: 'v-wr-msg' }, L('Мэхээ сонго!', 'Choose your move!'));
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
@@ -2005,8 +2089,9 @@
     const tail = h('div');
     // the zasuul calls out both wrestlers by their titles before the bout
     const myT = titleObj(R.titleFor(v.wr)), opT = cfg.ai ? titleObj(OPP_TITLE[cfg.round]) : null, named = (t, n) => (t ? tx(t.name) + ' ' : '') + n;
-    const herald = h('div', { class: 'v-zasuul' }, h('b', null, '📣 ', L('Засуул', 'Herald'), ': '),
-      L(`«${named(myT, live.name)}, ${named(opT, cfg.opp.name)} хоёр барилдана! Хүчит бөхчүүд дэвээгээ хийцгээ!»`, `"${named(myT, live.name)} and ${named(opT, cfg.opp.name)} will wrestle! Mighty wrestlers, do your eagle dance!"`));
+    const heraldSay = h('span');
+    const herald = h('div', { class: 'v-zasuul' }, h('b', null, '📣 ', L('Засуул', 'Herald'), ': '), heraldSay);
+    { const t0 = L(`«${named(myT, live.name)}, ${named(opT, cfg.opp.name)} хоёр барилдана! Хүчит бөхчүүд дэвээгээ хийцгээ!»`, `"${named(myT, live.name)} and ${named(opT, cfg.opp.name)} will wrestle! Mighty wrestlers, do your eagle dance!"`); TG.voice ? TG.voice.type(heraldSay, t0, 'zasuul') : (heraldSay.textContent = t0); }
     // дэвээ: flap like an eagle in time with the beat; a good dance gives power to your first move
     const feathers = Array.from({ length: DEVEE_TAPS }, () => h('i', { class: 'v-wr-feather' }));
     const deveeBtn = h('button', { class: 'btn primary big', onclick: () => deveeTap() }, '🦅 ', L('Дэвэх (Space)', 'Flap (Space)'));
@@ -2064,10 +2149,11 @@
       const type = SKILL[id] || 'timing'; st.t0 = performance.now();
       if (type === 'timing') { setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); return; }
       const sk = st.skill = { type, t0: performance.now(), el: {} };
-      if (type === 'combo') { sk.seq = Array.from({ length: 3 + Math.min(3, Math.floor(rnd / 3)) }, () => Math.floor(Math.random() * 4)); sk.i = 0; sk.err = 0; sk.limit = Math.max(2600, 4800 - rnd * 200); }
-      if (type === 'mash') { sk.n = 0; sk.need = 9 + rnd; sk.limit = 2400; }
-      if (type === 'hold') { sk.held = false; sk.v = 0; sk.zc = 0.8; sk.zw = 0.2 / sharp; }
+      if (type === 'combo') { sk.seq = Array.from({ length: 3 + Math.min(2, Math.floor(rnd / 4)) }, () => Math.floor(Math.random() * 4)); sk.i = 0; sk.err = 0; sk.limit = Math.max(3400, 5600 - rnd * 180) * (young ? 1.2 : 1); }
+      if (type === 'mash') { sk.n = 0; sk.need = 7 + Math.ceil(rnd * 0.6) - (young ? 1 : 0); sk.limit = 2900; }
+      if (type === 'hold') { sk.held = false; sk.v = 0; sk.zc = 0.78; sk.zw = (young ? 0.3 : 0.26) / sharp; }
       if (type === 'balance') { sk.x = 0; sk.vx = 0; sk.push = 0; sk.dir = 0; sk.good = 0; sk.limit = 2800; }
+      grunt('huff', 1.1); setTimeout(() => grunt('step'), 120);
       setPhase('skill'); renderSkill();
       msg.textContent = { combo: L('Хөлийн хөдөлгөөн! Сумнуудыг дарааллаар нь хурдан дар.', 'Footwork! Press the arrows in order, quickly.'), mash: L('Бүх хүчээ гарга! Хурдан, олон дар!', 'All your strength! Tap as fast as you can!'),
         hold: L('Барьцаа ав: дарж байгаад шар хэсэгт хүрэхэд тавь.', 'Take the grip: hold, and let go in the yellow zone.'), balance: L('Тэнцвэрээ хадгал! Зүү голдоо байлгах гэж ← → дар.', 'Keep your balance! Use ← → to keep the needle in the middle.') }[type];
@@ -2085,22 +2171,23 @@
     }
     function comboInput(i) {
       const sk = st.skill; if (!sk || sk.type !== 'combo' || st.phase !== 'skill') return;
-      if (sk.seq[sk.i] === i) { sk.i++; TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (sk.i >= sk.seq.length) { const q = (performance.now() - sk.t0) / sk.limit; return lock(clamp(0.45 + 0.55 * (1 - q) - 0.15 * sk.err, 0.05, 1)); } }
+      if (sk.seq[sk.i] === i) { sk.i++; grunt('step'); TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (sk.i >= sk.seq.length) { const q = (performance.now() - sk.t0) / sk.limit; return lock(clamp(0.45 + 0.55 * (1 - q) - 0.15 * sk.err, 0.05, 1)); } }
       else { sk.err++; TG.sfx.bad(); }
       renderSkill();
     }
-    function mashTap() { const sk = st.skill; if (!sk || sk.type !== 'mash' || st.phase !== 'skill') return; sk.n++; TG.sfx.tap(); if (sk.el.btn) sk.el.btn.textContent = L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`); }
-    function holdDown() { const sk = st.skill; if (!sk || sk.type !== 'hold' || st.phase !== 'skill' || sk.held) return; sk.held = true; sk.v = 0; }
+    function mashTap() { const sk = st.skill; if (!sk || sk.type !== 'mash' || st.phase !== 'skill') return; sk.n++; TG.sfx.tap(); if (sk.n % 3 === 0) grunt('effort', 1 + sk.n * 0.015); if (sk.el.btn) sk.el.btn.textContent = L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`); }
+    function holdDown() { const sk = st.skill; if (!sk || sk.type !== 'hold' || st.phase !== 'skill' || sk.held) return; sk.held = true; sk.v = 0; grunt('strain'); }
     function holdUp() { const sk = st.skill; if (!sk || sk.type !== 'hold' || !sk.held) return; sk.held = false; lock(clamp(1 - Math.abs(sk.v - sk.zc) * 3.2 * sharp, 0, 1)); }
     function skillTick(dt, ts) {
       const sk = st.skill; if (!sk || st.phase !== 'skill') return;
       const el = ts - sk.t0;
       if (sk.type === 'combo') { if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%'; if (el > sk.limit) lock((sk.i / sk.seq.length) * 0.5); }
       else if (sk.type === 'mash') { if (sk.el.fill) sk.el.fill.style.width = Math.min(100, (sk.n / sk.need) * 100) + '%'; if (el > sk.limit) lock(Math.min(1, sk.n / sk.need)); }
-      else if (sk.type === 'hold') { if (sk.held) { sk.v += dt / 1.5; if (sk.v > 1) { sk.v = 0; msg.textContent = L('Хэт удаан барилаа! Дахиад.', 'Held too long! Again.'); } } if (sk.el.fill) sk.el.fill.style.width = sk.v * 100 + '%'; if (el > 6000) lock(0.1); }
+      else if (sk.type === 'hold') { if (sk.held) { sk.v += dt / (young ? 1.9 : 1.6); if (sk.v > 1) { sk.v = 0; msg.textContent = L('Хэт удаан барилаа! Дахиад.', 'Held too long! Again.'); } } if (sk.el.fill) sk.el.fill.style.width = sk.v * 100 + '%'; if (el > 6000) lock(0.1); }
       else if (sk.type === 'balance') {
-        sk.push += (Math.random() - 0.5) * dt * (6 + rnd); sk.push = clamp(sk.push, -1.6, 1.6);   // your opponent shoves you this way and that
-        sk.vx += (sk.push * (1 + rnd * 0.12) + sk.dir * 4.2) * dt; sk.vx *= 0.92; sk.x = clamp(sk.x + sk.vx * dt, -1, 1);
+        sk.push += (Math.random() - 0.5) * dt * (4.5 + rnd * 0.7); sk.push = clamp(sk.push, -1.3, 1.3);   // your opponent shoves you this way and that
+        if (Math.random() < dt * 1.2) grunt('huff', 0.85);
+        sk.vx += (sk.push * (0.85 + rnd * 0.08) + sk.dir * 4.6) * dt; sk.vx *= 0.92; sk.x = clamp(sk.x + sk.vx * dt, -1, 1);
         if (Math.abs(sk.x) < 0.25) sk.good += dt * 1000;
         if (sk.el.needle) sk.el.needle.style.left = (50 + sk.x * 48) + '%'; if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%';
         if (el > sk.limit) lock(clamp((sk.good / sk.limit) * 1.15, 0, 1));
@@ -2149,6 +2236,7 @@
       const good = deveeOnBeat(performance.now());
       feathers[d.n].classList.add(good ? 'good' : 'miss'); d.n++; d.f ^= 1; if (good) d.good++;
       if (good) TG.sfx.chime(); else TG.sfx.tap();
+      grunt('clap'); // the eagle dance: arms spread, palms slap the thighs
       if (d.n < DEVEE_TAPS) return;
       st.bonus = d.good * 0.06;
       msg.textContent = d.good >= 3 ? L(`Гоё дэвлээ! Бүргэд шиг! Эхний мэх +${Math.round(st.bonus * 100)}% хүчтэй.`, `Beautiful dance, like an eagle! First move +${Math.round(st.bonus * 100)}% power.`)
@@ -2158,6 +2246,7 @@
     function lock(given) {
       if (st.phase !== 'timing' && st.phase !== 'skill') return;
       herald.remove(); st.skill = null;
+      grunt('effort'); setTimeout(() => grunt('effort', 0.82), 160); // both wrestlers heave
       let power = typeof given === 'number' ? given : Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
       if (st.bonus) { power = Math.min(1, power + st.bonus); st.bonus = 0; } // the eagle dance's power
       const repeated = st.move === st.lastPlayer;
@@ -2168,7 +2257,7 @@
         // the opponent studies you: in later rounds it often picks a move that beats the one you use most
         const fav = Object.entries(st.used).sort((a2, b2) => b2[1] - a2[1])[0][0];
         const read = repeated ? st.move : (Math.random() < 0.5 ? st.lastPlayer : fav);
-        const smart = read && Math.random() < Math.min(0.72, 0.04 + cfg.round * 0.075);
+        const smart = read && Math.random() < Math.min(0.5, 0.03 + cfg.round * 0.05);
         const counters = R.MOVES.filter((q) => q.beats.includes(read));
         const om = smart && counters.length ? TG.pick(counters).id : TG.pick(R.MOVES).id;
         const op = clamp(cfg.opp.skill + (Math.random() - 0.5) * Math.max(0.18, 0.5 - cfg.round * 0.035), 0.05, 1);
@@ -2178,6 +2267,7 @@
     function apply(r, mm, mp, om, op) {
       const wasRepeat = mm === st.lastPlayer;
       st.lastPlayer = mm; if (r) st.lastMove = r > 0 ? mm : om;
+      if (r > 0) grunt('oof', 0.82); else if (r < 0) grunt('oof', 1.08); else grunt('huff');
       if (r > 0) { st.a++; TG.sfx.good(); const wr = V().wr; wr.techs = wr.techs || {}; wr.techs[mm] = (wr.techs[mm] || 0) + 1; S.save(); } else if (r < 0) { st.b++; TG.sfx.bad(); } else TG.sfx.tap();
       st.flash = { text: (r >= 0 ? moveLabel(mm) : moveLabel(om)).toUpperCase() + '!', good: r > 0, t0: performance.now() };
       if (wasRepeat && r < 0) setTimeout(() => { if (!st.over) msg.textContent += ' ' + L('(Давтсан мэхийг өрсөлдөгч таньчихлаа!)', '(They saw your repeated move coming!)'); }, 30);
@@ -2192,6 +2282,7 @@
       if (st.over) return; st.over = true; setPhase('done'); herald.remove();
       st.pose = won ? ['dance', 'fall'] : ['fall', 'dance']; st.target = won ? 18 : -18; st.end = performance.now(); st.left = !!reason;
       if (won) { TG.sfx.win(); TG.confetti(60); } else TG.sfx.bad();
+      grunt('crowd'); // the crowd shouts “uukhai!”
       const res = onEnd ? onEnd(won) || {} : {};
       const t = res.newTitle && titleObj(res.newTitle);
       const part = st.lastMove && WR_PART[st.lastMove] ? tx(WR_PART[st.lastMove]) : null;

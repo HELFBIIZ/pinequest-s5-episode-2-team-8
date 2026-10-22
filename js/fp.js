@@ -285,7 +285,7 @@
       const x = hud.getContext('2d'), Wd = hud.width, Hd = hud.height; x.clearRect(0, 0, Wd, Hd);
       if (cfg.riding && cfg.riding()) { // your horse’s neck, mane and ears in front of you, bobbing as it moves
         const u = Math.max(6, Math.round(Math.min(Wd, Hd) / 70)), bob = Math.round(Math.sin(P.bob * 2) * u), cxh = Wd / 2, by = Hd + u * 2 + bob;
-        const coat = (cfg.horseCoat && cfg.horseCoat()) || '#8a5a33', dk = '#2b1e14';
+        const coat = (cfg.horseCoat && cfg.horseCoat()) || '#8a5a33', dk = (cfg.horseMane && cfg.horseMane()) || '#2b1e14';
         x.fillStyle = '#2b1e2e'; x.fillRect(cxh - u * 7, by - u * 18, u * 14, u * 18);
         x.fillStyle = coat; x.fillRect(cxh - u * 6, by - u * 17, u * 12, u * 17);
         x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(cxh - u * 6, by - u * 17, u * 3, u * 17);
