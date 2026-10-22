@@ -214,10 +214,11 @@
     const v = V();
     switch (m.t) {
       case 'welcome':
-        live.online = true; live.offset = m.now - Date.now(); live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room;
+        live.online = true; live.offset = m.now - Date.now(); live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room; live.serverV = m.v;
         live.others.clear(); (m.players || []).forEach(addOther);
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
+        if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Сервер хуучин хувилбартай байна. Барилдаан зөв ажиллахын тулд серверийг дахин асаагаарай (Ctrl+C, дараа нь node server.js).', '⚠️ The server is running an old version. Restart it (Ctrl+C, then node server.js) so wrestling works.')), 2500);
         break;
       case 'join': addOther(m.p); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
       case 'leave': live.others.delete(m.id); hud(); break;

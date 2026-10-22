@@ -6,6 +6,7 @@
   else { root.TG = root.TG || {}; root.TG.vrules = api; }
 })(typeof self !== 'undefined' ? self : this, function () {
   const W = 56, H = 40, LOTS = 8, GER_PRICE = 200, GER_LEVEL = 2;
+  const VERSION = 3; // bump when the game and server must change together (moves, messages), so an old running server is noticed
   const T = (mn, en) => ({ mn, en });
 
   // The herding and dairy yard (хот айл): animals you milk, and the white foods (цагаан идээ) you make from the milk.
@@ -141,5 +142,5 @@
     return out;
   }
 
-  return { W, H, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, DAIRY_ANIMALS, DAIRY, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, level, cleanLook, now };
+  return { VERSION, W, H, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, DAIRY_ANIMALS, DAIRY, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, level, cleanLook, now };
 });

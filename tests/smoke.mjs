@@ -377,6 +377,16 @@ try {
   await page.evaluate(() => TG._village.battle('tatar')); await sleep(300);
   await page.evaluate(() => TG._village.fp()); await sleep(3500);
   if (!(await page.evaluate(() => !!document.querySelector('.village-fp .fp-cv')))) errors.push('first-person village: did not open');
+  // phones: a thumb that lands on the info box must still work the joystick
+  {
+    const at = await page.evaluate(() => { const b = document.querySelector('.village-fp .scene-info').getBoundingClientRect(); return { x: Math.min(b.x + 20, innerWidth * 0.4), y: b.y + b.height / 2 }; });
+    const me0 = await page.evaluate(() => [TG._village.fpScene.me.x, TG._village.fpScene.me.y]);
+    const cdp = await page.target().createCDPSession();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [at] });
+    for (let i = 1; i <= 8; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at.x, y: at.y - i * 8 }] }); await sleep(30); }
+    await sleep(700); await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+    if (await page.evaluate((a) => Math.hypot(TG._village.fpScene.me.x - a[0], TG._village.fpScene.me.y - a[1]) < 0.3, me0)) errors.push('first-person village: the touch joystick did not walk when started on the info box');
+  }
   await sleep(1500);
   await page.evaluate(() => { const bt = TG._village.battleState(), e = bt && bt.enemies[0], sc = TG._village.fpScene; if (e) { sc.me.x = e.x - 1; sc.me.y = e.y; } }); await sleep(200);
   await page.keyboard.press('KeyF'); await sleep(100);

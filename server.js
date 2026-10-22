@@ -161,7 +161,7 @@ function onMessage(conn, text) {
     if (old) { old.conn.player = null; old.conn.room = null; old.conn.send({ t: 'replaced' }); setTimeout(() => old.conn.socket.destroy(), 50); } // same player in another tab: keep the newest, and tell the old one why
     const p = { id, conn, name: cleanName(m.name), look: R.cleanLook(m.look), lvl: num(m.lvl, 1, 99), x: numf(m.x, 0.5, R.W - 2), y: numf(m.y, 0.5, R.H - 2), dir: num(m.dir, 0, 3) };
     r.players.set(id, p); conn.player = p; conn.room = r;
-    conn.send({ t: 'welcome', now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), lots: r.lots });
+    conn.send({ t: 'welcome', v: R.VERSION, now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), lots: r.lots });
     broadcast(r, { t: 'join', p: pub(p) }, conn);
     census();
     return;
