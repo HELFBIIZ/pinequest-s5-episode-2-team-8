@@ -103,7 +103,7 @@ try {
   await b.evaluate(() => [...document.querySelectorAll('.modal .btn.primary')].find((x) => /Барилдъя/.test(x.textContent)).click());
   await until(() => a.evaluate(() => !!document.querySelector('.v-wrestle')) && b.evaluate(() => !!document.querySelector('.v-wrestle')), 'both see the match');
   for (let round = 0; round < 15; round++) {
-    const over = await a.evaluate(() => !!document.querySelector('.v-wrestle .v-zasuul, .v-wrestle .row-btns'));
+    const over = await a.evaluate(() => !!document.querySelector('.v-wrestle .row-btns'));
     if (over) break;
     for (const [pg, k] of [[a, 0], [b, 1]]) {
       await until(() => pg.evaluate(() => { const m = document.querySelector('.v-wr-moves'); return (m && !m.classList.contains('hidden')) || !!document.querySelector('.v-wrestle .row-btns'); }), 'move buttons', 6000);

@@ -220,6 +220,19 @@ try {
   await check('village minimap', '.village .v-mini');
   await page.keyboard.down('Space'); await sleep(100); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => performance.now() - (TG._village.live().me.jt || 0) < 1000))) errors.push('village: Space did not jump');
+  // walking into a rock hops over it
+  const rock = await page.evaluate(() => {
+    const W = TG.vworld; let r = null;
+    for (let y = 2; y < W.H - 2 && !r; y++) for (let x = 2; x < W.W - 3 && !r; x++) if (W.g[y][x] === 'r' && !W.blocked(x - 1, y) && !W.blocked(x + 1, y) && !W.blocked(x + 2, y)) r = { x, y };
+    if (r) { const l = TG._village.live(); l.me.path = []; l.me.vx = l.me.vy = 0; l.me.px = l.me.x = r.x - 1; l.me.py = l.me.y = r.y; }
+    return r;
+  });
+  if (!rock) errors.push('village: no rock to jump over');
+  else {
+    await page.keyboard.down('KeyD'); await sleep(900); await page.keyboard.up('KeyD'); await sleep(200);
+    const px = await page.evaluate(() => TG._village.live().me.px);
+    if (!(px > rock.x + 0.4)) errors.push(`village: walking into a rock did not hop over it (rock at ${rock.x}, stopped at ${px.toFixed(2)})`);
+  }
   // running (Shift, or the 🏃 button on phones) is faster and uses energy; food fills it back up
   step = 'running + eating';
   await page.evaluate(() => { TG.store.active().village.energy = 60; const l = TG._village.live(); l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; });
@@ -303,6 +316,10 @@ try {
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   step = 'wrestling techniques';
   await page.evaluate(() => TG._village.tournament(8)); await sleep(400);
+  // the eagle dance (дэвээ) comes first: four flaps, then the move buttons appear
+  if (!(await page.evaluate(() => /Засуул/.test(document.querySelector('.v-wrestle').textContent)))) errors.push('wrestling: the zasuul did not announce the wrestlers');
+  for (let i = 0; i < 4; i++) { await page.evaluate(() => document.querySelector('.v-wr-devee .btn').click()); await sleep(150); }
+  await sleep(1100);
   const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
   if (nMoves !== 7) errors.push(`wrestling: expected 7 techniques, found ${nMoves}`);
   if (!(await page.evaluate(() => /3/.test(document.querySelector('.v-wrestle .eyebrow').textContent)))) errors.push('wrestling: late rounds should need 3 falls');
