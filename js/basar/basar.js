@@ -190,7 +190,9 @@
     const log = h('div', { class: 'b-log', 'aria-live': 'polite' });
     const say = (who, content, extra) => {
       const row = h('div', { class: 'b-row ' + who }, who === 'basar' ? api.face(1, 34) : null, h('div', { class: 'b-bubble' }, content, extra || null));
-      log.appendChild(row); log.scrollTop = log.scrollHeight; return row;
+      log.appendChild(row); log.scrollTop = log.scrollHeight;
+      if (who === 'basar' && typeof content === 'string' && TG.voice) TG.voice.babble(content, 'basar');
+      return row;
     };
     const input = h('input', { class: 'input b-input', maxlength: 300, placeholder: L('Монгол эсвэл англиар асуу…', 'Ask in English or Mongolian…'), 'aria-label': L('Асуулт', 'Question'),
       onkeydown: (e) => { e.stopPropagation(); if (e.key === 'Enter') send(); } });

@@ -71,6 +71,54 @@ try {
   if (!(await page.evaluate(() => /📍/.test(document.querySelector('.v-loc').textContent)))) errors.push('village: the home province chip is missing');
   const prof = await page.evaluate(() => { const p = TG.store.active(); return p && { name: p.name, age: p.age, avatar: p.avatar, code: p.code }; });
   if (!prof || prof.name !== 'Тест' || prof.age !== 8 || !prof.code) errors.push(`register: profile not saved correctly: ${JSON.stringify(prof)}`);
+
+  // the tutorial: Guide Nomin talks in the story box (portrait, typed text, voice), asks questions, and walks the player
+  // through walking, jumping, talking to Basar and using the well, then answers questions and gives a gift
+  step = 'tutorial';
+  for (let i = 0; i < 40 && !(await page.evaluate(() => TG.dialog.active())); i++) await sleep(100);
+  if (!(await page.evaluate(() => TG.dialog.active()))) errors.push('tutorial: the guide did not start talking on the first visit');
+  else {
+    await check('tutorial dialogue box', '.dlg .dlg-box .dlg-face canvas');
+    if (!(await page.evaluate(() => !!(TG._village.live().tut || {}).guide))) errors.push('tutorial: the guide is not standing in the village');
+    const coins0 = await page.evaluate(() => TG.store.active().village.coins);
+    const faces = new Set();
+    const tutState = () => page.evaluate(() => JSON.stringify({ goal: (document.querySelector('.tut-goal') || {}).textContent, say: ((document.querySelector('.dlg-text') || {}).textContent || '').slice(0, 50), modal: !!document.querySelector('.modal-back'), focus: document.activeElement && document.activeElement.tagName, walked: TG._village.live() && TG._village.live().walked }));
+    const until = async (fn, n = 90) => {
+      for (let i = 0; i < n; i++) {
+        faces.add(await page.evaluate(() => { const c = document.querySelector('.dlg-face canvas'); return c ? c.toDataURL() : ''; }));
+        if (await page.evaluate(fn)) return true;
+        await page.keyboard.press('Space'); await sleep(140);
+      }
+      return false;
+    };
+    if (!(await until(() => !!document.querySelector('.dlg.asking .dlg-opt')))) errors.push('tutorial: the guide never asked a question with answers');
+    else {
+      if ((await page.$$('.dlg-opt')).length < 2) errors.push('tutorial: a question needs at least two answers');
+      await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowUp'); await sleep(80);
+      await page.keyboard.press('Enter'); // “Yes, let's go!”
+      if (!(await until(() => !!document.querySelector('.tut-goal')))) errors.push('tutorial: the walking goal did not appear');
+      // hold → until the walking goal is met (slow machines draw fewer frames, so never rely on a fixed time)
+      await page.keyboard.down('KeyD');
+      for (let i = 0; i < 80 && (await page.evaluate(() => /Алх|walk/i.test((document.querySelector('.tut-goal') || {}).textContent || ''))); i++) await sleep(100);
+      await page.keyboard.up('KeyD');
+      if (!(await until(() => /Басар|Basar/.test((document.querySelector('.tut-goal') || {}).textContent || '')))) errors.push('tutorial: walking and jumping goals did not complete: ' + await tutState());
+      else {
+        await page.keyboard.press('KeyB'); await sleep(500);
+        if (!(await page.$('.modal .b-head'))) errors.push('tutorial: B did not open Basar');
+        await page.keyboard.press('Escape'); await sleep(400);
+        if (!(await until(() => /Худ[аг]|well/i.test((document.querySelector('.tut-goal') || {}).textContent || '')))) errors.push('tutorial: the well goal did not appear');
+        await page.evaluate(() => { const l = TG._village.live(), w = TG._village.objects().find((o) => o.id === 'well'); l.me.path = []; l.me.vx = l.me.vy = 0; l.me.px = w.door.x; l.me.py = w.door.y - 0.7; });
+        await sleep(300); await page.keyboard.press('KeyE'); await sleep(300);
+        if (!(await until(() => !TG.dialog.active() && !document.querySelector('.tut-goal') && !TG.tutorial.active(), 140))) errors.push('tutorial: did not reach the end');
+      }
+    }
+    if (faces.size < 4) errors.push(`tutorial: the guide's face should change while talking (saw ${faces.size} different faces)`);
+    const done = await page.evaluate(() => ({ t: TG.store.active().village.tutorial, coins: TG.store.active().village.coins }));
+    if (!done.t) errors.push('tutorial: finishing did not save it as done');
+    if (done.coins < coins0 + 30) errors.push(`tutorial: the guide's gift was not given (${coins0} → ${done.coins})`);
+    if (await page.evaluate(() => !!document.querySelector('.tut-glow'))) errors.push('tutorial: a button is still glowing after the end');
+    await page.evaluate(() => TG.tutorial.stop()); // never let a stuck tutorial swallow the keys of the checks below
+  }
   await page.evaluate(() => { TG.store.state.settings.sound = false; document.querySelectorAll('.modal-x').forEach((x) => x.click()); });
 
   // modal accessibility: focus moves into the dialog, Escape closes it, focus returns
@@ -389,8 +437,10 @@ try {
   }
   await sleep(1500);
   await page.evaluate(() => { const bt = TG._village.battleState(), e = bt && bt.enemies[0], sc = TG._village.fpScene; if (e) { sc.me.x = e.x - 1; sc.me.y = e.y; } }); await sleep(200);
+  const shots0 = await page.evaluate(() => TG._village.battleState().shots || 0);
   await page.keyboard.press('KeyF'); await sleep(100);
-  if (!(await page.evaluate(() => TG._village.battleState().arrows.length >= 1 || TG._village.battleState().repelled >= 1))) errors.push('first-person battle: F did not shoot');
+  // a raider one step away is hit (and the arrow gone) within a frame or two, so count the shot itself
+  if (!(await page.evaluate((n) => (TG._village.battleState().shots || 0) > n, shots0))) errors.push('first-person battle: F did not shoot');
   await page.evaluate(() => { const bt = TG._village.battleState(); bt.herd = 0; }); await sleep(600);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(300);
   await page.evaluate(() => TG._village.fpScene.close()); await sleep(400);

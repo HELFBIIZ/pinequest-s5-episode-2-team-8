@@ -123,6 +123,8 @@ window.TG = { games: {}, gameOrder: [] };
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
     src.connect(f).connect(g).connect(actx.destination); src.start(t); src.stop(t + d + 0.02);
   }
+  /** The shared AudioContext, or null when sound is off or unavailable (character voices use it too). */
+  TG.audio = () => (ctxOk() ? actx : null);
   TG.buzz = (ms = 12) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* no haptics */ } };
   TG.sfx = {
     tap: () => tone(520, 0.06, 'triangle', 0, 0.08),

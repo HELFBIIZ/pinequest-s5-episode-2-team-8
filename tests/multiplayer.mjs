@@ -36,7 +36,7 @@ async function player(name, look, room, ctxIn) {
     localStorage.clear();
     const p = TG.store.addProfile({ name, age: 9, avatar: '🐎' }); TG.store.state.loggedIn = true;
     TG.store.state.settings.sound = false;
-    p.village = { tips: true, look, xp: 200, coins: 600, room: room || 'NUTAG' };
+    p.village = { tips: true, tutorial: true, look, xp: 200, coins: 600, room: room || 'NUTAG' };
     TG.go('village');
   }, name, look, room);
   await until(() => page.evaluate(() => TG._village.live() && TG._village.live().online), `${name} online`);
