@@ -93,7 +93,7 @@
   // ---------------------------------------------------------------- the trip
   /** cfg: like TG.scene.open, plus map (the province map). Positions in cfg (things, start, actors) are in 2D map pixels. */
   function open(cfg) {
-    const WF = W8(), world = WF.create(cfg.map), PXB = WF.TILE / TG.travel.TS, M = WF.M;
+    const WF = W8(), world = cfg.world || WF.create(cfg.map), PXB = cfg.scale || WF.TILE / TG.travel.TS, M = world.M;   // cfg.scale: blocks per unit of the caller's coordinates
     const toB = (px, py) => [M + px * PXB, M + py * PXB];
     const cv = h('canvas', { class: 'fp-cv' }), hud = h('canvas', { class: 'fp-hud' });
     const gl = cv.getContext('webgl', { antialias: false, alpha: false }) || cv.getContext('experimental-webgl');
@@ -121,8 +121,8 @@
     const skyBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const spriteTex = new Map(), texOf = (canvas) => { if (!spriteTex.has(canvas)) spriteTex.set(canvas, texFrom(canvas)); return spriteTex.get(canvas); };
     const sunCanvas = (() => { const c = document.createElement('canvas'); c.width = c.height = 8; const x = c.getContext('2d'); x.fillStyle = '#fff6c8'; x.fillRect(0, 0, 8, 8); x.fillStyle = '#ffffff'; x.fillRect(2, 2, 4, 4); return c; })();
-    const snowing = cfg.map.snow || (TG.seasons && TG.seasons.current().id === 'winter');
-    const SKY = snowing ? { lo: [0.86, 0.9, 0.95], hi: [0.55, 0.68, 0.85] } : cfg.map.desert ? { lo: [0.93, 0.86, 0.72], hi: [0.36, 0.62, 0.92] } : { lo: [0.78, 0.88, 0.97], hi: [0.3, 0.56, 0.92] };
+    const snowing = (cfg.map && cfg.map.snow) || (TG.seasons && TG.seasons.current().id === 'winter');
+    const SKY = snowing ? { lo: [0.86, 0.9, 0.95], hi: [0.55, 0.68, 0.85] } : (cfg.map && cfg.map.desert) ? { lo: [0.93, 0.86, 0.72], hi: [0.36, 0.62, 0.92] } : { lo: [0.78, 0.88, 0.97], hi: [0.3, 0.56, 0.92] };
     const FOG = SKY.lo, FAR = 150;
 
     // the player (block units: x east, z south, y up)
@@ -152,7 +152,8 @@
       P.sprint = f > 0.3 && (P.sprint || keys.has('shift') || keys.has('ctrl') || runLock);
       if (f <= 0.3) P.sprint = false;
       P.inWater = waterAt(P.x, P.y + 0.4, P.z);
-      const speed = P.inWater ? 2.2 : P.sprint ? 5.6 : 4.3;                         // Minecraft's walk and sprint speeds (blocks per second)
+      const riding = cfg.riding && cfg.riding();
+      const speed = P.inWater ? 2.2 : (P.sprint ? 5.6 : 4.3) * (riding ? 1.7 : 1);    // Minecraft's walk and sprint speeds (blocks per second); a horse is faster
       const fx = Math.sin(P.yaw), fz = -Math.cos(P.yaw), rx = Math.cos(P.yaw), rz = Math.sin(P.yaw);
       const tvx = (fx * f + rx * s) * speed, tvz = (fz * f + rz * s) * speed, acc = Math.min(1, dt * (P.ground ? 14 : 3.5));
       P.vx += (tvx - P.vx) * acc; P.vz += (tvz - P.vz) * acc;
@@ -185,7 +186,7 @@
     const interact = () => { if (near) near.run(); };
     // input
     const KEYM = { KeyW: 'w', ArrowUp: 'w', KeyS: 's', ArrowDown: 's', KeyA: 'a', ArrowLeft: 'a', KeyD: 'd', ArrowRight: 'd', Space: ' ', ShiftLeft: 'shift', ShiftRight: 'shift', ControlLeft: 'ctrl', ControlRight: 'ctrl' };
-    const busy = (e) => document.querySelector('.modal-back') || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '');
+    const busy = (e) => document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '');
     const kd = (e) => {
       if (busy(e)) return;
       const k = KEYM[e.code];
@@ -194,6 +195,7 @@
         if (k === 'w' && !e.repeat) { const n = performance.now(); if (n - lastW < 300) P.sprint = true; lastW = n; }   // double-tap W to sprint
         keys.add(k); if (k === ' ' && !e.repeat) doJump();
       } else if (e.code === 'KeyE' || e.code === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) interact(); }
+      else if (cfg.onKey && !e.repeat && cfg.onKey(e.code)) { e.preventDefault(); e.stopPropagation(); }
       else if (e.code === 'Escape' && !locked) { e.preventDefault(); api.close(); }
     };
     const ku = (e) => { const k = KEYM[e.code]; if (k) keys.delete(k); };
@@ -203,7 +205,8 @@
     cv.addEventListener('mousedown', (e) => {
       if (coarse()) return;
       if (!locked) { tip.classList.add('gone'); try { const r = cv.requestPointerLock && cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* not allowed here */ } return; }
-      interact();                                                                     // left or right click uses what you face
+      if (cfg.onPrimary && e.button === 0 && cfg.onPrimary(api)) return;              // a battle: left click shoots
+      interact();                                                                     // otherwise a click uses what you face
     });
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
     // touch: left half = joystick, right half = look
@@ -227,8 +230,8 @@
     const drawBuf = (buf, n) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); bindAttrs(); gl.drawArrays(gl.TRIANGLES, 0, n); };
     let viewProj = null, eye = [0, 0, 0];
     function render(t) {
-      const asp = cv.width / cv.height, bob = P.ground ? Math.sin(P.bob * 2) * 0.05 : 0;
-      eye = [P.x, P.y + 1.62 + bob, P.z];
+      const asp = cv.width / cv.height, riding = cfg.riding && cfg.riding(), bob = P.ground ? Math.sin(P.bob * 2) * (riding ? 0.12 : 0.05) : 0;
+      eye = [P.x, P.y + (riding ? 2.55 : 1.62) + bob, P.z];
       const fwd = [Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), -Math.cos(P.yaw) * Math.cos(P.pitch)];
       viewProj = mul(persp(P.fov, asp, 0.05, 260), lookAt(eye, [eye[0] + fwd[0], eye[1] + fwd[1], eye[2] + fwd[2]]));
       gl.viewport(0, 0, cv.width, cv.height);
@@ -269,7 +272,7 @@
     const eagleImg = (() => { const c = document.createElement('canvas'); c.width = 12; c.height = 12; const x = c.getContext('2d'); x.fillStyle = '#2b1e2e'; x.fillRect(3, 2, 6, 9); x.fillStyle = '#6b4220'; x.fillRect(4, 3, 4, 7); x.fillStyle = '#c99257'; x.fillRect(4, 0, 4, 3); x.fillStyle = '#f7c646'; x.fillRect(7, 1, 2, 1); return c; })();
     function sprites(t) {
       const out = [];
-      for (const a of cfg.actors ? cfg.actors(t) : []) { const [x, z] = toB(a.x, a.y); out.push({ img: a.img, x, z, y: world.groundAt(x, z), h: a.h, w: a.h * (a.img.width / a.img.height), flip: a.flip }); }
+      for (const a of cfg.actors ? cfg.actors(t) : []) { const [x, z] = toB(a.x, a.y); out.push({ img: a.img, x, z, y: world.groundAt(x, z) + (a.lift || 0), h: a.h, w: a.h * (a.img.width / a.img.height), flip: a.flip }); }
       for (const s of extra) { const img = s.img || eagleImg, hh = { hunter: 1.8, eagle: 0.8, camel: 2.1, horse: 1.6, bear: 1.3, swan: 0.65, gull: 0.45, reindeer: 1.45, gazelle: 1.15 }[s.kind] || 1.2; out.push({ img, x: s.x + 0.5, z: s.z + 0.5, y: s.kind === 'eagle' ? world.G + 3 : world.groundAt(s.x, s.z), h: hh, w: hh * img.width / img.height }); }
       out.push({ img: TG.pixel.bankhar(Math.hypot(P.vx, P.vz) > 0.5 ? 1 + Math.floor(t * 8) % 2 : 3), x: dog.x, z: dog.z, y: world.groundAt(dog.x, dog.z), h: 0.95, w: 0.95 * 22 / 16 });
       // farthest first so see-through edges look right
@@ -278,20 +281,34 @@
     }
     function overlay(t) { // crosshair, floating markers over people and places, what you're facing
       const x = hud.getContext('2d'), Wd = hud.width, Hd = hud.height; x.clearRect(0, 0, Wd, Hd);
+      if (cfg.riding && cfg.riding()) { // your horse’s neck, mane and ears in front of you, bobbing as it moves
+        const u = Math.max(6, Math.round(Math.min(Wd, Hd) / 70)), bob = Math.round(Math.sin(P.bob * 2) * u), cxh = Wd / 2, by = Hd + u * 2 + bob;
+        const coat = (cfg.horseCoat && cfg.horseCoat()) || '#8a5a33', dk = '#2b1e14';
+        x.fillStyle = '#2b1e2e'; x.fillRect(cxh - u * 7, by - u * 18, u * 14, u * 18);
+        x.fillStyle = coat; x.fillRect(cxh - u * 6, by - u * 17, u * 12, u * 17);
+        x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(cxh - u * 6, by - u * 17, u * 3, u * 17);
+        x.fillStyle = dk; x.fillRect(cxh - u, by - u * 19, u * 2, u * 19); for (let i = 0; i < 6; i++) x.fillRect(cxh - u * 2 + (i % 2) * u * 3, by - u * (18 - i * 3), u, u * 2);   // mane
+        x.fillStyle = '#2b1e2e'; x.fillRect(cxh - u * 5, by - u * 22, u * 3, u * 5); x.fillRect(cxh + u * 2, by - u * 22, u * 3, u * 5);
+        x.fillStyle = coat; x.fillRect(cxh - u * 4, by - u * 21, u, u * 3); x.fillRect(cxh + u * 3, by - u * 21, u, u * 3);   // ears
+      }
+      if (cfg.overlay) cfg.overlay(x, (wx, wy, wz) => project(wx, wy, wz), t, dpr);
       const cx = Wd / 2, cy = Hd / 2, s = Math.round(9 * dpr);
       x.fillStyle = 'rgba(255,255,255,.85)'; x.fillRect(cx - s, cy - dpr, s * 2, dpr * 2); x.fillRect(cx - dpr, cy - s, dpr * 2, s * 2);
-      const proj = (wx, wy, wz) => { const m = viewProj, X = m[0] * wx + m[4] * wy + m[8] * wz + m[12], Y = m[1] * wx + m[5] * wy + m[9] * wz + m[13], Wc = m[3] * wx + m[7] * wy + m[11] * wz + m[15]; if (Wc <= 0.1) return null; return [(X / Wc * 0.5 + 0.5) * Wd, (1 - (Y / Wc * 0.5 + 0.5)) * Hd, Wc]; };
+      const proj = project;
       x.textAlign = 'center'; x.font = `800 ${Math.round(12 * dpr)}px Rubik, sans-serif`;
       for (const m of cfg.markers ? cfg.markers() : []) {
         const [bx, bz] = toB(m.x, m.y), p = proj(bx, world.groundAt(bx, bz) + (m.lift || 2.4) + Math.sin(t * 4) * 0.08, bz); if (!p || p[2] > 40) continue;
         const sz = Math.max(10, 26 - p[2] * 0.4) * dpr;
-        x.fillStyle = '#2b1e2e'; x.fillRect(p[0] - sz * 0.18, p[1] - sz, sz * 0.36, sz * 0.75); x.fillRect(p[0] - sz * 0.18, p[1] - sz * 0.15, sz * 0.36, sz * 0.3);
-        x.fillStyle = m.c; x.fillRect(p[0] - sz * 0.12, p[1] - sz * 0.94, sz * 0.24, sz * 0.63); x.fillRect(p[0] - sz * 0.12, p[1] - sz * 0.09, sz * 0.24, sz * 0.18);
+        if (m.c) { // a “!” (new task) or “?” style marker; markers without a colour are just a name tag
+          x.fillStyle = '#2b1e2e'; x.fillRect(p[0] - sz * 0.18, p[1] - sz, sz * 0.36, sz * 0.75); x.fillRect(p[0] - sz * 0.18, p[1] - sz * 0.15, sz * 0.36, sz * 0.3);
+          x.fillStyle = m.c; x.fillRect(p[0] - sz * 0.12, p[1] - sz * 0.94, sz * 0.24, sz * 0.63); x.fillRect(p[0] - sz * 0.12, p[1] - sz * 0.09, sz * 0.24, sz * 0.18);
+        }
         if (m.label && p[2] < 16) { x.fillStyle = 'rgba(43,30,46,.7)'; const tw = x.measureText(m.label).width + 10 * dpr; x.fillRect(p[0] - tw / 2, p[1] - sz - 22 * dpr, tw, 17 * dpr); x.fillStyle = '#ffffff'; x.fillText(m.label, p[0], p[1] - sz - 9 * dpr); }
       }
       if (near) { x.font = `800 ${Math.round(14 * dpr)}px Rubik, sans-serif`; const label = near.label() + (coarse() ? '' : ' · E'), tw = x.measureText(label).width + 16 * dpr; x.fillStyle = 'rgba(43,30,46,.75)'; x.fillRect(cx - tw / 2, cy + 18 * dpr, tw, 24 * dpr); x.fillStyle = '#f7c646'; x.fillText(label, cx, cy + 35 * dpr); }
       if (snowing) { x.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 70; i++) { const fx = ((i * 97 + Math.sin(t + i) * 20 - P.yaw * 300) % Wd + Wd) % Wd, fy = ((i * 53 + t * (40 + (i % 5) * 12) * dpr) % Hd); x.fillRect(fx, fy, 2 * dpr, 2 * dpr); } }
     }
+    function project(wx, wy, wz) { const m = viewProj, Wd = hud.width, Hd = hud.height, X = m[0] * wx + m[4] * wy + m[8] * wz + m[12], Y = m[1] * wx + m[5] * wy + m[9] * wz + m[13], Wc = m[3] * wx + m[7] * wy + m[11] * wz + m[15]; if (Wc <= 0.1) return null; return [(X / Wc * 0.5 + 0.5) * Wd, (1 - (Y / Wc * 0.5 + 0.5)) * Hd, Wc]; }
     function drawMini() {
       const m = mini.getContext('2d'), Mi = cfg.mini; m.imageSmoothingEnabled = false; m.drawImage(Mi.img, 0, 0, Mi.w, Mi.h);
       const s = Mi.w / cfg.W, px = (P.x - M) / PXB * s, pz = (P.z - M) / PXB * s;
@@ -320,6 +337,7 @@
     Object.defineProperty(me, 'ty', { set: () => {}, get: () => (P.z - M) / PXB });
     const api = {
       me, root, info, P, world, stats: { verts: opq.n + wat.n },
+      toB, eye: () => eye.slice(), dir: () => [Math.sin(P.yaw) * Math.cos(P.pitch), Math.sin(P.pitch), -Math.cos(P.yaw) * Math.cos(P.pitch)], unit: PXB,
       say: (...kids) => { info.classList.remove('min'); info.replaceChildren(...kids); },
       close() {
         if (closed) return; closed = true; cancelAnimationFrame(raf);
@@ -327,10 +345,12 @@
         document.removeEventListener('pointerlockchange', onLock); document.removeEventListener('mousemove', onMouse);
         if (document.pointerLockElement === cv && document.exitPointerLock) document.exitPointerLock();
         const lose = gl.getExtension('WEBGL_lose_context'); root.classList.add('out'); setTimeout(() => { root.remove(); if (lose) lose.loseContext(); }, 180);
+        if (activeApi === api) activeApi = null;
         if (cfg.onClose) cfg.onClose();
       },
       near: () => near, interact, jump: doJump,
     };
+    activeApi = api;
     if (cfg.info) api.say(...[].concat(cfg.info));
     const welcome = info.firstChild; setTimeout(() => { if (!closed && info.firstChild === welcome) info.classList.add('min'); tip.classList.add('gone'); }, 9000); // fold the welcome away so the view is clear
     document.body.appendChild(root);
@@ -339,5 +359,6 @@
     raf = requestAnimationFrame(frame);
     return api;
   }
-  TG.fp = { open, supported };
+  let activeApi = null;
+  TG.fp = { open, supported, active: () => activeApi };
 })(window.TG);

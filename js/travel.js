@@ -211,6 +211,11 @@
       { kind: 'sign', ...at(SIGN.x, SIGN.y), label: () => L('📋 Самбар унших', '📋 Read the sign'), run: () => run('sign') },
       ...herds.map((hd) => Object.assign(hd, { kind: 'animal', penalty: 8, label: () => `🐾 ${tx(ANAME[hd.sp])}`, run: () => run('animal', hd) })),
     ];
+    // the historian's task: an item to find, sparkling beside one of the sights
+    const hq = TG.history && TG.history.target(id);
+    if (hq) { const mk = map.marks.find((q) => q.i === hq.near) || map.marks[0]; let ax = mk.x + 2, ay = mk.y; for (const [dx, dy] of [[2, 0], [-2, 0], [2, 1], [-2, 1], [1, 1], [-1, 1]]) { const c = map.g[mk.y + dy] && map.g[mk.y + dy][mk.x + dx]; if (c === 'g' || c === 'p') { ax = mk.x + dx; ay = mk.y + dy; break; } }
+      const art = { kind: 'artifact', ...at(ax, ay), label: () => `${hq.e} ${tx(hq.item)}`, run: () => { const q = TG.history.found(id); if (!q) return; things.splice(things.indexOf(art), 1); sc.say(h('b', null, `${q.e} `, L('Олдлоо!', 'Found it!')), h('p', null, tx(q.item), '. ', L('Нутагтаа буцаад Түүхчид өгөөрэй.', 'Take it back to the historian in Nutag.'))); } };
+      things.push(art); }
     const byKind = (k) => things.find((q) => q.kind === k), guideT = byKind('guide'), busT = byKind('bus'), famT = byKind('family');
     function run(kind, m) {
       if (kind === 'mark') {
@@ -265,6 +270,7 @@
         ...things.filter((q) => q.kind === 'mark').map((q) => ({ x: q.x, y: q.y, c: seen.includes(q.i) ? '#5c9a36' : '#f7c646', label: tx(q.m.name), lift: 2.6 })),
         ...(stamped() ? [] : [{ x: guideT.x, y: guideT.y, c: seen.length === 3 ? '#7fe07a' : '#f7c646', label: L('Хөтөч', 'Guide') }]),
         ...(famDone() ? [] : [{ x: famT.x, y: famT.y - 6, c: '#f7c646', label: L('Малчин айл', 'Herder family') }]),
+        ...things.filter((q) => q.kind === 'artifact').map((q) => ({ x: q.x, y: q.y, c: '#7fe07a', label: `${hq.e} ${tx(hq.item)}`, lift: 1.4 })),
       ],
     };
     const cfg = {
@@ -280,6 +286,7 @@
         }
       },
       ents: (t) => [
+        ...things.filter((q) => q.kind === 'artifact').map((q) => ({ y: q.y, f: (b) => { const tw = Math.floor(t * 6) % 4; b.fillStyle = '#fff6c8'; b.fillRect(Math.round(q.x) - 1, Math.round(q.y) - 6, 3, 3); b.fillStyle = '#f7c646'; if (tw < 2) { b.fillRect(Math.round(q.x) - 4, Math.round(q.y) - 5, 9, 1); b.fillRect(Math.round(q.x), Math.round(q.y) - 9, 1, 9); } } })),
         ...herds.map((hd) => ({ y: hd.y, f: (b) => { const img = TG.landmarks.critter(hd.sp, hd.moving ? Math.floor(t * 6) % 2 : 0), X = Math.round(hd.x - 10), Y = Math.round(hd.y - 14); b.fillStyle = 'rgba(30,20,10,.22)'; b.fillRect(X + 4, Y + 14, 12, 2); if (hd.flip) { b.save(); b.translate(X + 20, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); } else b.drawImage(img, X, Y); } })),
         { y: famT.y - 2, f: (b) => { const f0 = famT; b.drawImage(TG.pixel.char(herderLook, Math.floor(t / 3) % 4 === 3 ? 2 : 0, 0), Math.round(f0.x - 8), Math.round(f0.y - 28)); if (!famDone()) { b.fillStyle = '#f7c646'; const bob = Math.round(Math.sin(t * 5) * 1.5); b.fillRect(Math.round(f0.x - 1), Math.round(f0.y - 38) + bob, 2, 5); b.fillRect(Math.round(f0.x - 1), Math.round(f0.y - 32) + bob, 2, 2); } } },
         ...things.filter((q) => q.kind === 'mark').map((q) => ({ y: q.y, f: (b) => { const done = seen.includes(q.i), X = Math.round(q.x), Y = Math.round(q.y); TG.pixel.R(b, X - 1, Y - 18, 2, 18, '#6b4220'); TG.pixel.R(b, X + 1, Y - 18, 8, 6, '#2b1e2e'); TG.pixel.R(b, X + 1, Y - 17, 7, 4, done ? '#5c9a36' : '#f7c646'); if (!done && Math.floor(t * 3) % 2) TG.pixel.R(b, X + 4, Y - 24, 2, 3, '#ffffff'); } })),

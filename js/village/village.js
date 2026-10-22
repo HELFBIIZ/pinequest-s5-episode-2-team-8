@@ -55,6 +55,7 @@
     archery: { n: 3, c: 25, x: 35, t: Tx('Сур харваанд 3 бай онох', 'Hit 3 archery targets') },
     wrestle: { n: 1, c: 25, x: 35, t: Tx('Бөхийн барилдаанд 1 удаа давах', 'Win 1 wrestling round') },
     etiquette: { n: 1, c: 30, x: 40, t: Tx('Эмээгийн гэрт ёсоор зочлох', 'Visit Grandma’s ger with good manners') },
+    defend: { n: 1, c: 40, x: 60, t: Tx('Нутгаа хамгаалах тулаанд ялах', 'Win a defend-the-homeland battle') },
     eat: { n: 3, c: 15, x: 20, t: Tx('3 удаа хоол идэх, ундаа уух', 'Eat or drink 3 times') },
   };
   const POOL = ['milk', 'dairy', 'milk', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz', 'eat'];
@@ -89,7 +90,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
+  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -383,11 +384,14 @@
       ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
       hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Цагаан идээ', 'Dairy') }),
       race: h('div', { class: 'v-race px-frame hidden', 'aria-live': 'polite' }),
+      battle: h('div', { class: 'v-race v-battle px-frame hidden', 'aria-live': 'polite' }),
+      shoot: h('button', { class: 'v-sprint v-shoot px-frame hidden', 'aria-label': L('Харвах (F)', 'Shoot (F)'), onclick: () => shootNearest() }, '🏹'),
       sprint: h('button', { class: 'v-sprint px-frame hidden', 'aria-label': L('Чү! (Shift)', 'Chü! (Shift)'),
         onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       mini: h('canvas', { class: 'v-mini px-frame', width: WD.W * 3, height: WD.H * 3, 'aria-label': L('Газрын зураг', 'Map'), title: L('Газрын зураг: дарж томруулна', 'Map: tap to enlarge') }),
       run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), onclick: () => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); } }, '🏃'),
+      fp: h('button', { class: 'v-round px-frame v-fpbtn', 'aria-label': L('Өөрийн нүдээр', 'First person'), title: L('Өөрийн нүдээр (3D)', 'First person (3D)'), onclick: () => openFP() }, '👁'),
       jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
@@ -395,17 +399,17 @@
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
         h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net)),
-      els.race,
+      els.race, els.battle,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
-          els.horse,
+          els.fp, els.horse,
           h('button', { class: 'v-round px-frame v-basar', 'aria-label': 'basar', title: L('Басар (B)', 'Basar (B)'), onclick: () => openBasar() }, pic('ui:dog', 34)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
           els.music),
-        els.hotbar, els.run, els.jump, els.ctx, els.sprint));
+        els.hotbar, els.run, els.jump, els.ctx, els.sprint, els.shoot));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -472,6 +476,7 @@
     rc(e.me, portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
     rc(e.coins, pic('ui:coin', 20), h('span', null, v.coins));
     hudEnergy();
+    e.battle.classList.toggle('hidden', !live.battle); e.shoot.classList.toggle('hidden', !live.battle); if (live.battle) e.battle.textContent = battleLabel();
     const n = live.others.size + 1;
     e.net.className = 'v-pill px-frame v-net ' + live.status;
     const sea = TG.seasons.current(); e.season.textContent = `${sea.icon} ${tx(sea.name)}`;
@@ -494,6 +499,7 @@
   function contextAction() {
     if (!live || live.me.path.length || live.race) return null;
     const m = live.me, fx = m.px + 0.5, fy = m.py + 0.82;
+    if (live.battle) { const e = nearestEnemy(fx, fy, 1.7); if (e) return { type: 'lasso', e }; }
     let best = null, bd = 1.05;
     const consider = (d, a) => { if (d < bd) { bd = d; best = a; } };
     for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
@@ -508,6 +514,9 @@
       case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
       case 'arcade': return ['ui:book', L('Сурах', 'Learn')];
       case 'academy': return ['ui:book', L('Монгол бичиг', 'Mongol script')];
+      case 'lasso': return ['ui:horse', L('Уургадах', 'Lasso')];
+      case 'general': return ['ui:trophy', L('Жанжин', 'General')];
+      case 'historian': return ['ui:book', L('Түүхч', 'Historian')];
       case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
       case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
       case 'well': return ['ui:drop', L('Ус уух', 'Drink water')];
@@ -541,6 +550,9 @@
       case 'home': return wardrobe();
       case 'arcade': return TG.go('learn');
       case 'academy': return TG.go('bichig');
+      case 'lasso': return lasso(a.e);
+      case 'general': return generalModal();
+      case 'historian': return TG.history && TG.history.open();
       case 'shop': return shopModal();
       case 'board': return questModal();
       case 'well': return eat('us', { free: true });
@@ -566,6 +578,7 @@
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    if (live.battle) { const e = nearestEnemy(wx, wy + 0.4, 1.4); if (e) { shootAt(e.x, e.y); return; } }   // tap a raider to loose a whistling arrow
     { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
@@ -592,9 +605,10 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
-    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
+    if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = true; if (live.race) live.race.sprint = true; return; } // hold Shift to run (in a race: the horse's sprint)
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space jumps, E uses what is next to you; neither ever re-presses a focused HUD button
@@ -617,6 +631,198 @@
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = false; if (live.race) live.race.sprint = false; }
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
+  }
+
+  // ================================================================ Эх орноо хамгаалах: defend the homeland (2D and first person)
+  // Raiders ride in along the roads towards the herd and the gers. Whistling arrows and the lasso take away their courage;
+  // when it is gone they turn round and ride home. Nobody is hurt, and the chapters teach what really happened.
+  const GENERAL = { deel: 'green', skin: '#B97A4A', hat: 'loovuuz', face: null, neck: null, pet: null };
+  const HISTORIAN = { deel: 'purple', skin: '#EDBB93', hat: 'mongol', face: 'glasses', neck: null, pet: null };
+  const B_SPAWN = [{ x: 54, y: 12 }, { x: 17, y: 2 }, { x: 1, y: 12 }];
+  const B_TARGET = [{ x: 27, y: 16 }, { x: 9, y: 14 }, { x: 4, y: 7 }, { x: 11, y: 7 }];
+  const HERD_MAX = 5, ARROW_SPEED = 10, SHOOT_CD = 0.45;
+  const camp = () => (V().camp = V().camp || { won: {}, tries: 0 });
+  function generalModal() {
+    const c = camp(), chs = TG.battles.CHAPTERS;
+    const close = TG.modal(h('div', null, h('div', { class: 'v-wr-head' }, portrait(GENERAL, 48), h('div', null, h('h2', null, L('Жанжин Батмөнх', 'General Batmönkh')), h('p', { class: 'muted' }, L('Эх орноо хамгаалсан түүхүүд', 'Stories of defending the homeland')))),
+      h('p', null, L('Монголчууд олон зуун жилийн турш нутаг усаа хамгаалж ирсэн. Түүх бүрийг сонсоод, нутгаа хамгаал! Дуут сум, уурга хоёр зөвхөн дайсны зоригийг мохоодог: хэн ч гэмтэхгүй.', 'For centuries Mongolians have protected their land. Hear each story, then defend the land! Whistling arrows and the lasso only break the raiders’ courage: nobody gets hurt.')),
+      h('div', { class: 'v-list' }, chs.map((ch, i) => { const open = i === 0 || c.won[chs[i - 1].id], won = c.won[ch.id];
+        return h('div', { class: 'v-row' + (open ? '' : ' locked') }, h('span', { class: 'v-card-e' }, won ? '🏆' : open ? '⚔️' : '🔒'), h('div', { class: 'v-row-b' }, h('b', null, tx(ch.name)), h('small', null, tx(ch.year), won ? ` · ${L('Хамгаалсан', 'Defended')} ✓` : '')),
+          open ? h('button', { class: 'btn sm primary', onclick: () => { close(); battleIntro(ch.id); } }, won ? L('Дахин', 'Again') : L('Эхлэх', 'Begin')) : null); })),
+      h('p', { class: 'privacy' }, '🏹 ', L('Сумаа: дайсан дээр дар эсвэл F. Уурга: ойртоод E. 3D-д: харж байгаад дар.', 'Arrows: tap a raider or press F. Lasso: get close and press E. In 3D: aim and click.'))), { cls: 'v-modal' });
+  }
+  function battleIntro(id) {
+    const ch = TG.battles.byId(id);
+    const close = TG.modal(h('div', null, h('div', { class: 'eyebrow' }, `⚔️ ${tx(ch.year)}`), h('h2', null, tx(ch.name)),
+      h('div', { class: 'teach' }, h('b', null, '📜 ', L('Түүх', 'The story')), h('p', null, tx(ch.intro))),
+      h('p', { class: 'muted' }, L(`Холбоотнууд: ${ch.allies.map((a) => a.name.mn).join(', ')}. ${ch.waves.length} давалгаа.`, `Allies: ${ch.allies.map((a) => a.name.en).join(', ')}. ${ch.waves.length} waves.`)),
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn primary', onclick: () => { close(); startBattle(id); } }, '⚔️ ', L('Хамгаалъя!', 'Defend!')),
+        TG.fp && TG.fp.supported() ? h('button', { class: 'btn', onclick: () => { close(); startBattle(id); setTimeout(() => openFP(), 50); } }, '👁 ', L('Өөрийн нүдээр', 'First person')) : null)), { cls: 'v-modal' });
+  }
+  function startBattle(id) {
+    if (!live) return;
+    const ch = TG.battles.byId(id);
+    if (live.race) return;
+    live.battle = { ch, wave: 0, toSpawn: ch.waves[0], spawnT: 1.5, breakT: 0, enemies: [], allies: ch.allies.map((a, i) => ({ ...a, look: { ...a.look, ride: 'horse', coat: a.coat }, x: 18 + i * 2, y: 13 + i, cd: 1 + i * 0.5, face: 2 })), arrows: [], herd: HERD_MAX, repelled: 0, total: ch.waves.reduce((a, b) => a + b, 0), cd: 0, lassoCd: 0, over: false, nid: 0 };
+    camp().tries++; S.save(); TG.sfx.whoosh && TG.sfx.whoosh(); hud();
+    TG.toast('⚔️ ' + L(`${tx(ch.name)}: 1-р давалгаа ирж байна!`, `${tx(ch.name)}: the first wave is coming!`));
+  }
+  const nearestEnemy = (x, y, max = 9) => { let best = null, bd = max; for (const e of live.battle.enemies) if (!e.flee) { const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; best = e; } } return best; };
+  const meXY = () => ({ x: live.me.px + 0.5, y: live.me.py + 0.82 });
+  function shootAt(tx0, ty0, from) {
+    const bt = live.battle; if (!bt || bt.over) return false;
+    const o = from || meXY(); if (!from) { if (bt.cd > 0) return false; bt.cd = SHOOT_CD; TG.sfx.snap(); }
+    const dx = tx0 - o.x, dy = ty0 - o.y, d = Math.hypot(dx, dy) || 1;
+    bt.arrows.push({ x: o.x, y: o.y, dx: dx / d, dy: dy / d, life: 1.1, mine: !from });
+    return true;
+  }
+  function shootNearest() { const bt = live && live.battle; if (!bt) return; const m = meXY(), e = nearestEnemy(m.x, m.y); if (e) shootAt(e.x, e.y); else if (bt.cd <= 0) { bt.cd = 1.2; TG.toast(L('Ойрхон дайсан алга.', 'No raider nearby.')); } }
+  function lasso(e) { const bt = live.battle; if (!bt || bt.lassoCd > 0 || e.flee) return; bt.lassoCd = 1; e.courage -= 2; e.hitT = performance.now(); TG.sfx.whoosh && TG.sfx.whoosh(); floatAt({ x: e.x - 0.5, y: e.y - 0.8 }, L('Уургадлаа!', 'Lassoed!'), '#f7c646'); if (e.courage <= 0) scare(e); }
+  function scare(e) { e.flee = true; e.courage = 0; live.battle.repelled++; floatAt({ x: e.x - 0.5, y: e.y - 1 }, L('Зориг нь мохлоо!', 'Lost courage!'), '#ffffff'); TG.sfx.good(); hud(); }
+  function battleTick(dt) {
+    const bt = live.battle; if (!bt || bt.over) return;
+    bt.cd = Math.max(0, bt.cd - dt); bt.lassoCd = Math.max(0, bt.lassoCd - dt);
+    // waves: spawn the raiders one by one from the edges of the village
+    if (bt.toSpawn > 0) { bt.spawnT -= dt; if (bt.spawnT <= 0) { bt.spawnT = 1.6; bt.toSpawn--; const sp = TG.pick(B_SPAWN), tg = TG.pick(B_TARGET), path = WD.findPath(sp.x, sp.y, tg.x, tg.y) || [];
+      bt.enemies.push({ id: ++bt.nid, x: sp.x + 0.5, y: sp.y + 0.5, home: { x: sp.x + 0.5, y: sp.y + 0.5 }, path, courage: bt.ch.enemy.courage, max: bt.ch.enemy.courage, flee: false, speed: 1.9 + TG.battles.CHAPTERS.indexOf(bt.ch) * 0.15 + bt.wave * 0.1, face: 1, look: { ...bt.ch.enemy.look, ride: 'horse', coat: bt.ch.enemy.coat } }); } }
+    else if (!bt.enemies.length) {
+      if (bt.wave + 1 >= bt.ch.waves.length) return endBattle(true);
+      bt.breakT += dt; if (bt.breakT > 2.5) { bt.breakT = 0; bt.wave++; bt.toSpawn = bt.ch.waves[bt.wave]; bt.spawnT = 0.5; TG.toast('⚔️ ' + L(`${bt.wave + 1}-р давалгаа!`, `Wave ${bt.wave + 1}!`)); hud(); }
+    }
+    // raiders follow the roads to the herd; scared ones ride straight home
+    for (const e of bt.enemies) {
+      let tx0, ty0;
+      if (e.flee) { tx0 = e.home.x; ty0 = e.home.y; } else if (e.path.length) { tx0 = e.path[0].x + 0.5; ty0 = e.path[0].y + 0.5; } else { bt.herd--; e.flee = true; e.scared = true; TG.sfx.bad(); floatAt({ x: e.x - 0.5, y: e.y - 1 }, L('Хонь айлаа!', 'A sheep got scared!'), '#e14b3d'); hud(); continue; }
+      const dx = tx0 - e.x, dy = ty0 - e.y, d = Math.hypot(dx, dy), sp = (e.flee ? 3.4 : e.speed) * dt;
+      if (d <= sp) { e.x = tx0; e.y = ty0; if (!e.flee) e.path.shift(); else e.gone = true; } else { e.x += (dx / d) * sp; e.y += (dy / d) * sp; }
+      if (Math.abs(dx) > 0.05) e.face = dx < 0 ? 1 : 2;
+    }
+    bt.enemies = bt.enemies.filter((e) => !e.gone);
+    // allies ride towards the nearest raider and loose arrows
+    for (const a of bt.allies) {
+      const e = nearestEnemy(a.x, a.y, 30);
+      if (!e) continue;
+      const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy);
+      if (d > 3.5) { a.x += (dx / d) * 2.6 * dt; a.y += (dy / d) * 2.6 * dt; a.moving = true; } else a.moving = false;
+      if (Math.abs(dx) > 0.05) a.face = dx < 0 ? 1 : 2;
+      a.cd -= dt; if (a.cd <= 0 && d < 6) { a.cd = 1.5 + Math.random() * 0.6; const miss = Math.random() < 0.3 ? 1.2 : 0; shootAt(e.x + miss, e.y + miss * 0.5, { x: a.x, y: a.y }); }
+    }
+    // arrows: blunt whistling arrows that only take courage
+    for (const ar of bt.arrows) {
+      ar.x += ar.dx * ARROW_SPEED * dt; ar.y += ar.dy * ARROW_SPEED * dt; ar.life -= dt;
+      for (const e of bt.enemies) if (!e.flee && Math.hypot(e.x - ar.x, e.y - ar.y) < 0.6) { e.courage--; e.hitT = performance.now(); ar.life = 0; if (ar.mine) TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (e.courage <= 0) scare(e); break; }
+    }
+    bt.arrows = bt.arrows.filter((a) => a.life > 0);
+    if (bt.herd <= 0) endBattle(false);
+  }
+  function endBattle(won) {
+    const bt = live.battle; if (!bt || bt.over) return; bt.over = true;
+    const ch = bt.ch, c = camp(), first = won && !c.won[ch.id];
+    if (won) { c.won[ch.id] = Date.now(); reward(first ? 40 : 15, first ? 60 : 20); quest('defend'); TG.sfx.win(); TG.confetti(80); if (TG.history) TG.history.battleWon(ch.id); } else TG.sfx.bad();
+    S.save(); setTimeout(() => { if (live) { live.battle = null; hud(); } }, 600);
+    TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, won ? '🏆' : '🐑'), h('h2', null, won ? L('Нутгаа хамгааллаа!', 'You defended the land!') : L('Дахин оролдоё!', 'Let’s try again!')),
+      h('p', null, won ? L(`${bt.repelled} дайсны зоригийг мохоож, малаа аварлаа. 🐑 ${bt.herd}/${HERD_MAX}`, `You broke the courage of ${bt.repelled} raiders and saved the herd. 🐑 ${bt.herd}/${HERD_MAX}`) : L('Хонинууд айсан ч бүгд эсэн мэнд, буцаад ирлээ. Холбоотнуудтайгаа хамт дахиад хамгаалъя!', 'The sheep got scared, but they’re all safe and back home. Let’s defend again with your allies!')),
+      won ? h('div', { class: 'teach' }, h('b', null, '📜 ', L('Түүхэнд юу болсон бэ?', 'What really happened?')), h('p', null, tx(ch.after))) : null,
+      h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: (e) => e.currentTarget.closest('.modal-back').querySelector('.modal-x').click() }, L('Гайхалтай!', 'Great!'))), { cls: 'v-modal' });
+  }
+  function battleDraw(ents, drawRider, t) {
+    const bt = live && live.battle; if (!bt) return;
+    for (const u of [...bt.enemies, ...bt.allies]) ents.push({ y: u.y - 0.82, f: () => drawRider(u.look, u.face || 2, true, u.x - 0.5, u.y - 0.82) });
+  }
+  function battleOverlay(ctx, S2, k) {
+    const bt = live && live.battle; if (!bt) return;
+    ctx.save(); ctx.lineWidth = Math.max(2, k * 0.8); ctx.strokeStyle = '#3a2516';
+    for (const a of bt.arrows) { const [x1, y1] = S2(a.x * T, a.y * T - 10), [x2, y2] = S2((a.x - a.dx * 0.5) * T, (a.y - a.dy * 0.5) * T - 10); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.fillStyle = '#f7c646'; ctx.fillRect(x1 - k, y1 - k, k * 2, k * 2); }
+    ctx.font = `${Math.round(k * 5)}px Rubik, sans-serif`; ctx.textAlign = 'center';
+    for (const e of bt.enemies) { const [sx, sy] = S2(e.x * T, e.y * T - 38); ctx.fillStyle = e.flee ? '#ffffff' : '#e14b3d'; ctx.fillText(e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), sx, sy); }
+    ctx.restore();
+  }
+  const battleLabel = () => { const bt = live && live.battle; return bt ? `⚔️ ${tx(bt.ch.name)} · ${L('Давалгаа', 'Wave')} ${bt.wave + 1}/${bt.ch.waves.length} · 🐑 ${bt.herd}/${HERD_MAX} · 😨 ${bt.repelled}/${bt.total}` : ''; };
+
+  // ================================================================ Нутаг in first person (3D): roam, ride, use everything, see your friends
+  const CHAR_H = 1.8;
+  const ARROW_IMG = (() => { const c = document.createElement('canvas'); c.width = 12; c.height = 2; const x = c.getContext('2d'); x.fillStyle = '#6b4220'; x.fillRect(0, 0, 10, 2); x.fillStyle = '#f7c646'; x.fillRect(9, 0, 3, 2); x.fillStyle = '#ffffff'; x.fillRect(0, 0, 2, 2); return c; })();
+  function villageThings() {
+    const list = [];
+    for (const o of WD.objects) {
+      if (!o.door) continue;
+      const a = o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id };
+      list.push({ kind: 'obj', x: o.door.x + 0.5, y: o.door.y + 0.5, label: () => labelFor(a)[1] || L('Харах', 'Look'), run: () => doAction(a) });
+    }
+    list.push({ kind: 'fish', x: WD.DOCK.x + 0.5, y: WD.DOCK.y + 0.5, label: () => labelFor({ type: 'fish' })[1], run: () => doAction({ type: 'fish' }) });
+    for (const q of live.sheep) list.push({ kind: 'sheep', q, x: q.px + 0.5, y: q.py + 0.7, penalty: 3, label: () => labelFor({ type: 'sheep', s: q })[1], run: () => petSheep(q) });
+    return list;
+  }
+  function openFP() {
+    if (!live || !TG.fp || !TG.fp.supported()) return TG.toast(L('Энэ төхөөрөмж 3D харагдацыг дэмжихгүй байна.', 'This device can’t show the 3D view.'));
+    if (live.race) return TG.toast(L('Уралдааны үеэр 3D харагдац ажиллахгүй.', 'Not during a race.'));
+    const v = V(), things = villageThings(), m = live.me;
+    let world;
+    try { world = TG.fpworld.createVillage(WD, lotsArr(), R); } catch (e) { console.warn(e); return TG.toast(L('3D ертөнц ачаалж чадсангүй.', 'Could not build the 3D village.')); }
+    const look = (who) => PX.char({ ...who, pet: null, ride: null }, 0, 0);
+    const horseBtn = h('button', { class: 'btn scene-side hidden', onclick: () => { dismount(); } }, '🐎 ', L('Мориноос буух', 'Get off'));
+    const backBtn = h('button', { class: 'btn scene-side', onclick: () => sc && sc.close() }, '🗺️ ', L('Дээрээс харах', 'Top view'));
+    let sc = null;
+    sc = TG.fp.open({
+      cls: 'village-fp', world, scale: TG.fpworld.TILE, look: v.look,
+      start: { x: m.px + 0.5, y: m.py + 0.82 }, W: WD.W, title: L('Нутаг', 'Nutag'), sub: L('Өөрийн нүдээр', 'First person'), buttons: [horseBtn, backBtn], things,
+      onPrimary: (api) => { if (!live.battle || live.battle.over) return false; const d = api.dir(), n = Math.hypot(d[0], d[2]) || 1, m2 = meXY(); shootAt(m2.x + (d[0] / n) * 10, m2.y + (d[2] / n) * 10); return true; },
+      onKey: (code) => { if (code === 'KeyF' && live.battle) { shootNearest(); return true; } return false; },
+      overlay: (x, proj, t, dpr) => { if (!live.battle) return; const txt = battleLabel(); x.font = `800 ${Math.round(15 * dpr)}px Rubik, sans-serif`; x.textAlign = 'center'; const tw = x.measureText(txt).width + 24 * dpr; x.fillStyle = 'rgba(43,30,46,.75)'; x.fillRect(x.canvas.width / 2 - tw / 2, 128 * dpr, tw, 28 * dpr); x.fillStyle = '#f7c646'; x.fillText(txt, x.canvas.width / 2, 147 * dpr); },
+      riding: () => !!live.ride, horseCoat: () => (PX.COATS[V().horse.coat] || PX.COATS.bay)[0],
+      hint: () => L('Ойртож харвал E', 'Face something and press E'),
+      step: () => {
+        // your position back into the village, so friends see you move and quests count where you are
+        const px = sc.me.x - 0.5, py = sc.me.y - 0.82, mv = Math.hypot(px - live.me.px, py - live.me.py);
+        live.me.moving = mv > 0.002; if (Math.abs(px - live.me.px) > 0.002) live.me.face = px < live.me.px ? 1 : 2;
+        live.me.px = px; live.me.py = py; live.me.vx = live.me.vy = 0; live.me.path = []; live.cam.x = px; live.cam.y = py;
+        for (const t of things) if (t.kind === 'sheep') { t.x = t.q.px + 0.5; t.y = t.q.py + 0.7; }
+        // raiders you can lasso when they come close
+        for (let i = things.length - 1; i >= 0; i--) if (things[i].kind === 'enemy' && (!live.battle || !live.battle.enemies.includes(things[i].e) || things[i].e.flee)) things.splice(i, 1);
+        if (live.battle) for (const e of live.battle.enemies) { if (e.flee) continue; let t2 = things.find((q) => q.e === e); if (!t2) things.push(t2 = { kind: 'enemy', e, label: () => L('Уургадах', 'Lasso'), run: () => lasso(e) }); t2.x = e.x; t2.y = e.y; }
+        horseBtn.classList.toggle('hidden', !live.ride);
+      },
+      actors: (t) => {
+        const out = [], f = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
+        for (const np of WD.objects) {
+          if (np.kind === 'npcq' && NPCS[np.id]) out.push({ img: look(NPCS[np.id].look), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H });
+          if (np.kind === 'npc') out.push({ img: look(ZASUUL), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H });
+          if (np.kind === 'emee') out.push({ img: look(EMEE), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H * 0.92 });
+          if (np.kind === 'cow' || np.kind === 'goat') out.push({ img: PX.beast(np.kind, Math.floor(t * 2 + np.y) % 5 === 0 ? 1 : 0), x: np.x + (np.kind === 'cow' ? 1 : 0.5), y: np.y + 0.6, h: np.kind === 'cow' ? 1.4 : 0.95 });
+          if (np.kind === 'zel') [[0.6, 'foal', 1.05], [2.2, 'foal', 1.05], [1.4, 'mare', 1.6], [3.2, 'mare', 1.6]].forEach(([dx, k, hh], i) => out.push({ img: PX.beast(k, 0), x: np.x + dx, y: np.y + (k === 'mare' ? 1.1 : 0.5), h: hh, flip: i % 2 === 1 }));
+          if (np.kind === 'uya') { out.push({ img: PX.beast('horse', 0), x: np.x + 0.8, y: np.y + 0.6, h: 1.6 }); out.push({ img: PX.beast('mare', 0), x: np.x + np.w - 0.8, y: np.y + 0.6, h: 1.6, flip: true }); }
+        }
+        for (const q of live.sheep) out.push({ img: PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), x: q.px + 0.5, y: q.py + 0.7, h: 0.95, flip: !q.flip });
+        for (const o of live.others.values()) {
+          if (o.look.ride) out.push({ img: PX.beast('horse', o.moving ? 1 + (Math.floor(t * 8) % 2) : 0), x: o.px + 0.5, y: o.py + 0.82, h: 1.6, flip: o.face === 1 });
+          out.push({ img: PX.char({ ...o.look, pet: null, ride: null }, o.dir, f(o)), x: o.px + 0.5, y: o.py + 0.82, h: CHAR_H, lift: o.look.ride ? 0.9 : 0 });
+        }
+        if (live.race) for (const n of live.race.npcs) out.push({ img: PX.beast('horse', 1 + (Math.floor(t * 10) % 2)), x: n.px + 0.5, y: n.py + 0.82, h: 1.6 });
+        for (const [o, lk] of [[WD.objects.find((q) => q.kind === 'general'), GENERAL], [WD.objects.find((q) => q.kind === 'historian'), HISTORIAN]]) if (o) out.push({ img: look(lk), x: o.x + 0.5, y: o.y + 0.9, h: CHAR_H });
+        const bt = live.battle;
+        if (bt) {
+          for (const u of [...bt.enemies, ...bt.allies]) { out.push({ img: PX.beast(u.look.coat === 'black' ? 'horse' : u.look.coat === 'white' ? 'mare' : 'horse', 1 + (Math.floor(t * 9 + u.x) % 2)), x: u.x, y: u.y, h: 1.6, flip: u.face === 1 }); out.push({ img: PX.char({ ...u.look, ride: null, pet: null }, u.face === 1 ? 1 : 2, 0), x: u.x, y: u.y, h: CHAR_H, lift: 0.85 }); }
+          for (const a of bt.arrows) out.push({ img: ARROW_IMG, x: a.x, y: a.y, h: 0.18, lift: 1.4 });
+        }
+        return out;
+      },
+      markers: () => {
+        const out = [];
+        for (const np of WD.objects) {
+          if (np.kind === 'npcq' && NPCS[np.id]) { const mk = npcMark(np.id); out.push({ x: np.x + 0.5, y: np.y + 0.9, c: mk === '?' ? '#7fe07a' : mk ? '#f7c646' : null, label: tx(NPCS[np.id].name).split(' ').pop(), lift: 2.4 }); }
+          if (np.kind === 'emee') out.push({ x: np.x + 0.5, y: np.y + 0.9, c: V().emee && V().emee.visits ? null : '#f7c646', label: L('Эмээ', 'Grandma'), lift: 2.2 });
+          if (np.kind === 'npc') out.push({ x: np.x + 0.5, y: np.y + 0.9, c: null, label: L('Засуул', 'Herald'), lift: 2.4 });
+        }
+        for (const o of live.others.values()) out.push({ x: o.px + 0.5, y: o.py + 0.82, c: null, label: o.name, lift: o.look.ride ? 3.2 : 2.3 });
+        const bt = live.battle; if (bt) for (const e of bt.enemies) out.push({ x: e.x, y: e.y, c: null, label: e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), lift: 3.3 });
+        if (TG.history && TG.history.ready()) { const o = WD.objects.find((q) => q.kind === 'historian'); if (o) out.push({ x: o.x + 0.5, y: o.y + 0.9, c: '#7fe07a', label: L('Түүхч', 'Historian'), lift: 2.4 }); }
+        return out;
+      },
+      mini: { img: live.miniBase, w: WD.W * 3, h: WD.H * 3, dots: () => [...[...live.others.values()].map((o) => ({ x: o.px + 0.5, y: o.py + 0.8, c: '#ffffff' })), ...WD.objects.filter((o) => o.kind === 'npcq' && npcMark(o.id)).map((o) => ({ x: o.x + 0.5, y: o.y + 0.5, c: '#f7c646' }))] },
+      info: [h('b', null, '👁 ', L('Нутгаа өөрийн нүдээр!', 'Nutag in first person!')), h('p', null, L('WASD алхах, хулганаар харах, Space үсрэх, Shift гүйх, E харилцах. Морины уяанаас морь унаж давхиж болно!', 'WASD walk, mouse to look, Space jump, Shift sprint, E interact. Take a horse from the hitching line and ride!'))],
+      onClose: () => { if (live) { live.keys.clear(); live.fpOpen = false; updateCtx(); } },
+    });
+    if (sc) { live.fpOpen = true; TG._village.fpScene = sc; }
   }
 
   // ---------------------------------------------------------------- minimap
@@ -661,7 +867,7 @@
     if (!live) return;
     const dt = Math.min(0.05, (ts - live.last) / 1000); live.last = ts;
     update(dt);
-    if (!(TG.scene && TG.scene.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
+    if (!(TG.scene && TG.scene.active()) && !(TG.fp && TG.fp.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
     live.raf = requestAnimationFrame(frame);
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
@@ -705,6 +911,7 @@
       live.eT = (live.eT || 0) + dt; if (live.eT > 1) { live.eT = 0; hudEnergy(); live.eS = (live.eS || 0) + 1; if (live.eS >= 5) { live.eS = 0; S.save(); } }
     }
     if (live.race) raceTick(dt);
+    if (live.battle) battleTick(dt);
     if (m.path.length) { m.stuck = Math.hypot(m.px - ox, m.py - oy) < 0.002 ? m.stuck + dt : 0; if (m.stuck > 0.5) { m.path = []; live.pending = null; } }
     const tx = Math.floor(m.px + 0.5), ty = Math.floor(m.py + 0.82);
     if (tx !== m.x || ty !== m.y) { m.x = tx; m.y = ty; updateCtx(); }
@@ -822,6 +1029,9 @@
       const RC = live.race.path.P, fl = Math.floor(t * 4) % 2;
       for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
     }
+    battleDraw(ents, drawRider, t);
+    const gn = WD.objects.find((q) => q.kind === 'general'), hs0 = WD.objects.find((q) => q.kind === 'historian');
+    for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
     // 4) evening: dark tint + stepped lantern glow
     const hr = new Date().getHours();
@@ -836,6 +1046,9 @@
     const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
+    if (gn) { const [sx, sy] = S(gn.x * T + 8, gn.y * T - 16); pixelText(ctx, L('Жанжин', 'General'), sx, sy, textSize() * 0.8, '#f7c646'); }
+    if (hs0) { const [sx, sy] = S(hs0.x * T + 8, hs0.y * T - 16); pixelText(ctx, L('Түүхч', 'Historian'), sx, sy, textSize() * 0.8, '#f7c646'); if (TG.history && TG.history.ready()) pixelText(ctx, '!', sx, sy - 9 * live.view.k, textSize() * 1.8, '#7fe07a'); }
+    battleOverlay(ctx, S, live.view.k);
     for (const np of tps) { const d = NPCS[np.id]; if (!d) continue; const [sx, sy] = S(np.x * T + 8, np.y * T - 16); pixelText(ctx, tx(d.name).split(' ').pop(), sx, sy, textSize() * 0.8, '#ffffff'); const mk = npcMark(np.id); if (mk) pixelText(ctx, mk, sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180 + np.x) * 2) * live.view.k / 2, textSize() * 1.8, mk === '?' ? '#7fe07a' : '#f7c646'); }
     if (em) { const [sx, sy] = S(em.x * T + 8, em.y * T - 16); pixelText(ctx, L('Эмээ', 'Grandma'), sx, sy, textSize(), '#f7c646'); if (!(V().emee && V().emee.visits)) pixelText(ctx, '!', sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2, textSize() * 1.8, '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);

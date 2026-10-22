@@ -61,6 +61,8 @@
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
     { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
     { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
+    { id: 'general', kind: 'general', x: 36, y: 10, w: 1, h: 1, door: { x: 36, y: 11 } },   // the general: the defend-the-homeland campaign
+    { id: 'historian', kind: 'historian', x: 29, y: 10, w: 1, h: 1, door: { x: 29, y: 11 } }, // the historian: history hunts across the aimags
     { id: 'academy', kind: 'academy', x: 49, y: 17, w: 4, h: 3, door: { x: 50, y: 20 } }, // Mongol script academy
     { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
     // townspeople with quests (see NPCS in village.js)

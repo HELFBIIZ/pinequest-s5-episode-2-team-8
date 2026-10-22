@@ -75,6 +75,9 @@
   t.deerStone = T('deerStone', (x, X, Y) => { noise(['#a5a5b0', '#8a8a94'], 48, 0.4)(x, X, Y); x.strokeStyle = '#5a5a66'; for (let k = 0; k < 3; k++) { x.beginPath(); x.moveTo(X + 2, Y + 5 + k * 4); x.lineTo(X + 13, Y + 2 + k * 4); x.stroke(); } });
   t.shrine = T('shrine', (x, X, Y) => { fill(x, X, Y, '#a8312a'); x.fillStyle = '#f7c646'; x.fillRect(X + 3, Y + 3, 4, 6); x.fillStyle = '#ffffff'; x.fillRect(X + 9, Y + 3, 4, 5); x.fillStyle = '#9fd8f7'; x.fillRect(X + 10, Y + 4, 2, 2); });
   t.toono = T('toono', (x, X, Y) => { fill(x, X, Y, '#8fd0ff'); x.fillStyle = '#d9762b'; x.fillRect(X, Y, 16, 2); x.fillRect(X, Y + 14, 16, 2); x.fillRect(X, Y, 2, 16); x.fillRect(X + 14, Y, 2, 16); x.fillRect(X + 7, Y, 2, 16); x.fillRect(X, Y + 7, 16, 2); });
+  t.flower = T('flower', (x, X, Y) => { x.clearRect(X, Y, 16, 16); for (const [i, c] of [[3, '#ff8fb1'], [8, '#ffd34e'], [12, '#ffffff']]) { for (let j = 9; j < 16; j++) px(x, X, Y, i, j, '#4f8a2e'); px(x, X, Y, i, 8, c); px(x, X, Y, i - 1, 8, c); px(x, X, Y, i + 1, 8, c); px(x, X, Y, i, 7, c); px(x, X, Y, i, 9, c); } });
+  t.tallgrass = T('tallgrass', (x, X, Y) => { x.clearRect(X, Y, 16, 16); for (let i = 1; i < 16; i += 2) { const h0 = 5 + Math.floor(hash(i, 3, 60) * 8); for (let j = 16 - h0; j < 16; j++) px(x, X, Y, i, j, j < 16 - h0 + 2 ? '#7cbc4a' : '#5c9a36'); } });
+  t.lantern = T('lantern', (x, X, Y) => { fill(x, X, Y, '#f7c646'); x.fillStyle = '#fff6c8'; x.fillRect(X + 4, Y + 4, 8, 8); x.fillStyle = '#2b1e2e'; x.fillRect(X, Y, 16, 2); x.fillRect(X, Y + 14, 16, 2); });
   t.lattice = T('lattice', (x, X, Y) => { fill(x, X, Y, '#efe1c3'); for (let i = 0; i < 16; i++) { px(x, X, Y, i, i, '#d9762b'); px(x, X, Y, 15 - i, i, '#d9762b'); px(x, X, Y, (i + 8) % 16, i, '#d9762b'); px(x, X, Y, (23 - i) % 16, i, '#d9762b'); } });
 
   // ---------------------------------------------------------------- blocks: [top, side, bottom], solid (you bump into it), cut (see-through pixels)
@@ -96,6 +99,7 @@
   def('yellow', t.yellow); def('clay', t.clay); def('cobble', t.cobble); def('reed', t.reed, t.reed, t.reed, { solid: false, cut: true }); def('carpet', t.carpet, t.red, t.red);
   def('egg', t.egg); def('darkStone', t.darkStone); def('white', t.white); def('cloud', t.cloud); def('carving', t.carving); def('deerStone', t.deerStone);
   def('saltwater', t.saltwater, t.saltwater, t.saltwater, { solid: false, water: true }); def('deepwater', t.deepwater, t.deepwater, t.deepwater, { solid: false, water: true }); def('saltcrust', t.saltcrust, t.saltcrust, t.dirt);
+  def('flower', t.flower, t.flower, t.flower, { solid: false, cut: true }); def('tallgrass', t.tallgrass, t.tallgrass, t.tallgrass, { solid: false, cut: true }); def('lantern', t.lantern);
   def('shrine', t.orange, t.shrine, t.orange); def('toono', t.toono, t.orange, t.toono); def('lattice', t.feltRoof, t.lattice, t.feltRoof);
 
   let atlasCache = null;
@@ -208,6 +212,87 @@
       L({ id: map.id, x0, z0, cx, cz, x1: x0 + LWb - 1, z1: z0 + LHb - 1, G, B, set, get, box, ellipsoid, cyl, cone, tree: (x, z, k) => tree(x, G, z, k || map.det.trees), hash, ger, add: (kind, x, z) => sprites.push({ kind, x, z }) });
     }
     return { X, Z, YS, vox, idx, get, set, groundAt, sprites, M, TILE, G, BLOCKS, B };
+  }
+
+  // ---------------------------------------------------------------- Нутаг in 3D: the village map (1 tile = 4×4 blocks)
+  function createVillage(WD, lots, R) {
+    const Wt = WD.W, Ht = WD.H, X = Wt * TILE + M * 2, Z = Ht * TILE + M * 2;
+    const vox = new Uint8Array(X * YS * Z), top = new Int16Array(X * Z);
+    const idx = (x, y, z) => (y * Z + z) * X + x, inside = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < X && y < YS && z < Z;
+    const set = (x, y, z, b) => { if (b === undefined) throw new Error('fpworld: unknown block type'); x = Math.round(x); y = Math.round(y); z = Math.round(z); if (inside(x, y, z)) vox[idx(x, y, z)] = b; };
+    const get = (x, y, z) => (inside(x, y, z) ? vox[idx(x, y, z)] : 0);
+    const box = (x0, y0, z0, x1, y1, z1, b) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) set(x, y, z, b); };
+    const ellipsoid = (cx, cy, cz, rx, ry, rz, b, keep) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let z = Math.floor(cz - rz); z <= cz + rz; z++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) { const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2; if (d <= 1 && (!keep || !get(x, y, z))) set(x, y, z, typeof b === 'function' ? b(x, y, z) : b); } };
+    const cyl = (cx, cz, r, y0, y1, b, hollow) => { for (let y = y0; y <= y1; y++) for (let z = Math.floor(cz - r); z <= cz + r; z++) for (let x = Math.floor(cx - r); x <= cx + r; x++) { const d = Math.hypot(x - cx, z - cz); if (d <= r + 0.2 && (!hollow || d > r - 1.5)) set(x, y, z, typeof b === 'function' ? b(x, y, z) : b); } };
+    const cone = (cx, cz, r0, y0, hgt, b) => { for (let k = 0; k < hgt; k++) cyl(cx, cz, Math.max(0.4, r0 * (1 - k / hgt)), y0 + k, y0 + k, typeof b === 'function' ? (x, y, z) => b(x, y, z, k) : b); };
+    const tileAt = (bx, bz) => { const tx = Math.floor((bx - M) / TILE), ty = Math.floor((bz - M) / TILE); return WD.g[ty] && WD.g[ty][tx] !== undefined ? WD.g[ty][tx] : null; };
+    const snow = TG.seasons && TG.seasons.current().id === 'winter', autumn = TG.seasons && TG.seasons.current().id === 'autumn';
+    const smooth = (x, z, s) => { const fx = x / s, fz = z / s, x0 = Math.floor(fx), z0 = Math.floor(fz), u = fx - x0, v = fz - z0, a = hash(x0, z0, 7), b2 = hash(x0 + 1, z0, 7), c = hash(x0, z0 + 1, 7), d = hash(x0 + 1, z0 + 1, 7), su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v); return a + (b2 - a) * su + (c - a) * sv + (a - b2 - c + d) * su * sv; };
+    const column = (x, z, h, topB, under) => { for (let y = 0; y < h; y++) set(x, y, z, y === h - 1 ? topB : y > h - 4 ? under : B.stone); };
+    // ground, water, roads and the hills round the village
+    for (let z = 0; z < Z; z++) for (let x = 0; x < X; x++) {
+      const tl = tileAt(x, z);
+      if (tl === null || ((tl === 'T') && (x < M + TILE * 2 || z < M + TILE * 2 || x >= X - M - TILE || z >= Z - M - TILE))) {
+        const ex = Math.max(0, M + TILE - x, x - (X - M - TILE - 1)), ez = Math.max(0, M + TILE - z, z - (Z - M - TILE - 1)), e = Math.max(ex, ez), ramp = Math.min(1, e / 12);
+        const h = G + Math.round(1 + e * 0.4 + smooth(x, z, 9) * 10 * ramp + smooth(x, z, 4) * 2 * ramp), hh = Math.min(YS - 4, h);
+        column(x, z, hh, snow || hh > G + 12 ? B.snow : hh > G + 9 ? B.stone : B.grass, B.dirt); top[z * X + x] = hh;
+        if (hh < G + 8 && hash(x, z, 3) < 0.04) villageTree(x, hh, z, hash(x, z, 9) > 0.6);
+        continue;
+      }
+      let h = G, tb = snow ? B.snow : B.grass;
+      if (tl === 'p') tb = B.path; else if (tl === 's') tb = B.cobble; else if (tl === 'a') tb = B.sand; else if (tl === 'k') tb = B.path;
+      if (tl === 'w' || tl === 'd') { h = G - 4; tb = B.sand; }
+      column(x, z, h, tb, tl === 'a' ? B.sand : B.dirt);
+      if (tl === 'w' || tl === 'd') for (let y = G - 4; y < G; y++) set(x, y, z, B.water);
+      if (tl === 'd') set(x, G - 1, z, B.planks);
+      top[z * X + x] = h;
+      if ((tl === 'g') && hash(x, z, 11) < 0.04) set(x, G, z, B.flower);          // wildflowers
+      if (tl === 'g' && hash(x, z, 12) < 0.05) set(x, G, z, B.tallgrass);
+    }
+    function villageTree(x, y, z, pine) {
+      if (pine) { box(x, y, z, x, y + 5, z, B.log); for (let k = 0; k < 5; k++) cyl(x, z, Math.max(0.5, 2.4 - k * 0.45), y + 2 + k, y + 2 + k, B.pine); set(x, y + 7, z, B.pine); return; }
+      box(x, y, z, x, y + 3, z, B.log); ellipsoid(x, y + 4.5, z, 2.3, 2, 2.3, autumn ? B.autumn : B.leaves, true);
+    }
+    const c = (o) => [M + o.x * TILE, M + o.y * TILE];                                   // an object’s top-left corner in blocks
+    for (const t of WD.trees) if (t.x > 1 && t.y > 1 && t.x < Wt - 2 && t.y < Ht - 2) villageTree(M + t.x * TILE + 2, G, M + t.y * TILE + 2, t.pine);
+    for (let ty = 0; ty < Ht; ty++) for (let tx = 0; tx < Wt; tx++) {
+      const ch = WD.g[ty][tx], bx = M + tx * TILE, bz = M + ty * TILE;
+      if (ch === 'r') ellipsoid(bx + 2, G + 0.4, bz + 2, 1.6, 1.2, 1.4, B.stone);
+      if (ch === 'f') { const nb = (dx, dy) => (WD.g[ty + dy] || [])[tx + dx] === 'f'; set(bx + 2, G, bz + 2, B.log); if (nb(1, 0)) box(bx + 2, G, bz + 2, bx + 4, G, bz + 2, B.planks); if (nb(0, 1)) box(bx + 2, G, bz + 2, bx + 2, G, bz + 4, B.planks); set(bx + 2, G + 1, bz + 2, B.log); }
+    }
+    // a ger like the real thing (walkable inside); door to the south
+    function ger(cx, cz, r, roofB) {
+      const y0 = G, wallTop = y0 + 1, peak = y0 + 2 + Math.max(1, Math.round(r * 0.75));
+      box(Math.floor(cx - r), y0 - 1, Math.floor(cz - r), Math.ceil(cx + r), y0 - 1, Math.ceil(cz + r), B.planks);
+      cyl(cx, cz, r, y0, wallTop, B.felt, true); cyl(cx, cz, r, wallTop, wallTop, roofB || B.trim, true); cyl(cx, cz, r - 1.6, y0, wallTop, 0); cyl(cx, cz, r - 1.2, y0 - 1, y0 - 1, B.carpet);
+      for (let k = 0; peak - k > wallTop; k++) cyl(cx, cz, Math.max(0.6, (r + 0.3) * ((k + 1) / (peak - wallTop))), peak - k, peak - k, B.feltRoof);
+      set(cx, peak, cz, B.toono); set(cx + 1, peak + 1, cz, B.iron);
+      const dz = Math.round(cz + r); for (const z of [dz, dz - 1]) { set(cx, y0, z, 0); set(cx, y0 + 1, z, 0); } set(cx + 1, y0, dz, B.door); set(cx + 1, y0 + 1, dz, B.door);
+      set(cx, y0, cz, B.iron); for (const dx of [-1, 1]) box(cx + dx, y0, cz - 1, cx + dx, peak - 1, cz - 1, B.orange);
+    }
+    const ROOFB = { blue: B.trim, red: B.red, green: B.greenTile, purple: B.trim, orange: B.orange, teal: B.trim };
+    for (const o of WD.objects) {
+      const [x0, z0] = c(o), w = o.w * TILE, d = o.h * TILE, cx = x0 + (w >> 1), cz = z0 + (d >> 1);
+      switch (o.kind) {
+        case 'ger': ger(cx, cz - 1, 4); break;
+        case 'shop': { for (let x = x0 + 1; x < x0 + w - 1; x++) box(x, G, z0 + 2, x, G + 3, z0 + d - 3, ((x - x0) >> 1) % 2 ? B.red : B.white); box(x0 + 1, G + 4, z0 + 1, x0 + w - 2, G + 4, z0 + d - 2, B.red); box(x0 + 3, G + 5, z0 + 3, x0 + w - 4, G + 5, z0 + d - 4, B.red); box(x0 + 2, G, z0 + d - 2, x0 + w - 3, G, z0 + d - 2, B.planks); for (let x = x0 + 3; x < x0 + w - 3; x += 3) set(x, G + 1, z0 + d - 2, [B.yellow, B.red, B.white][x % 3]); box(cx - 1, G, z0 + d - 3, cx, G + 2, z0 + d - 3, 0); break; }
+        case 'board': box(x0 + 1, G, z0 + 2, x0 + 1, G + 2, z0 + 2, B.log); box(x0 + w - 2, G, z0 + 2, x0 + w - 2, G + 2, z0 + 2, B.log); box(x0 + 1, G + 3, z0 + 2, x0 + w - 2, G + 4, z0 + 2, B.planks); set(x0 + 3, G + 3, z0 + 3, B.white); set(x0 + 5, G + 4, z0 + 3, B.white); break;
+        case 'well': cyl(cx, cz, 1.6, G, G, B.cobble, true); set(cx, G - 1, cz, B.water); box(cx - 2, G, cz, cx - 2, G + 3, cz, B.log); box(cx + 2, G, cz, cx + 2, G + 3, cz, B.log); box(cx - 2, G + 4, cz - 1, cx + 2, G + 4, cz + 1, B.red); break;
+        case 'lantern': box(cx, G, cz, cx, G + 3, cz, B.log); set(cx, G + 4, cz, B.lantern); break;
+        case 'lot': { const i = o.i, l = lots && lots[i]; if (l) ger(cx, cz - 1, 4, ROOFB[l.roof] || B.trim); else { box(x0 + 1, G - 1, z0 + 1, x0 + w - 2, G - 1, z0 + d - 2, B.path); box(cx, G, z0 + d - 2, cx, G + 2, z0 + d - 2, B.log); box(cx - 1, G + 3, z0 + d - 2, cx + 1, G + 3, z0 + d - 2, B.planks); } break; }
+        case 'bleachers': for (let k = 0; k < 3; k++) box(x0, G + k, z0 + k, x0 + w - 1, G + k, z0 + d - 1 + 2, B.planks); for (let x = x0; x < x0 + w; x += 6) { box(x, G + 3, z0 + 2, x, G + 7, z0 + 2, B.log); set(x + 1, G + 7, z0 + 2, [B.khadag, B.red, B.yellow][(x >> 1) % 3]); } break;
+        case 'ovoo': cone(cx, cz, 3.4, G, 4, (x, y, z) => (hash(x, y + z, 2) < 0.5 ? B.cobble : B.stone)); box(cx, G + 4, cz, cx, G + 8, cz, B.log); set(cx + 1, G + 7, cz, B.khadag); set(cx - 1, G + 6, cz, B.khadag); break;
+        case 'uya': box(x0 + 1, G, cz, x0 + 1, G + 2, cz, B.log); box(x0 + w - 2, G, cz, x0 + w - 2, G + 2, cz, B.log); box(x0 + 1, G + 2, cz, x0 + w - 2, G + 2, cz, B.planks); break;
+        case 'archery': for (let x = x0 + 2; x < x0 + w - 2; x++) box(x, G, z0 + 1, x, G + (x % 4 === 0 ? 1 : 0), z0 + 1, x % 3 ? B.red : B.white); box(x0, G - 1, z0, x0 + w - 1, G - 1, z0 + d - 1, B.path); break;
+        case 'academy': box(x0 + 1, G, z0 + 3, x0 + w - 2, G + 4, z0 + d - 2, B.plaster); for (let x = x0 + 2; x < x0 + w - 2; x += 3) box(x, G, z0 + d - 2, x, G + 4, z0 + d - 2, B.red); for (let k = 0; k < 3; k++) box(x0 + k, G + 5 + k, z0 + 1 + k, x0 + w - 1 - k, G + 5 + k, z0 + d - 1 - k, B.greenTile); box(cx - 1, G, z0 + d - 2, cx, G + 2, z0 + d - 2, B.door); set(cx, G + 8, cz, B.gold); break;
+        case 'zel': box(x0 + 1, G, cz, x0 + 1, G + 1, cz, B.log); box(x0 + w - 2, G, cz, x0 + w - 2, G + 1, cz, B.log); box(x0 + 1, G + 1, cz, x0 + w - 2, G + 1, cz, B.planks); break;
+        case 'churn': box(cx, G, cz, cx, G, cz, B.planks); set(cx, G + 1, cz, B.bronze); set(cx, G + 2, cz, B.log); break;
+        case 'tulga': set(cx, G, cz, B.iron); set(cx, G + 1, cz, B.silver); break;
+        case 'rack': box(x0 + 1, G, cz, x0 + 1, G + 2, cz, B.log); box(x0 + w - 2, G, cz, x0 + w - 2, G + 2, cz, B.log); box(x0 + 1, G + 2, cz - 1, x0 + w - 2, G + 2, cz + 1, B.white); break;
+      }
+    }
+    const groundAt = (x, z) => top[Math.round(z) * X + Math.round(x)] || G;
+    return { X, Z, YS, vox, idx, get, set, groundAt, sprites: [], M, TILE, G, BLOCKS, B };
   }
 
   // ---------------------------------------------------------------- landmark models (lot: x0..x0+15, z0..z0+11, front = south = z1)
@@ -409,5 +494,5 @@
   });
   function cliff(W, layers) { const { G } = W; for (let z = W.z0; z <= W.z0 + 6; z++) for (let x = W.x0; x <= W.x1; x++) { const hh = 6 + Math.round(Math.abs(Math.sin(x / 2.5)) * 4 + W.hash(x, z, 2) * 2) - Math.max(0, z - W.z0 - 3) * 2; for (let y = 0; y < hh; y++) W.set(x, G + y, z, layers[Math.floor(y / 2) % layers.length]); } }
 
-  TG.fpworld = { create, atlas, BLOCKS, B, TILE, M, G, YS, hash, tex: t };
+  TG.fpworld = { create, createVillage, atlas, BLOCKS, B, TILE, M, G, YS, hash, tex: t };
 })(window.TG);

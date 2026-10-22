@@ -1490,3 +1490,6 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .v-wr-bar.hold .v-wr-fill { background: rgba(225, 75, 61, .55) !important; }
 .v-wr-needle { position: absolute; top: -4px; bottom: -4px; width: 6px; margin-left: -3px; background: #2b1e2e; }
 .v-wr-bar.balance .v-wr-zone { background: rgba(92, 154, 54, .55); }
+
+.v-shoot { background: #8a4b1f; font-size: 30px; }
+.v-battle { top: calc(104px + env(safe-area-inset-top)); background: #fff3c4; color: #5a2d10; font-family: var(--font-display); font-weight: 800; font-size: 14px; }
