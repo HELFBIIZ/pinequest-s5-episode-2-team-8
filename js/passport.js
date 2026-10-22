@@ -146,6 +146,7 @@
     const quiz = h('div', { class: 'pp-quiz' },
       stampedAt ? h('div', { class: 'pp-stamped' }, h('span', { class: 'pp-stamp big' }, a.icon), h('b', null, L('Тамга авсан!', 'Stamped!')), h('small', null, TG.fmtDate(stampedAt))) : null,
       h('button', { class: 'btn primary big block', onclick: () => TG.travel.open(id) }, '🚌 ', stampedAt ? L('Дахин аялах', 'Travel there again') : L(`${a.name.mn} руу аялах`, `Travel to ${a.name.en}`)),
+      TG.fp && TG.fp.supported() ? h('button', { class: 'btn big block pp-fp', onclick: () => TG.travel.open(id, { view: 'fp' }) }, '👁 ', L('Өөрийн нүдээр аялах (3D)', 'Travel in first person (3D)')) : null,
       h('small', { class: 'muted' }, stampedAt ? L(`${seen}/3 газраар аялсан.`, `Visited ${seen}/3 places.`) : L('Тэнд очиж 3 алдартай газраар аялаад, нутгийн хөтчөөс тамгаа аваарай.', 'Go there, visit the 3 famous places and get your stamp from the local guide.')));
     return shell([
       h('div', { class: 'pp-top' }, h('button', { class: 'icon-btn', 'aria-label': 'back', onclick: () => TG.go('passport') }, TG.icon('arrowLeft')), h('span', null, `${i + 1} / ${ORDER.length}`)),
