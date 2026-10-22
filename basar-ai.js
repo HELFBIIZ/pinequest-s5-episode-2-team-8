@@ -25,7 +25,7 @@ module.exports = function createBasar(root) {
   const BASE = (env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '');
   const DAILY = Number(env.BASAR_DAILY_LIMIT || 1500); // protects the bill: whole-server cap per day
   const TOPICS = {
-    history: 'Mongolian history (from the Xiongnu to modern Mongolia)', nuuts: 'The Secret History of the Mongols (Монголын нууц товчоо)',
+    history: 'Mongolian history from the Xiongnu and the Mongol Empire to modern times: 1911 independence, 1921, Khalkhin Gol 1939, the 1945 referendum, joining the UN in 1961, the 1990 democratic revolution, the 1992 Constitution, and events of the last 20 years (sport, UNESCO heritage, the 2021 airport); only well-established facts', nuuts: 'The Secret History of the Mongols (Монголын нууц товчоо)',
     ger: 'the Mongol ger: its parts and how a family builds it', idee: 'Mongolian dairy foods (цагаан идээ) and how they are made',
     naadam: 'Naadam: wrestling, horse racing and archery', customs: 'Mongolian customs and manners, especially inside a ger', nomad: 'Mongolian nomadic herding life: the five animals, seasonal camps and the provinces', arts: 'Mongolian music and arts: morin khuur, long song, khöömii and folk dances', mix: 'any Mongolian heritage topic',
   };

@@ -49,8 +49,8 @@
     { id: 'arslan', name: T('Арслан', 'Lion'), need: 9, fact: T('Наадамд түрүүлсэн бөх Арслан цол хүртэнэ.', 'The wrestler who wins the whole Naadam becomes an Arslan (lion).') },
     { id: 'avarga', name: T('Аварга', 'Titan'), need: 10, fact: T('Хоёр удаа түрүүлсэн Арслан Аварга цол хүртдэг. Монголын хамгийн дээд бөхийн цол!', 'An Arslan who wins twice becomes an Avarga (titan), the highest wrestling title in Mongolia!') },
   ];
-  // Wrestling techniques (мэх). Seven real бөх techniques in a circle: each one beats the next three
-  // and loses to the three before it, so there is always a counter. Timing power can still turn a bad match-up.
+  // Wrestling techniques (мэх): real бөх techniques in a circle. Each beats the next half of the circle and loses to the
+  // half before it, so there is always a counter. How well you perform the move (its power) can still turn a bad match-up.
   const M = (id, mn, en, fmn, fen) => ({ id, name: T(mn, en), fact: T(fmn, fen) });
   const MOVES = [
     M('push', 'Түлхэх', 'Push', 'Өрсөлдөгчөө мөрөөрөө түлхэж тэнцвэрийг нь алдагдуулна.', 'Drive into your opponent with your shoulder to break their balance.'),
@@ -60,8 +60,15 @@
     M('hip', 'Ташаадах', 'Hip throw', 'Өрсөлдөгчөө ташаан дээгүүрээ эргүүлэн шиддэг.', 'Turn and throw them over your hip.'),
     M('leg', 'Хөл шүүрэх', 'Leg grab', 'Бөхийн хөлийг шүүрэн авч өргөөд унагадаг.', 'Grab their leg, lift it and bring them down.'),
     M('lift', 'Өргөж хаях', 'Lift and throw', 'Хамгийн хүчтэй мэх: өрсөлдөгчөө газраас өргөөд хаядаг.', 'The strongest move: lift them off the ground and throw.'),
+    M('havirah', 'Хавирах', 'Khavirakh (leg sweep)', 'Хөлөөрөө өрсөлдөгчийн хөлийг хавирч, тэнцвэрийг нь алдагдуулан унагадаг мэх.', 'Sweep their leg away with yours so they lose balance and fall.'),
+    M('humruh', 'Хөмрөх', 'Khömrökh (overturn)', 'Өрсөлдөгчөө урагш нь хөмрүүлж, эргүүлэн унагадаг хүчтэй мэх.', 'A powerful move that tips your opponent forward and over.'),
+    M('toigdoh', 'Тойгдох', 'Toigdokh', 'Хав дөрвөлжин барьцнаас хийдэг онцгой сайхан мэх. Тэнцвэр, байрлал чухал.', 'A fine technique done from the square grip. Balance and position matter most.'),
+    M('hongodoh', 'Хонгодох', 'Khongodokh (leg take)', 'Өрсөлдөгчийн хөлийг авч унагадаг, жүдогийн мэхтэй төстэй хөлийн мэх.', 'A leg technique that takes their leg away, a little like a judo throw.'),
+    M('suga', 'Сугадах', 'Sugadakh (armpit throw)', 'Өрсөлдөгчийн сугаар орж, мөрөн дээгүүрээ эргүүлэн хаядаг мэх.', 'Get in under their arm and turn them over your shoulder.'),
+    M('tahim', 'Тахимдах', 'Takhimdakh (knee grab)', 'Өрсөлдөгчийн өвдөгний ар талаас шүүрэн татаж унагадаг мэх.', 'Grab behind their knee and pull them down.'),
   ];
-  MOVES.forEach((m, i) => { m.beats = [1, 2, 3].map((k) => MOVES[(i + k) % MOVES.length].id); });
+  const HALF = Math.floor((MOVES.length - 1) / 2); // each move beats the next half of the circle and loses to the half before it
+  MOVES.forEach((m, i) => { m.beats = Array.from({ length: HALF }, (_, k) => MOVES[(i + k + 1) % MOVES.length].id); });
   const beats = (x, y) => { const m = MOVES.find((q) => q.id === x); return !!m && m.beats.includes(y); };
   function exchange(ma, pa, mb, pb) {
     const base = (x, y) => (x === y ? 0.3 : beats(x, y) ? 0.6 : 0);

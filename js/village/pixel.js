@@ -453,6 +453,31 @@
     x.drawImage(rm.bg, ox, oy, rm.W * k, rm.H * k);
     rm.props.slice().sort((a, b) => a.base - b.base).forEach((p) => x.drawImage(p.c, ox + p.x * k, oy + p.y * k, p.c.width * k, p.c.height * k));
   }
+  /** A wrestler seen from the front, arms reaching to grip you (40×56): open zodog over a bare chest, shuudag, gutal boots. */
+  function wrestlerFront(col, skin, frame) {
+    const key = ['wf', col, skin, frame].join(); if (cache.has(key)) return cache.get(key);
+    const { c, x } = mk(40, 56), D = shade(col, -0.32), Lt = shade(col, 0.22), skD = shade(skin, -0.16), skL = shade(skin, 0.14), bob = frame ? 1 : 0;
+    // boots with upturned toes and ornament
+    for (const bx of [12, 22]) { R(x, bx, 44, 7, 12, K.out); R(x, bx + 1, 45, 5, 10, '#5a3420'); R(x, bx + 1, 45, 5, 1, K.gold); R(x, bx + 1, 46, 5, 1, K.red); R(x, bx + 3, 47, 1, 8, K.goldD); R(x, bx, 54, 7, 2, '#24120a'); }
+    // legs, then the shuudag
+    for (const lx of [13, 23]) { R(x, lx, 36, 5, 9, K.out); R(x, lx + 1, 36, 3, 8, skin); P(x, lx + 1, 38, skL); }
+    R(x, 12, 32, 17, 6, K.out); R(x, 13, 33, 15, 4, col); R(x, 13, 33, 15, 1, Lt); R(x, 19, 36, 3, 2, K.out); R(x, 20, 36, 1, 1, col);
+    // bare chest and belly, with the zodog's open front and its cord
+    R(x, 12, 16 + bob, 17, 17, K.out); R(x, 13, 17 + bob, 15, 15, skin);
+    R(x, 15, 21 + bob, 4, 1, skD); R(x, 22, 21 + bob, 4, 1, skD); R(x, 20, 23 + bob, 1, 7, skD); P(x, 20, 30 + bob, skD); P(x, 16, 18 + bob, skL);
+    R(x, 12, 16 + bob, 4, 17, col); R(x, 25, 16 + bob, 4, 17, col); R(x, 12, 16 + bob, 1, 17, D); R(x, 15, 17 + bob, 1, 15, K.gold); R(x, 25, 17 + bob, 1, 15, K.gold);
+    R(x, 13, 29 + bob, 15, 1, D); P(x, 20, 29 + bob, K.gold);
+    // shoulders and long sleeves reaching forward, hands open to grip
+    R(x, 8, 13 + bob, 25, 5, K.out); R(x, 9, 14 + bob, 23, 3, col); R(x, 9, 14 + bob, 23, 1, Lt);
+    for (const [ax, dir] of [[4, -1], [31, 1]]) { R(x, ax, 15 + bob, 6, 14, K.out); R(x, ax + 1, 16 + bob, 4, 12, col); R(x, ax + 1, 16 + bob, 1, 12, dir < 0 ? Lt : D); R(x, ax + 1, 26 + bob, 4, 1, K.gold);
+      R(x, ax, 28 + bob, 6, 5, K.out); R(x, ax + 1, 29 + bob, 4, 3, skin); P(x, ax + (dir < 0 ? 1 : 4), 31 + bob, skD); }
+    // head: hair, ears, determined eyes and brows
+    R(x, 15, 3 + bob, 11, 12, K.out); R(x, 16, 4 + bob, 9, 10, skin); R(x, 16, 4 + bob, 9, 3, K.hair); P(x, 18, 4 + bob, K.hairL);
+    R(x, 14, 8 + bob, 2, 3, skin); R(x, 25, 8 + bob, 2, 3, skin); P(x, 14, 8 + bob, K.out); P(x, 26, 8 + bob, K.out);
+    R(x, 17, 8 + bob, 3, 1, K.hair); R(x, 21, 8 + bob, 3, 1, K.hair); P(x, 18, 9 + bob, K.eye); P(x, 22, 9 + bob, K.eye); P(x, 18, 10 + bob, '#ffffff'); P(x, 22, 10 + bob, '#ffffff');
+    R(x, 19, 12 + bob, 3, 1, skD); P(x, 20, 11 + bob, skD);
+    cache.set(key, c); return c;
+  }
   /** Mongolian wrestler (32×48, facing right): open-front zodog jacket with long sleeves, back panel and waist cord,
       tight shuudag briefs, knee-high gutal boots with upturned toes, wrestling hat for the eagle dance.
       pose: idle | grip | push | dance | fall */
@@ -871,5 +896,5 @@
     return img;
   }
 
-  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler, beast, BEAST };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler, wrestlerFront, beast, BEAST };
 })(window.TG);

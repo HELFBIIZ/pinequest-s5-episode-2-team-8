@@ -1471,3 +1471,22 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .v-steps li.on { color: #3a1e08; }
 .v-steps li.done { color: #5c9a36; text-decoration: line-through; }
 .v-own { color: #2b52a5; font-weight: 800; }
+
+.v-wr-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: 40px; }
+.v-wr-title h2 { margin: 0; }
+.v-wr-skill { display: grid; gap: 8px; margin-top: 6px; }
+.v-wr-combo { display: flex; gap: 6px; justify-content: center; }
+.v-wr-arrow { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; font-weight: 800; background: #fbe8c2; box-shadow: inset 0 0 0 2px #c99a5a; color: #5a2d10; }
+.v-wr-arrow.next { background: #fff3c4; box-shadow: inset 0 0 0 3px #e14b3d; }
+.v-wr-arrow.ok { background: #cdeab0; color: #2e7d32; }
+.v-wr-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.v-wr-pad.two { grid-template-columns: 1fr 1fr; }
+.v-wr-pad .btn { font-size: 1.3rem; }
+.v-wr-skill .v-wr-bar { position: relative; height: 22px; overflow: hidden; background: repeating-linear-gradient(90deg, #e6c48a 0 6px, #f0d6a2 6px 12px); box-shadow: inset 0 0 0 2px #8a4b1f; }
+.v-wr-skill .v-wr-bar .v-wr-zone { position: absolute; top: 0; bottom: 0; }
+.v-wr-bar > i:not(.v-wr-zone):not(.v-wr-needle):not(.v-wr-marker) { position: absolute; left: 0; top: 0; bottom: 0; background: #5c9a36; }
+.v-wr-bar.time > i { background: #e9a24a !important; }
+.v-wr-bar.hold .v-wr-zone { background: rgba(247, 198, 70, .75); }
+.v-wr-bar.hold .v-wr-fill { background: rgba(225, 75, 61, .55) !important; }
+.v-wr-needle { position: absolute; top: -4px; bottom: -4px; width: 6px; margin-left: -3px; background: #2b1e2e; }
+.v-wr-bar.balance .v-wr-zone { background: rgba(92, 154, 54, .55); }

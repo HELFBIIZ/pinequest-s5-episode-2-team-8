@@ -1737,7 +1737,7 @@
         : next.id === 'avarga' ? L('Наадамд дахин түрүүлбэл Аварга цол хүртэнэ!', 'Win the Naadam once more to become an Avarga!')
           : L(`Наадамд ${next.need} давбал «${tx(next.name)}» цол хүртэнэ.`, `Win ${next.need} rounds at the Naadam to earn the "${tx(next.name)}" title.`)),
       h('button', { class: 'btn primary big block', onclick: () => { close(); tournament(1); } }, L('Наадамд барилдах (9 даваа)', 'Wrestle in the Naadam (9 rounds)')),
-      h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L('Мэхний ном (7 мэх)', 'Technique book (7 moves)')),
+      h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L(`Мэхний ном (${R.MOVES.length} мэх)`, `Technique book (${R.MOVES.length} moves)`)),
       live.online ? h('div', { style: { marginTop: '12px' } }, h('div', { class: 'label' }, L('Найзтайгаа барилдах', 'Wrestle a friend')),
         others.length ? h('div', { class: 'v-list' }, others.map((o) => h('div', { class: 'v-row' }, portrait(o.look, 28), h('div', { class: 'v-row-b' }, h('b', null, o.name), h('small', null, `${L('Түвшин', 'Level')} ${o.lvl}`)),
           h('button', { class: 'btn sm primary', onclick: () => { net.send({ t: 'wr-invite', to: o.id }); TG.toast(L('Урилга илгээлээ…', 'Invitation sent…')); close(); } }, L('Урих', 'Invite')))))
@@ -1747,9 +1747,9 @@
   function techBook() {
     const used = (V().wr.techs) || {};
     TG.modal(h('div', null, h('h2', null, L('Бөхийн мэхний ном', 'Wrestling technique book')),
-      h('p', { class: 'muted' }, L('Мэх бүр дараагийн 3 мэхийг давж, өмнөх 3-д дийлддэг. Нэг мэхийг давтвал өрсөлдөгч таньж, хүч чинь сулардаг. Даваа ахих тусам өрсөлдөгч чинь ухаалаг, хурдан болно!', 'Each move beats the next 3 and loses to the 3 before it. Repeat a move and your opponent reads it, so your power drops. Each round, opponents get smarter and faster!')),
+      h('p', { class: 'muted' }, L(`Мэх бүр дараагийн ${R.MOVES.length >> 1} мэхийг давж, өмнөхөд нь дийлддэг. Мэх бүрийг өөр ур чадвараар хийнэ: ⏱ цаг тааруулах, ⇄ хөлийн хөдөлгөөн (сумнууд), 💪 хүч (хурдан дарах), ✋ барьцаа (дарж байгаад тавих), ⚖ тэнцвэр. Нэг мэхийг давтвал өрсөлдөгч таньдаг. Даваа ахих тусам хэцүү болно!`, `Each move beats the next ${R.MOVES.length >> 1} and loses to the ones before it. Each is done with its own skill: ⏱ timing, ⇄ footwork (arrows), 💪 power (fast taps), ✋ grip (hold and release), ⚖ balance. Repeat a move and your opponent reads it. Each round gets harder!`)),
       h('div', { class: 'v-list' }, R.MOVES.map((m) => h('div', { class: 'v-row' }, h('span', { class: 'v-tech-n' }, used[m.id] || 0),
-        h('div', { class: 'v-row-b' }, h('b', null, tx(m.name)), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
+        h('div', { class: 'v-row-b' }, h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
   }
   function tournament(round) {
     const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.15 + round * 0.085, skin: TG.pick(R.SKINS) };
@@ -1764,7 +1764,13 @@
     });
   }
   // what touches the ground after each move (a fall counts when an elbow, knee, back or shoulder touches)
-  const WR_PART = { push: Tx('нуруу', 'back'), pull: Tx('өвдөг', 'knee'), hook: Tx('нуруу', 'back'), inhook: Tx('нуруу', 'back'), hip: Tx('мөр', 'shoulder'), leg: Tx('тохой', 'elbow'), lift: Tx('нуруу', 'back') };
+  const WR_PART = { push: Tx('нуруу', 'back'), pull: Tx('өвдөг', 'knee'), hook: Tx('нуруу', 'back'), inhook: Tx('нуруу', 'back'), hip: Tx('мөр', 'shoulder'), leg: Tx('тохой', 'elbow'), lift: Tx('нуруу', 'back'),
+    havirah: Tx('ташаа', 'hip'), humruh: Tx('нуруу', 'back'), toigdoh: Tx('мөр', 'shoulder'), hongodoh: Tx('нуруу', 'back'), suga: Tx('мөр', 'shoulder'), tahim: Tx('өвдөг', 'knee') };
+  // each technique is performed with its own skill, so bouts don't feel the same: footwork combos for hooks and sweeps,
+  // rapid power for lifts, hold-and-release for grip throws, keeping your balance for тойгдох and хонгодох, timing for the rest
+  const SKILL = { push: 'timing', hip: 'timing', tahim: 'timing', pull: 'hold', leg: 'hold', suga: 'hold', hook: 'combo', inhook: 'combo', havirah: 'combo', lift: 'mash', humruh: 'mash', toigdoh: 'balance', hongodoh: 'balance' };
+  const SKILL_ICON = { timing: '⏱', hold: '✋', combo: '⇄', mash: '💪', balance: '⚖' };
+  const ARROWS = ['←', '→', '↑', '↓'], ARROW_KEY = { ArrowLeft: 0, KeyA: 0, ArrowRight: 1, KeyD: 1, ArrowUp: 2, KeyW: 2, ArrowDown: 3, KeyS: 3 };
   const OPP_TITLE = ['', '', '', '', 'nachin', 'khartsaga', 'zaan', 'garid', 'arslan', 'arslan'];
   const DEVEE_BEAT = 700, DEVEE_TAPS = 4;
   function wrestleMatch(cfg, onEnd) {
@@ -1779,6 +1785,9 @@
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
     const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone', style: { width: Math.round(36 / sharp) + '%', left: (50 - 18 / sharp) + '%' } }), marker), goBtn);
+    const skillBox = h('div', { class: 'v-wr-skill hidden' });
+    st.view = v.wrView === 'fp' ? 'fp' : 'side';
+    const viewBtn = h('button', { class: 'btn sm v-wr-view', onclick: () => { st.view = st.view === 'fp' ? 'side' : 'fp'; v.wrView = st.view; S.save(); viewBtn.textContent = st.view === 'fp' ? L('🗺️ Хажуугаас', '🗺️ Side view') : L('👁 Өөрийн нүдээр', '👁 First person'); viewBtn.blur(); } }, st.view === 'fp' ? L('🗺️ Хажуугаас', '🗺️ Side view') : L('👁 Өөрийн нүдээр', '👁 First person'));
     const tail = h('div');
     // the zasuul calls out both wrestlers by their titles before the bout
     const myT = titleObj(R.titleFor(v.wr)), opT = cfg.ai ? titleObj(OPP_TITLE[cfg.round]) : null, named = (t, n) => (t ? tx(t.name) + ' ' : '') + n;
@@ -1789,14 +1798,14 @@
     const deveeBtn = h('button', { class: 'btn primary big', onclick: () => deveeTap() }, '🦅 ', L('Дэвэх (Space)', 'Flap (Space)'));
     const deveeBox = h('div', { class: 'v-wr-devee hidden' }, h('div', { class: 'v-wr-feathers' }, ...feathers), deveeBtn);
     const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
-      h('h2', null, `${live.name} · ${cfg.opp.name}`), cv, herald, score, msg, deveeBox, moves, timing, tail);
+      h('div', { class: 'v-wr-title' }, h('h2', null, `${live.name} · ${cfg.opp.name}`), viewBtn), cv, herald, score, msg, deveeBox, moves, timing, skillBox, tail);
     const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(Math.max(0, need - st.a))), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(Math.max(0, need - st.b)), ' ', cfg.opp.name));
     const moveLabel = (id) => tx(R.MOVES.find((m) => m.id === id).name);
     const setPhase = (p) => {
       st.phase = p;
-      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee');
-      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; st.t0 = performance.now(); setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); } },
-        h('b', null, tx(m.name)), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
+      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee'); skillBox.classList.toggle('hidden', p !== 'skill');
+      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; startSkill(m.id); } },
+        h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
     };
     let raf = 0, lastT = performance.now();
     const loop = (ts) => {
@@ -1804,6 +1813,8 @@
       st.off += (st.target - st.off) * Math.min(1, dt * 8);
       if (st.phase === 'devee') deveeBtn.classList.toggle('beat', deveeOnBeat(ts));
       if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * barSpeed) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
+      skillTick(dt, ts);
+      if (st.view === 'fp') { drawFP(ts); raf = requestAnimationFrame(loop); return; }
       // pixel scene: crowd stands, flags, sand ring, the zasuul watching
       const Wc = 192, Hc = 108, ground = 100;
       cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, Wc, Hc);
@@ -1835,7 +1846,90 @@
       }
       raf = requestAnimationFrame(loop);
     };
+    function startSkill(id) {
+      const type = SKILL[id] || 'timing'; st.t0 = performance.now();
+      if (type === 'timing') { setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); return; }
+      const sk = st.skill = { type, t0: performance.now(), el: {} };
+      if (type === 'combo') { sk.seq = Array.from({ length: 3 + Math.min(3, Math.floor(rnd / 3)) }, () => Math.floor(Math.random() * 4)); sk.i = 0; sk.err = 0; sk.limit = Math.max(2600, 4800 - rnd * 200); }
+      if (type === 'mash') { sk.n = 0; sk.need = 9 + rnd; sk.limit = 2400; }
+      if (type === 'hold') { sk.held = false; sk.v = 0; sk.zc = 0.8; sk.zw = 0.2 / sharp; }
+      if (type === 'balance') { sk.x = 0; sk.vx = 0; sk.push = 0; sk.dir = 0; sk.good = 0; sk.limit = 2800; }
+      setPhase('skill'); renderSkill();
+      msg.textContent = { combo: L('Хөлийн хөдөлгөөн! Сумнуудыг дарааллаар нь хурдан дар.', 'Footwork! Press the arrows in order, quickly.'), mash: L('Бүх хүчээ гарга! Хурдан, олон дар!', 'All your strength! Tap as fast as you can!'),
+        hold: L('Барьцаа ав: дарж байгаад шар хэсэгт хүрэхэд тавь.', 'Take the grip: hold, and let go in the yellow zone.'), balance: L('Тэнцвэрээ хадгал! Зүү голдоо байлгах гэж ← → дар.', 'Keep your balance! Use ← → to keep the needle in the middle.') }[type];
+    }
+    function renderSkill() {
+      const sk = st.skill; if (!sk) return;
+      const meter = (cls) => { const fill = h('i'); sk.el.fill = fill; return h('div', { class: 'v-wr-bar ' + (cls || '') }, fill); };
+      if (sk.type === 'combo') rc(skillBox, h('div', { class: 'v-wr-combo' }, sk.seq.map((a, i) => h('span', { class: 'v-wr-arrow' + (i < sk.i ? ' ok' : i === sk.i ? ' next' : '') }, ARROWS[a]))), meter('time'),
+        h('div', { class: 'v-wr-pad' }, ARROWS.map((a, i) => h('button', { class: 'btn', onclick: () => comboInput(i) }, a))));
+      else if (sk.type === 'mash') { const b = h('button', { class: 'btn primary big block', onclick: () => mashTap() }, L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`)); sk.el.btn = b; rc(skillBox, meter('power'), b); }
+      else if (sk.type === 'hold') { const b = h('button', { class: 'btn primary big block', onpointerdown: (e) => { e.preventDefault(); holdDown(); }, onpointerup: () => holdUp(), onpointerleave: () => sk.held && holdUp() }, L('Барих: дарж байгаад тавих (Space)', 'Grip: hold, then let go (Space)'));
+        rc(skillBox, h('div', { class: 'v-wr-bar hold' }, h('i', { class: 'v-wr-zone', style: { left: (sk.zc - sk.zw / 2) * 100 + '%', width: sk.zw * 100 + '%' } }), (sk.el.fill = h('i', { class: 'v-wr-fill' }))), b); }
+      else if (sk.type === 'balance') { const needle = h('i', { class: 'v-wr-needle' }); sk.el.needle = needle; const btn = (d, t) => h('button', { class: 'btn big', onpointerdown: (e) => { e.preventDefault(); sk.dir = d; }, onpointerup: () => { sk.dir = 0; }, onpointerleave: () => { if (sk.dir === d) sk.dir = 0; } }, t);
+        rc(skillBox, h('div', { class: 'v-wr-bar balance' }, h('i', { class: 'v-wr-zone', style: { left: '37.5%', width: '25%' } }), needle), meter('time'), h('div', { class: 'v-wr-pad two' }, btn(-1, '◀'), btn(1, '▶'))); }
+    }
+    function comboInput(i) {
+      const sk = st.skill; if (!sk || sk.type !== 'combo' || st.phase !== 'skill') return;
+      if (sk.seq[sk.i] === i) { sk.i++; TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (sk.i >= sk.seq.length) { const q = (performance.now() - sk.t0) / sk.limit; return lock(clamp(0.45 + 0.55 * (1 - q) - 0.15 * sk.err, 0.05, 1)); } }
+      else { sk.err++; TG.sfx.bad(); }
+      renderSkill();
+    }
+    function mashTap() { const sk = st.skill; if (!sk || sk.type !== 'mash' || st.phase !== 'skill') return; sk.n++; TG.sfx.tap(); if (sk.el.btn) sk.el.btn.textContent = L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`); }
+    function holdDown() { const sk = st.skill; if (!sk || sk.type !== 'hold' || st.phase !== 'skill' || sk.held) return; sk.held = true; sk.v = 0; }
+    function holdUp() { const sk = st.skill; if (!sk || sk.type !== 'hold' || !sk.held) return; sk.held = false; lock(clamp(1 - Math.abs(sk.v - sk.zc) * 3.2 * sharp, 0, 1)); }
+    function skillTick(dt, ts) {
+      const sk = st.skill; if (!sk || st.phase !== 'skill') return;
+      const el = ts - sk.t0;
+      if (sk.type === 'combo') { if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%'; if (el > sk.limit) lock((sk.i / sk.seq.length) * 0.5); }
+      else if (sk.type === 'mash') { if (sk.el.fill) sk.el.fill.style.width = Math.min(100, (sk.n / sk.need) * 100) + '%'; if (el > sk.limit) lock(Math.min(1, sk.n / sk.need)); }
+      else if (sk.type === 'hold') { if (sk.held) { sk.v += dt / 1.5; if (sk.v > 1) { sk.v = 0; msg.textContent = L('Хэт удаан барилаа! Дахиад.', 'Held too long! Again.'); } } if (sk.el.fill) sk.el.fill.style.width = sk.v * 100 + '%'; if (el > 6000) lock(0.1); }
+      else if (sk.type === 'balance') {
+        sk.push += (Math.random() - 0.5) * dt * (6 + rnd); sk.push = clamp(sk.push, -1.6, 1.6);   // your opponent shoves you this way and that
+        sk.vx += (sk.push * (1 + rnd * 0.12) + sk.dir * 4.2) * dt; sk.vx *= 0.92; sk.x = clamp(sk.x + sk.vx * dt, -1, 1);
+        if (Math.abs(sk.x) < 0.25) sk.good += dt * 1000;
+        if (sk.el.needle) sk.el.needle.style.left = (50 + sk.x * 48) + '%'; if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%';
+        if (el > sk.limit) lock(clamp((sk.good / sk.limit) * 1.15, 0, 1));
+      }
+    }
     function deveeOnBeat(ts) { const q = ((ts - st.devee.t0) % DEVEE_BEAT) / DEVEE_BEAT; return q < 0.2 || q > 0.84; }
+    // first person: you face your opponent up close, your red sleeves gripping his zodog, the crowd all round the ring
+    let fallAnim = 0, lastScore = 0;
+    function drawFP(ts) {
+      const Wc = 192, Hc = 108, f = Math.floor(ts / 260) % 2, sway = Math.sin(ts / 420) * 3 + st.off * 0.4;
+      const iFell = st.over && st.pose[0] === 'fall', heFell = st.over && st.pose[1] === 'fall';
+      if (st.a + st.b !== lastScore) { lastScore = st.a + st.b; fallAnim = ts; }
+      const hit = ts - fallAnim < 450 ? 1 - (ts - fallAnim) / 450 : 0, scored = st.flash && st.flash.good;
+      cx.save(); cx.imageSmoothingEnabled = false;
+      if (iFell) { const q = clamp((ts - st.end) / 700, 0, 1); cx.translate(Wc / 2, Hc / 2); cx.rotate(q * 0.5); cx.translate(-Wc / 2, -Hc / 2 + q * 30); }
+      else if (hit && !scored) cx.translate(Math.round(Math.sin(ts / 30) * 3 * hit), Math.round(hit * 2));   // you were thrown off balance
+      cx.fillStyle = '#9fd8f7'; cx.fillRect(-20, -40, Wc + 40, 70); cx.fillStyle = '#c4e6fb'; cx.fillRect(-20, 6, Wc + 40, 8);
+      cx.fillStyle = '#5a361c'; cx.fillRect(-20, 14, Wc + 40, 22);
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 40; i++) { const px0 = -8 + i * 5 + (row % 2) * 2, py0 = 15 + row * 7, bob = Math.floor(ts / 300 + i * 1.7 + row) % 4 === 0 ? -1 : 0; cx.fillStyle = ['#d8342b', '#2b5bd8', '#f7c646', '#2ea35f', '#ffffff', '#9466e0'][(i * 3 + row) % 6]; cx.fillRect(px0, py0 + 3 + bob, 4, 3); cx.fillStyle = (i + row) % 3 ? '#edbb93' : '#c98a5a'; cx.fillRect(px0 + 1, py0 + bob, 2, 3); }
+      [[6, '#2b5bd8'], [70, '#d8342b'], [120, '#f7c646'], [182, '#2b5bd8']].forEach(([fx, fc]) => { cx.fillStyle = '#4a2a14'; cx.fillRect(fx, 22, 1, 18); cx.fillStyle = fc; for (let r = 0; r < 5; r++) cx.fillRect(fx + 1, 22 + r, 6 - Math.abs(r - 2), 1); });
+      cx.fillStyle = '#e8c994'; cx.fillRect(-20, 36, Wc + 40, 90); cx.fillStyle = '#d4ae72'; for (let i = -6; i <= 6; i++) { cx.beginPath(); cx.moveTo(96 + i * 6, 36); cx.lineTo(96 + i * 40, Hc + 10); cx.lineTo(97 + i * 40, Hc + 10); cx.lineTo(97 + i * 6, 36); cx.fill(); }
+      const zs = PX.char(ZASUUL, 0, 0); cx.drawImage(zs, 150, 18, 12, 21);                                               // the zasuul watching from the side
+      // your opponent
+      const opp = PX.wrestlerFront(BLUE, oppSkin, st.phase === 'devee' ? (st.devee && st.devee.f) || f : f), sc = 2;
+      cx.save(); cx.translate(Math.round(96 + sway), 16 + 112);
+      if (heFell) { const q = clamp((ts - st.end) / 650, 0, 1); cx.rotate(-q * 1.35); cx.translate(0, q * 40); }
+      else if (hit && scored) cx.rotate(-hit * 0.35);                                                                      // he staggers from your move
+      cx.drawImage(opp, -20 * sc, -56 * sc, 40 * sc, 56 * sc); cx.restore();
+      // your arms gripping his sleeves (raised and flapping during the eagle dance, up in victory)
+      const dance = st.phase === 'devee' || (st.over && !iFell), up = dance ? (st.devee && st.devee.f) || f : 0;
+      const arm = (side) => { const bx = side < 0 ? 18 : 174, tx = dance ? (side < 0 ? 30 : 162) : 96 + sway + side * 26, ty = dance ? (up ? 20 : 34) : 64;
+        cx.fillStyle = '#2b1e2e'; cx.beginPath(); cx.moveTo(bx - 14, Hc + 4); cx.lineTo(tx - 7, ty - 1); cx.lineTo(tx + 7, ty - 1); cx.lineTo(bx + 14, Hc + 4); cx.fill();
+        cx.fillStyle = RED; cx.beginPath(); cx.moveTo(bx - 12, Hc + 4); cx.lineTo(tx - 5, ty + 1); cx.lineTo(tx + 5, ty + 1); cx.lineTo(bx + 12, Hc + 4); cx.fill();
+        cx.fillStyle = '#f7c646'; cx.fillRect(Math.round(tx - 6), Math.round(ty + 2), 12, 2);
+        cx.fillStyle = mySkin; cx.fillRect(Math.round(tx - 5), Math.round(ty - 6), 10, 7); cx.fillStyle = '#2b1e2e'; cx.fillRect(Math.round(tx - 5), Math.round(ty - 7), 10, 1); };
+      arm(-1); arm(1);
+      if (st.flash && ts - st.flash.t0 < 1300) {
+        const q = (ts - st.flash.t0) / 1300, fy = 50 - q * 10;
+        cx.font = '700 13px Rubik, sans-serif'; cx.textAlign = 'center'; cx.globalAlpha = q > 0.75 ? (1 - q) * 4 : 1;
+        cx.fillStyle = '#2b1e2e'; cx.fillText(st.flash.text, 97, fy + 1); cx.fillStyle = st.flash.good ? '#f7c646' : '#ffffff'; cx.fillText(st.flash.text, 96, fy); cx.globalAlpha = 1;
+      }
+      cx.restore();
+    }
     function deveeTap() {
       const d = st.devee; if (st.phase !== 'devee' || d.n >= DEVEE_TAPS) return;
       const good = deveeOnBeat(performance.now());
@@ -1847,10 +1941,10 @@
         : d.good ? L(`Дэвээ дууслаа. Эхний мэх +${Math.round(st.bonus * 100)}% хүчтэй.`, `Dance done. First move +${Math.round(st.bonus * 100)}% power.`) : L('Дэвээ хэмнэлээсээ алдлаа. Одоо барилдъя!', 'The dance was off the beat. Now wrestle!');
       setTimeout(() => { if (st.over) return; st.pose = ['grip', 'grip']; herald.remove(); setPhase('choose'); }, 900);
     }
-    function lock() {
-      if (st.phase !== 'timing') return;
-      herald.remove();
-      let power = Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
+    function lock(given) {
+      if (st.phase !== 'timing' && st.phase !== 'skill') return;
+      herald.remove(); st.skill = null;
+      let power = typeof given === 'number' ? given : Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
       if (st.bonus) { power = Math.min(1, power + st.bonus); st.bonus = 0; } // the eagle dance's power
       const repeated = st.move === st.lastPlayer;
       if (repeated) power *= 0.8; // the same move twice in a row is easier to read
@@ -1901,7 +1995,17 @@
             : h('button', { class: 'btn primary', onclick: () => { close(); tournament(1); } }, L('Шинэ Наадам', 'New Naadam'))) : null));
       if (cfg.remote && live) live.match = null;
     }
-    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) { if (st.phase === 'devee') deveeTap(); else lock(); } } };
+    const key = (e) => {
+      if (document.querySelectorAll('.modal-back').length > 1) return;
+      const down = e.type === 'keydown', sk = st.phase === 'skill' && st.skill;
+      if (sk && sk.type === 'combo' && ARROW_KEY[e.code] !== undefined) { e.preventDefault(); e.stopPropagation(); if (down && !e.repeat) comboInput(ARROW_KEY[e.code]); return; }
+      if (sk && sk.type === 'balance' && ['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); const d = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1; if (down) sk.dir = d; else if (sk.dir === d) sk.dir = 0; return; }
+      if (e.code !== 'Space' && e.code !== 'KeyE') return;
+      e.preventDefault(); e.stopPropagation();
+      if (sk && sk.type === 'hold') { if (down && !e.repeat) holdDown(); else if (!down) holdUp(); return; }
+      if (!down || e.repeat) return;
+      if (st.phase === 'devee') deveeTap(); else if (sk && sk.type === 'mash') mashTap(); else if (st.phase === 'timing') lock();
+    };
     window.addEventListener('keydown', key, true); window.addEventListener('keyup', key, true);
     goBtn.addEventListener('click', lock);
     if (cfg.remote) cfg.remote.ui = (m) => {

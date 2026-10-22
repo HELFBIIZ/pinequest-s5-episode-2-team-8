@@ -92,7 +92,7 @@ try {
     if (over) break;
     for (const [pg, k] of [[a, 0], [b, 1]]) {
       await until(() => pg.evaluate(() => { const m = document.querySelector('.v-wr-moves'); return (m && !m.classList.contains('hidden')) || !!document.querySelector('.v-wrestle .row-btns'); }), 'move buttons', 6000);
-      await pg.evaluate((k) => { const btns = document.querySelectorAll('.v-wr-moves .btn'); if (btns.length && !document.querySelector('.v-wrestle .row-btns')) { btns[(k + Math.floor(Math.random() * 3)) % 3].click(); setTimeout(() => { const go = document.querySelector('.v-wr-timing .btn'); if (go) go.click(); }, 120 + Math.random() * 300); } }, k);
+      await pg.evaluate((k) => { const btns = document.querySelectorAll('.v-wr-moves .btn'); if (btns.length && !document.querySelector('.v-wrestle .row-btns')) { btns[[0, 4, 12][(k + Math.floor(Math.random() * 3)) % 3]].click(); /* timing moves: push, hip throw, knee grab */ setTimeout(() => { const go = document.querySelector('.v-wr-timing .btn'); if (go) go.click(); }, 120 + Math.random() * 300); } }, k);
     }
     await sleep(1600);
   }

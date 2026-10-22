@@ -338,7 +338,17 @@ try {
   for (let i = 0; i < 4; i++) { await page.evaluate(() => document.querySelector('.v-wr-devee .btn').click()); await sleep(150); }
   await sleep(1100);
   const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
-  if (nMoves !== 7) errors.push(`wrestling: expected 7 techniques, found ${nMoves}`);
+  if (nMoves !== 13) errors.push(`wrestling: expected 13 techniques, found ${nMoves}`);
+  // a footwork move (хавирах) needs the arrow combo, not Space
+  await page.evaluate(() => [...document.querySelectorAll('.v-wr-moves .btn')].find((b) => /Хавирах/.test(b.querySelector('b').textContent)).click()); await sleep(200);
+  if (!(await page.evaluate(() => document.querySelectorAll('.v-wr-combo .v-wr-arrow').length >= 3))) errors.push('wrestling: хавирах should ask for a footwork combo');
+  for (let i = 0; i < 8 && (await page.evaluate(() => !!document.querySelector('.v-wr-arrow.next'))); i++) { const k = await page.evaluate(() => ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'][['←', '→', '↑', '↓'].indexOf(document.querySelector('.v-wr-arrow.next').textContent)]); await page.keyboard.press(k); await sleep(60); }
+  await sleep(300);
+  if (!(await page.evaluate(() => /%/.test(document.querySelector('.v-wr-msg').textContent)))) errors.push('wrestling: finishing the combo did not perform the move');
+  // first-person wrestling view
+  await page.evaluate(() => document.querySelector('.v-wr-view').click()); await sleep(400);
+  if ((await page.evaluate(() => TG.store.active().village.wrView)) !== 'fp') errors.push('wrestling: the first-person view did not switch on');
+  await page.evaluate(() => document.querySelector('.v-wr-view').click()); await sleep(100);
   if (!(await page.evaluate(() => /3/.test(document.querySelector('.v-wrestle .eyebrow').textContent)))) errors.push('wrestling: late rounds should need 3 falls');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
