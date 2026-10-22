@@ -40,6 +40,7 @@ async function player(name, look, room, ctxIn) {
     TG.go('village');
   }, name, look, room);
   await until(() => page.evaluate(() => TG._village.live() && TG._village.live().online), `${name} online`);
+  if (!(await page.evaluate(() => TG._village.live().serverV === TG.vrules.VERSION))) throw new Error('the server and the game report different versions');
   return page;
 }
 
