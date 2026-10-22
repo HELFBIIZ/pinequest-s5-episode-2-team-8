@@ -43,14 +43,26 @@
       desc: T('Үнээ саагаад сүүгээ буцалгаж, өрөм, тараг, ааруул хийцгээе.', 'Milk the cow, boil the milk and make cream, yogurt and aaruul.'),
       steps: [
         { type: 'learn', stage: 0, title: T('Цагаан идээ гэж юу вэ?', 'What is “white food”?'), text: T('Монголчууд зун сүүгээр тараг, өрөм, ааруул, бяслаг, шар тос, айраг хийдэг. Үүнийг цагаан идээ гэнэ. Цагаан сараар ширээний тэргүүнд тавьдаг.', 'In summer Mongols make yogurt, cream, aaruul, cheese, butter and airag from milk. These are “white foods”, placed first on the Tsagaan Sar table.') },
-        { type: 'tap', stage: 0, n: 10, label: T('Саах', 'Milk'), title: T('1. Үнээгээ саа!', '1. Milk the cow!'), text: T('10 удаа дарж хувингаа сүүгээр дүүргээрэй.', 'Tap 10 times to fill the bucket.'), after: T('Саасан сүүний дээжийг тэнгэрт өргөж цацдаг уламжлалтай.', 'Families offer the first of the milk by sprinkling it to the sky.') },
-        { type: 'hold', stage: 1, lo: 0.82, hi: 0.97, label: T('Гал түлэх (дараад барина)', 'Heat (press and hold)'), title: T('2. Сүүгээ буцалга', '2. Bring the milk to a boil'), text: T('Товчийг дараад барь. Сүү буцлах үед (ногоон хэсэгт) тавиарай. Удаан барьвал сүү халина!', 'Press and hold. Let go when the milk boils (green zone). Hold too long and it boils over!'), after: T('Сайн байна! Халуун сүүг заавал том хүнтэй хамт буцалгаарай.', 'Well done! Always boil hot milk with a grown-up.') },
-        { type: 'tap', stage: 2, n: 6, label: T('Самрах', 'Ladle'), title: T('3. Сүүгээ самра!', '3. Ladle the milk!'), text: T('Шанагаар сүүгээ өндрөөс цутгаж хөөсрүүлбэл дээр нь зузаан өрөм тогтоно.', 'Pour milk from high with a ladle to make foam, so thick cream forms on top.'), after: T('Хонуулахад сүүний дээр өрөм тогтоно. Өрөмөөс шар тос хийдэг.', 'Overnight cream (öröm) forms on top. Butter is made from it.') },
+        { type: 'drag', stage: 0, dir: 'down', alt: true, n: 8, icon: '✊', label: T('Доош нь татаж саа', 'Pull down to milk'), title: T('1. Үнээгээ саа!', '1. Milk the cow!'),
+          text: T('Хөхийг нь атгаад доош нь тат. Хоёр гараараа ээлжлэн саана: зүүн, баруун, зүүн…', 'Hold a teat and pull it down. Use both hands in turn: left, right, left…'),
+          altHint: T('Ээлжлэн саа! Одоо нөгөө талын хөхийг тат.', 'Take turns! Now pull the other teat.'), low: T('Доош нь бүр татаарай!', 'Pull all the way down!'),
+          after: T('Хувин дүүрлээ! Саахдаа үнээгээ зөөлөн илж, аялгуулан дуулж тайвшруулдаг.', 'The bucket is full! Herders stroke the cow and sing softly to keep her calm.') },
+        { type: 'drag', dir: 'up', release: true, need: 0.8, n: 3, field: 'flick', set: { tsatsal: true }, icon: '🥄', label: T('Дээш цацах', 'Flick up'), title: T('Сүүний дээж өргө', 'Offer the first milk'),
+          text: T('Шанагаар сүүний дээжийг авч тэнгэр өөд гурван удаа цацал өргө. Дээш нь шидэх шиг өргөөд тавиарай.', 'Scoop the first milk and flick it up to the sky three times. Swing up and let go.'), low: T('Илүү өндөр өргө!', 'Higher!'),
+          after: T('Цацал өргөхдөө сайн сайхныг ерөөдөг. Тэнгэр, газар, нутагтаа хүндэтгэл үзүүлж байгаа хэрэг.', 'While offering, people wish for good things. It honours the sky, the land and home.') },
+        { type: 'hold', stage: 1, set: { tsatsal: false }, lo: 0.82, hi: 0.97, label: T('Гал түлэх (дараад барина)', 'Heat (press and hold)'), title: T('2. Сүүгээ буцалга', '2. Bring the milk to a boil'), text: T('Товчийг дараад барь. Сүү буцлах үед (ногоон хэсэгт) тавиарай. Удаан барьвал сүү халина!', 'Press and hold. Let go when the milk boils (green zone). Hold too long and it boils over!'), after: T('Сайн байна! Халуун сүүг заавал том хүнтэй хамт буцалгаарай.', 'Well done! Always boil hot milk with a grown-up.') },
+        { type: 'drag', stage: 2, dir: 'up', release: true, need: 0.8, n: 6, icon: '🥄', label: T('Шанагаа өргөөд тавь', 'Lift the ladle, let go'), title: T('3. Сүүгээ самра!', '3. Ladle the milk!'),
+          text: T('Шанагаар сүүгээ утгаад өндөрт өргөж цутга. Өндрөөс цутгах тусам хөөс их гарч, өрөм зузаан тогтоно.', 'Scoop milk with the ladle, lift it high and pour. The higher you pour, the more foam and the thicker the cream.'),
+          low: T('Арай намхан байна. Шанагаа өндөрт өргө!', 'Too low. Lift the ladle higher!'), after: T('Хонуулахад сүүний дээр өрөм тогтоно. Өрөмөөс шар тос хийдэг.', 'Overnight cream (öröm) forms on top. Butter is made from it.') },
         { type: 'timing', stage: 3, lo: 0.3, hi: 0.48, label: T('Одоо!', 'Now!'), title: T('4. Бүлээн болтол хөргө', '4. Cool it to lukewarm'), text: T('Сүү хөрч байна. Зүү ногоон “бүлээн” хэсэгт ирэхэд дар.', 'The milk is cooling. Tap when the needle reaches the green “lukewarm” zone.'), after: T('Хуруу тэвчихүйц бүлээн байх ёстой. Хэт халуунд тараг исэхгүй.', 'It should be finger-warm. Too hot and the yogurt won’t set.') },
         { type: 'pick', stage: 4, title: T('5. Тараг исгэхийн тулд юу нэмэх вэ?', '5. What do we add to make yogurt?'), text: T('Бүлээн сүүндээ…', 'Into the warm milk goes…'),
           options: [O('Хөрөнгө (бага зэрэг хуучин тараг)', 'Starter (a little old yogurt)', 1), O('Давс', 'Salt'), O('Чихэр', 'Sugar')], after: T('Хөрөнгөнд байгаа сайн бактери сүүг тараг болгодог.', 'Good bacteria in the starter turn milk into yogurt.') },
         { type: 'tap', stage: 5, n: 4, label: T('Дулаан боох', 'Wrap warm'), title: T('6. Дулаан боож хонуул', '6. Wrap it warm overnight'), text: T('Савыг дээл, хөнжлөөр боож дулаан газар хонуулна.', 'Wrap the pot in a deel or blanket and leave it somewhere warm overnight.'), after: T('Өглөө боллоо — тараг бэлэн! 🌞', 'Morning — the yogurt is ready! 🌞') },
-        { type: 'tap', stage: 6, n: 5, label: T('Шахах', 'Press'), title: T('7. Ааруул хийцгээе', '7. Let’s make aaruul'), text: T('Тарагаа халааж ээдэм гаргаад, даавуунд хийж шахаж усыг нь гаргана.', 'Heat the yogurt until curds form, put them in a cloth and press out the water.') },
+        { type: 'drag', stage: 6, dir: 'down', n: 4, icon: '🪨', label: T('Чулуугаар дарах', 'Press with the stone'), title: T('7. Ааруул хийцгээе', '7. Let’s make aaruul'),
+          text: T('Тарагаа халааж ээдэм гаргаад даавуунд хийнэ. Дээр нь хавтгай чулуу тавиад доош нь дарж усыг нь шахаж гаргана.', 'Heat the yogurt until curds form and put them in a cloth. Lay a flat stone on top and press down to squeeze out the water.'), low: T('Хүчтэй дар!', 'Press harder!') },
+        { type: 'drag', dir: 'side', n: 5, field: 'cut', set: { cutting: true }, icon: '🔪', label: T('Хажуу тийш шудрах', 'Swipe sideways'), title: T('Ааруулаа хэрчинэ', 'Cut the aaruul'),
+          text: T('Шахсан ээдмээ утас эсвэл хутгаар жижиг хэсэг болгон хэрчинэ. Хажуу тийш шудар!', 'Cut the pressed curd into small pieces with a thread or a knife. Swipe sideways!'), low: T('Бүтэн шудраарай!', 'Swipe all the way!'),
+          after: T('Ааруулыг янз бүрийн хэлбэрээр хэрчдэг: дөрвөлжин, урт, хээтэй.', 'Aaruul is cut into all sorts of shapes: squares, sticks, patterned pieces.') },
         { type: 'pick', stage: 7, title: T('8. Ааруулаа хаана хатаах вэ?', '8. Where do we dry the aaruul?'), text: T('Хэрчсэн ааруулаа…', 'Cut the curd into pieces and…'),
           options: [O('Нар, салхинд', 'In the sun and wind', 1), O('Хөргөгчинд', 'In the fridge'), O('Усанд', 'In water')], after: T('Гэрийн дээвэр эсвэл тавиур дээр наранд хатаадаг. Хатуу, амттай ааруул бэлэн!', 'Dried on the ger roof or a rack in the sun. Crunchy aaruul is ready!') },
       ],
@@ -304,7 +316,8 @@
       const s = l.steps[i];
       if (s.ch) st.ch = s.ch; st.broken = !!s.broken;
       if (s.set) Object.assign(st, JSON.parse(JSON.stringify(s.set)));
-      if (s.stage !== undefined && s.type !== 'pick' && s.type !== 'zones' && s.type !== 'tf') { st.stage = s.stage; st.sub = s.type === 'tap' || s.type === 'hold' || s.type === 'timing' ? 0 : 1; }
+      st.pull = 0; st.fx = 0;
+      if (s.stage !== undefined && s.type !== 'pick' && s.type !== 'zones' && s.type !== 'tf') { st.stage = s.stage; st.sub = s.type === 'tap' || s.type === 'hold' || s.type === 'timing' || s.type === 'drag' ? 0 : 1; }
       else if (s.type === 'pick' && s.stage !== undefined) { st.stage = s.stage - 1; st.sub = 1; }
       pr.step = Math.max(pr.step || 0, i); S.save();
       const head = [turnEl(s), h('h2', null, tx(s.title)), h('p', null, tx(s.text))].filter(Boolean);
@@ -344,6 +357,36 @@
           if (n >= s.n) { btn.disabled = true; out.replaceChildren(...[success(s), nextBtn()].filter(Boolean)); }
         } }, tx(s.label), h('small', null, `0 / ${s.n}`));
         return panel.replaceChildren(...head, btn, out);
+      }
+      if (s.type === 'drag') {
+        // a hand gesture: pull the teat down, lift the ladle high and let go, press the stone, swipe to cut
+        const LEN = 80, ARROW = { down: '⬇', up: '⬆', side: '⬅ ➡' };
+        let n = 0, g = null, lastSide = null;
+        const knob = h('i', { class: 'l-drag-knob' }, s.icon || '✋'), count = h('small', null, `0 / ${s.n}`);
+        const pad = h('div', { class: `l-drag ${s.dir}${s.alt ? ' alt' : ''}` }, h('span', { class: 'l-drag-arrow' }, ARROW[s.dir]), knob, h('b', null, tx(s.label)), count);
+        const amount = (e) => { const dx = e.clientX - g.x, dy = e.clientY - g.y; return Math.max(0, Math.min(1, (s.dir === 'side' ? Math.abs(dx) : s.dir === 'down' ? dy : -dy) / LEN)); };
+        const place = (a, e) => { knob.style.transform = s.dir === 'side' ? `translateX(${Math.max(-LEN, Math.min(LEN, e.clientX - g.x))}px)` : `translateY(${(s.dir === 'down' ? 1 : -1) * a * LEN}px)`; };
+        const stroke = () => {
+          if (s.alt && g.side === lastSide) { TG.sfx.bad(); out.replaceChildren(say(tx(s.altHint))); return; }
+          lastSide = g.side; n++; st.fx = performance.now();
+          if (s.field) st[s.field] = n / s.n; else st.sub = n / s.n;
+          TG.sfx.pop ? TG.sfx.pop() : TG.sfx.tap(); TG.buzz && TG.buzz(12);
+          count.textContent = `${n} / ${s.n}`; out.replaceChildren();
+          if (n >= s.n) { pad.classList.add('done'); out.replaceChildren(...[success(s), nextBtn()].filter(Boolean)); }
+        };
+        pad.addEventListener('pointerdown', (e) => {
+          if (n >= s.n) return; e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch (_) {}
+          const r = pad.getBoundingClientRect(); g = { x: e.clientX, y: e.clientY, side: e.clientX < r.left + r.width / 2 ? 'l' : 'r', done: false };
+          st.side = g.side; if (s.alt) knob.style.left = g.side === 'l' ? '28%' : '72%';
+        });
+        pad.addEventListener('pointermove', (e) => { if (!g) return; const a = amount(e); st.pull = a; place(a, e); if (!s.release && a >= 1 && !g.done) { g.done = true; stroke(); } });
+        const up = (e) => {
+          if (!g) return; const a = amount(e);
+          if (s.release ? a >= s.need : g.done) { if (s.release) stroke(); } else if (a > 0.15 && s.low) out.replaceChildren(say(tx(s.low)));
+          g = null; st.pull = 0; knob.style.transform = '';
+        };
+        pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
+        return panel.replaceChildren(...head, pad, out);
       }
       if (s.type === 'hold' || s.type === 'timing') {
         const fill = h('i'), zone = h('b', { style: { left: s.lo * 100 + '%', width: (s.hi - s.lo) * 100 + '%' } }), needle = h('em');
