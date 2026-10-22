@@ -175,7 +175,8 @@
     return c;
   }
 
-  function open(id) {
+  /** opts.view: 'fp' (first person, 3D) or '2d'. Without it, the view the child picked last time. */
+  function open(id, opts = {}) {
     const a = TG.aimags.byId(id), p = S.active(); if (!a || !TG.passport.J[id]) return;
     const map = build(id), terrain = paint(map), v = p.village || {};
     p.travel = p.travel || {}; const seen = (p.travel[id] = p.travel[id] || []);
@@ -237,9 +238,26 @@
     const blocked = (px, py) => { const X = Math.floor(px / TS), Y = Math.floor(py / TS); const c = map.g[Y] && map.g[Y][X]; return !c || BLOCK.includes(c); };
     const free = (px, py) => !blocked(px - 4, py - 2) && !blocked(px + 4, py - 2) && !blocked(px - 4, py + 2) && !blocked(px + 4, py + 2);
     drawProg();
-    const sc = TG.scene.open({
+    const fpWanted = (opts.view || p.travelView) === 'fp' && TG.fp && TG.fp.supported();
+    let switching = false;
+    const viewBtn = h('button', { class: 'btn scene-side travel-view', onclick: () => { p.travelView = fpWanted ? '2d' : 'fp'; S.save(); switching = true; sc.close(); setTimeout(() => open(id, { view: p.travelView }), 200); } }, fpWanted ? L('🗺️ Дээрээс харах', '🗺️ Top view') : L('👁 Өөрийн нүдээр (3D)', '👁 First person (3D)'));
+    const SIZE = { sheep: 1.0, goat: 0.95, horse: 1.6, camel: 2.1, yak: 1.5, reindeer: 1.45, gazelle: 1.15 };
+    const fpExtra = { // only the first-person view uses these
+      map,
+      actors: (t) => [
+        ...herds.map((hd) => ({ img: TG.landmarks.critter(hd.sp, hd.moving ? Math.floor(t * 6) % 2 : 0), x: hd.x, y: hd.y, h: SIZE[hd.sp] || 1.2, flip: hd.flip })),
+        { img: TG.pixel.char(guideLook, 0, 0), x: guideT.x, y: guideT.y, h: 1.8 },
+        { img: TG.pixel.char(herderLook, 0, 0), x: famT.x, y: famT.y - 6, h: 1.8 },
+      ],
+      markers: () => [
+        ...things.filter((q) => q.kind === 'mark').map((q) => ({ x: q.x, y: q.y, c: seen.includes(q.i) ? '#5c9a36' : '#f7c646', label: tx(q.m.name), lift: 2.6 })),
+        ...(stamped() ? [] : [{ x: guideT.x, y: guideT.y, c: seen.length === 3 ? '#7fe07a' : '#f7c646', label: L('Хөтөч', 'Guide') }]),
+        ...(famDone() ? [] : [{ x: famT.x, y: famT.y - 6, c: '#f7c646', label: L('Малчин айл', 'Herder family') }]),
+      ],
+    };
+    const cfg = {
       cls: 'travel-scene', W: MW * TS, H: MH * TS, fit: 190, bg: '#2b1e2e', look: v.look || {}, start: at(map.start.x, map.start.y), speed: 72,
-      title: `${a.icon} ${tx(a.name)}`, sub: tx(a.center), right: prog, free, things, reach: 24,
+      title: `${a.icon} ${tx(a.name)}`, sub: tx(a.center), right: prog, free, things, reach: 24, buttons: [viewBtn],
       hint: () => L('Шар тугтай газраар аялаарай', 'Visit the places with yellow flags'),
       drawBg: (b) => b.drawImage(terrain, 0, 0),
       step: (dt) => { // animals graze: stand a while, then amble to a nearby open spot
@@ -269,10 +287,13 @@
         if (map.snow || TG.seasons.current().id === 'winter') for (let i = 0; i < 40; i++) { b.fillStyle = 'rgba(255,255,255,.8)'; b.fillRect(Math.round((i * 53 + Math.sin(t + i) * 6) % (MW * TS)), Math.round((i * 31 + t * 16 * (1 + (i % 3) * 0.3)) % (MH * TS)), 1, 1); } },
       mini: { img: terrain, w: MW * 4, h: MH * 4, dots: () => [...things.filter((q) => q.kind === 'mark').map((q) => ({ x: q.x, y: q.y, c: seen.includes(q.i) ? '#5c9a36' : '#f7c646' })), { x: guideT.x, y: guideT.y, c: stamped() ? '#ffffff' : seen.length === 3 ? '#7fe07a' : '#f492ba' }, { x: busT.x, y: busT.y, c: '#3f76db' }, { x: famT.x, y: famT.y, c: famDone() ? '#ffffff' : '#f7c646' }] },
       info: [h('b', null, '🚌 ', L(`${a.name.mn}-д ирлээ!`, `You arrived in ${a.name.en}!`)), h('p', null, L(`Төв: ${a.center.mn} · ${det.area ? det.area.toLocaleString('en-US') : '?'} км². `, `Centre: ${a.center.en} · ${det.area ? det.area.toLocaleString('en-US') : '?'} km². `), L('Шар тугтай 3 үзвэрээр аялж, дараа нь нутгийн хөтөчтэй уулзаарай. WASD-аар алхаж, E дарж үзнэ, Space дарвал үсэрнэ. Баруун дээд буланд газрын зураг бий.', 'Visit the 3 sights with yellow flags, then meet the local guide. Walk with WASD, press E to look, Space to jump. The map is in the top-right corner.'))],
-      onClose: () => { if (document.querySelector('.pp-grid, .pp-visit')) TG.go('passport'); },
-    });
+      onClose: () => { if (!switching && document.querySelector('.pp-grid, .pp-visit')) TG.go('passport'); },
+    };
+    let sc = null;
+    if (fpWanted) { try { sc = TG.fp.open({ ...cfg, ...fpExtra, info: [...cfg.info.slice(0, 1), h('p', null, window.matchMedia && matchMedia('(pointer: coarse)').matches ? L('Өөрийн нүдээр аялж байна! Зүүн талд чирж алхаж, баруун талд чирж эргэн харна. ⤒ үсрэх, 🏃 гүйх, доод товчоор харилцана. Гэр рүү орж ч болно!', 'You are travelling first person! Drag on the left to walk and on the right to look around. ⤒ jumps, 🏃 runs, the big button interacts. You can even walk into the gers!') : L('Өөрийн нүдээр аялж байна! Дэлгэц дээр дарж хулганаар эргэн харна. WASD алхах, Space үсрэх, Shift гүйх, E эсвэл хулганы товч харилцах. Гэр рүү орж ч болно!', 'You are travelling first person! Click to look around with the mouse. WASD walk, Space jump, Shift sprint, E or a click to interact. You can even walk into the gers!'))] }); } catch (e) { console.warn('first-person view failed', e); sc = null; } }
+    if (!sc) sc = TG.scene.open(cfg);
     TG.sfx.whoosh && TG.sfx.whoosh();
-    TG.travel._cur = { me: sc.me, things, run: (t) => t.run(), seen, close: () => sc.close() }; // used by automated tests
+    TG.travel._cur = { me: sc.me, things, run: (t) => t.run(), seen, close: () => sc.close(), view: fpWanted && sc.P ? 'fp' : '2d', sc }; // used by automated tests
   }
-  TG.travel = { open, build };
+  TG.travel = { open, build, CAMP, FAM, OVOO, SIGN, TS, DETAIL };
 })(window.TG);

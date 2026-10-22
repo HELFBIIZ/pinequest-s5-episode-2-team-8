@@ -24,7 +24,7 @@ const base = `http://localhost:${server.address().port}`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const errors = [], external = [];
-const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox'] });
+const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }); // software WebGL for the first-person trips
 const page = await browser.newPage();
 await page.setViewport({ width: 390, height: 844 });
 await page.setRequestInterception(true);
@@ -80,7 +80,7 @@ try {
     window.__before = document.activeElement;
     window.__close = TG.modal(TG.h('div', null, TG.h('button', { class: 'btn', id: 'inside-modal' }, 'inside')));
   });
-  await sleep(150);
+  for (let i = 0; i < 20 && !(await page.evaluate(() => { const b = document.querySelector('.modal'); return !!(b && b.contains(document.activeElement)); })); i++) await sleep(50); // focus moves on the next animation frame
   const a11y = await page.evaluate(() => {
     const box = document.querySelector('.modal');
     const x = box && box.querySelector('.modal-x');
@@ -360,6 +360,31 @@ try {
   await page.keyboard.press('KeyE'); await sleep(250);
   await check('travel animal fact', '.travel-scene .scene-info');
   if (!(await page.evaluate(() => /Адуу/.test(document.querySelector('.travel-scene .scene-info').textContent)))) errors.push('travel: talking to a horse did not show its name and fact');
+  // first person (3D): switch view, walk, jump, sprint, talk, switch back
+  step = 'first-person trip';
+  await page.evaluate(() => document.querySelector('.travel-view').click()); await sleep(3000);
+  const fpOn = await page.evaluate(() => ({ view: TG.travel._cur.view, cv: !!document.querySelector('.fp .fp-cv'), verts: TG.travel._cur.sc.stats ? TG.travel._cur.sc.stats.verts : 0, gl: TG.fp.supported() }));
+  if (!fpOn.gl) errors.push('first person: WebGL is not available in the test browser');
+  else {
+    if (fpOn.view !== 'fp' || !fpOn.cv || fpOn.verts < 20000) errors.push(`first person: the 3D view did not open ${JSON.stringify(fpOn)}`);
+    const p0 = await page.evaluate(() => { const P = TG.travel._cur.sc.P; return { x: P.x, z: P.z, y: P.y }; });
+    await page.keyboard.down('KeyW'); await sleep(800); await page.keyboard.up('KeyW'); await sleep(200);
+    const p1 = await page.evaluate(() => { const P = TG.travel._cur.sc.P; return { x: P.x, z: P.z, y: P.y, ground: P.ground }; });
+    if (Math.hypot(p1.x - p0.x, p1.z - p0.z) < 1.5) errors.push(`first person: W did not walk forward ${JSON.stringify([p0, p1])}`);
+    if (!p1.ground) errors.push('first person: the player is not standing on the ground');
+    await page.keyboard.press('Space'); await sleep(160);
+    if (!(await page.evaluate((y0) => TG.travel._cur.sc.P.y > y0 + 0.4, p1.y))) errors.push('first person: Space did not jump');
+    await sleep(700);
+    await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW'); await sleep(400);
+    if (!(await page.evaluate(() => TG.travel._cur.sc.P.sprint))) errors.push('first person: Shift + W did not sprint');
+    await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); await sleep(300);
+    await page.evaluate(() => { const c = TG.travel._cur, t = c.things.find((q) => q.kind === 'guide'); c.me.x = t.x; c.me.y = t.y + 4; }); await sleep(300);
+    await page.keyboard.press('KeyE'); await sleep(300);
+    if (!(await page.evaluate(() => /хөтөч|guide/i.test(document.querySelector('.fp .scene-info').textContent)))) errors.push('first person: pressing E at the guide did not talk');
+    await check('first-person screen', '.fp .fp-hud');
+    await page.evaluate(() => document.querySelector('.travel-view').click()); await sleep(1200);
+    if ((await page.evaluate(() => TG.travel._cur.view)) !== '2d') errors.push('first person: switching back to the top view did not work');
+  }
   await page.evaluate(() => TG.travel._cur.close()); await sleep(400);
   await page.evaluate(() => TG.go('aimag', { id: 'tuv' })); await sleep(700);
   await check('next province unlocked after the stamp', '.pp-visit + .card .pp-go, .pp-visit ~ .pp-go');
