@@ -1426,3 +1426,15 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .bc-tile.lock { opacity: .5; }
 .hub-mong { font-size: 1.3rem !important; max-height: 2.4rem; }
 @media (max-width: 480px) { .bc-btns { grid-template-columns: repeat(2, 1fr); } }
+
+.v-net.alert { background: #fff3c4; box-shadow: inset 0 0 0 2px #e14b3d, 0 3px 0 #8a4b1f; animation: pulse-net 1.4s ease-in-out infinite; }
+@keyframes pulse-net { 50% { transform: scale(1.06); } }
+
+.v-run { width: 56px; height: 56px; flex: none; display: grid; place-items: center; align-self: flex-end; font-size: 22px; }
+.scene-run { width: 60px; height: 60px; display: grid; place-items: center; font-size: 22px; }
+.v-run.on, .scene-run.on { background: #fff3c4; box-shadow: inset 0 0 0 3px #e14b3d, 0 3px 0 #8a4b1f; }
+.v-energy { font-family: 'Tiny5', monospace; }
+.v-energy.low { color: #c2302a; animation: pulse-net 1.2s ease-in-out infinite; }
+.v-new { color: #2e7d32; font-weight: 800; }
+.bc-pix { image-rendering: pixelated; flex: none; display: block; }
+.hub-card .bc-pix { margin-bottom: 2px; }

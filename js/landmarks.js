@@ -189,6 +189,33 @@
     R(x, X + 30, Y + 16, 4, 8, '#5a3a22'); R(x, X + 43, Y + 16, 4, 8, '#5a3a22');
   };
 
+  // ---- herd animals for the trips (about 20×16, facing right; frame 0/1 = legs)
+  const CR = {};
+  const legs = (x, f, xs, top, col, len = 4) => { const { R } = P_(); xs.forEach((lx, i) => R(x, lx + ((i + f) % 2 ? 1 : 0), top, 1, len - ((i + f) % 2), col)); };
+  CR.horse = (x, f) => { const { R, P } = P_(); const c = '#8a5a33', d = '#5a3a1e';
+    R(x, 4, 6, 11, 5, OUT); R(x, 5, 7, 9, 3, c); legs(x, f, [5, 7, 11, 13], 11, d); R(x, 14, 3, 3, 5, OUT); R(x, 15, 4, 2, 4, c); R(x, 15, 2, 4, 3, OUT); R(x, 16, 3, 3, 1, c); P(x, 18, 3, d);
+    R(x, 13, 3, 2, 4, '#2b1e14'); R(x, 3, 7, 2, 4, '#2b1e14'); };
+  CR.camel = (x, f) => { const { R, P } = P_(); const c = '#c99a5a', d = '#8a5a33';
+    R(x, 3, 7, 12, 5, OUT); R(x, 4, 8, 10, 3, c); R(x, 5, 4, 3, 4, OUT); R(x, 6, 5, 1, 3, c); R(x, 10, 4, 3, 4, OUT); R(x, 11, 5, 1, 3, c);
+    legs(x, f, [4, 6, 11, 13], 12, d, 4); R(x, 14, 4, 2, 6, OUT); R(x, 15, 5, 1, 4, c); R(x, 15, 3, 4, 2, OUT); R(x, 16, 3, 2, 1, c); P(x, 5, 6, '#a87648'); P(x, 11, 6, '#a87648'); };
+  CR.yak = (x, f) => { const { R, P } = P_(); const c = '#3a2c2c';
+    R(x, 3, 5, 13, 7, OUT); R(x, 4, 6, 11, 5, c); for (let i = 4; i < 15; i += 2) P(x, i, 11, '#5a4a4a'); R(x, 4, 11, 11, 1, '#2b1e2e');
+    legs(x, f, [5, 7, 12, 14], 12, '#1e1616', 3); R(x, 15, 6, 4, 4, OUT); R(x, 16, 7, 2, 2, c); R(x, 16, 4, 1, 2, '#f2eee4'); R(x, 18, 4, 1, 2, '#f2eee4'); R(x, 2, 6, 2, 4, '#f2eee4'); };
+  CR.goat = (x, f) => { const { R, P } = P_(); const c = '#f2eee4';
+    R(x, 5, 7, 9, 4, OUT); R(x, 6, 8, 7, 2, c); legs(x, f, [6, 8, 11, 12], 11, '#8a7a64', 3); R(x, 13, 5, 3, 4, OUT); R(x, 14, 6, 2, 2, c); P(x, 14, 9, '#c9bda6'); P(x, 14, 10, '#c9bda6');
+    P(x, 13, 4, '#8a7a64'); P(x, 12, 3, '#8a7a64'); P(x, 15, 6, OUT); };
+  CR.reindeer = (x, f) => { const { R, P } = P_(); const c = '#8a6a4a';
+    R(x, 4, 7, 11, 4, OUT); R(x, 5, 8, 9, 2, c); R(x, 12, 8, 3, 2, '#e8dcc0'); legs(x, f, [5, 7, 11, 13], 11, '#5a3a22', 4); R(x, 14, 4, 3, 5, OUT); R(x, 15, 5, 2, 3, c);
+    R(x, 14, 0, 1, 4, '#c9a87a'); R(x, 17, 0, 1, 4, '#c9a87a'); P(x, 13, 1, '#c9a87a'); P(x, 18, 1, '#c9a87a'); P(x, 13, 2, '#c9a87a'); P(x, 18, 2, '#c9a87a'); };
+  CR.gazelle = (x, f) => { const { R, P } = P_(); const c = '#d8a868';
+    R(x, 5, 7, 9, 4, OUT); R(x, 6, 8, 7, 2, c); R(x, 5, 8, 2, 2, '#ffffff'); R(x, 7, 10, 5, 1, '#f3e6c4'); legs(x, f, [6, 8, 11, 12], 11, '#8a5a33', 4); R(x, 13, 4, 2, 5, c); R(x, 14, 3, 3, 2, c); P(x, 14, 1, '#3a2516'); P(x, 14, 2, '#3a2516'); };
+  CR.sheep = (x, f) => { x.drawImage(TG.pixel.animal('sheep', f), 0, 0); };
+  const crCache = new Map();
+  function critter(kind, f) {
+    const key = kind + f; if (crCache.has(key)) return crCache.get(key);
+    const c = document.createElement('canvas'); c.width = 20; c.height = 16; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; (CR[kind] || CR.sheep)(x, f); crCache.set(key, c); return c;
+  }
+
   function draw(x, kind, X, Y) { (D[kind] || D.sacredmtn)(x, X, Y); }
-  TG.landmarks = { KIND, draw, kinds: Object.keys(D) };
+  TG.landmarks = { KIND, draw, kinds: Object.keys(D), critter, critters: Object.keys(CR), khadag, stupa };
 })(window.TG);

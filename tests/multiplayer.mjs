@@ -2,7 +2,9 @@
 // and checks they see each other, share one garden, and can talk with preset phrases.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, networkInterfaces } from 'node:os';
+import net from 'node:net';
+import crypto from 'node:crypto';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from 'puppeteer-core';
@@ -13,27 +15,30 @@ const dataDir = mkdtempSync(join(tmpdir(), 'naadamy-'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, label, ms = 8000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await fn()) return; await sleep(150); } throw new Error(`timed out waiting for: ${label}`); };
 
-const server = spawn(process.execPath, [join(root, 'server.js')], { env: { ...process.env, PORT: '0', DATA_DIR: dataDir }, stdio: ['ignore', 'pipe', 'inherit', 'ipc'] });
+const server = spawn(process.execPath, [join(root, 'server.js')], { env: { ...process.env, PORT: '0', DATA_DIR: dataDir, HEARTBEAT_MS: '600' }, stdio: ['ignore', 'pipe', 'inherit', 'ipc'] });
 const port = await new Promise((res, rej) => { server.on('message', (m) => m.port && res(m.port)); server.on('exit', (c) => rej(new Error('server exited ' + c))); setTimeout(() => rej(new Error('server did not start')), 8000); });
-const base = `http://localhost:${port}`;
+// connect over the computer's Wi-Fi address like a second device would (falls back to localhost without a network)
+const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
+const base = `http://${lan ? lan.address : 'localhost'}:${port}`;
 const browser = await puppeteer.launch({ executablePath: chrome, headless: 'new', args: ['--no-sandbox'] });
 const errors = [];
-const results = [];
+const results = [`(connected over ${base})`];
 const ok = (label) => { results.push('✓ ' + label); };
 
-async function player(name, look) {
-  const ctx = await browser.createBrowserContext();       // separate storage = separate person
+async function player(name, look, room, ctxIn) {
+  const ctx = ctxIn || await browser.createBrowserContext();       // separate storage = separate person
   const page = await ctx.newPage();
   await page.setViewport({ width: 390, height: 844 });
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
-  await page.evaluate((name, look) => {
+  if (ctxIn) await page.evaluate(() => TG.go('village'));   // same storage: the same profile again
+  else await page.evaluate((name, look, room) => {
     localStorage.clear();
     const p = TG.store.addProfile({ name, age: 9, avatar: '🐎' }); TG.store.state.loggedIn = true;
     TG.store.state.settings.sound = false;
-    p.village = { tips: true, look, seeds: { carrot: 5 }, xp: 200, coins: 600 };
+    p.village = { tips: true, look, seeds: { carrot: 5 }, xp: 200, coins: 600, room: room || 'NUTAG' };
     TG.go('village');
-  }, name, look);
+  }, name, look, room);
   await until(() => page.evaluate(() => TG._village.live() && TG._village.live().online), `${name} online`);
   return page;
 }
@@ -116,6 +121,38 @@ try {
   await sleep(300);
 
   await a.screenshot({ path: join(process.env.SHOT_DIR || tmpdir(), 'village-two-players.png') });
+
+  // a third friend whose profile remembers an old private room: they are told others are here and can join in one tap
+  const c = await player('Тэмүүлэн', { deel: 'blue' }, 'ABCDE');
+  await until(() => c.evaluate(() => document.querySelector('.v-net').classList.contains('alert') && /\(\+2\)/.test(document.querySelector('.v-net').textContent)), 'C is shown 2 people in another room');
+  await c.evaluate(() => document.querySelector('.v-net').click()); await sleep(300);
+  await c.evaluate(() => [...document.querySelectorAll('.modal .btn.primary')].find((x) => /NUTAG|Үндсэн Нутаг|main village/.test(x.textContent)).click());
+  await until(() => c.evaluate(() => TG._village.live().online && TG._village.live().room === 'NUTAG' && TG._village.live().others.size === 2), 'C joins the main village and sees both');
+  await until(() => a.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Тэмүүлэн')), 'A sees C');
+  ok('a player stuck in another room is pointed to the main village and joins in one tap');
+
+  // the same profile opened in a second tab: the old tab steps aside, no reconnect fight
+  const c2 = await player('Тэмүүлэн', null, null, c.browserContext());
+  await until(() => c.evaluate(() => TG._village.live().status === 'solo'), 'old tab steps aside');
+  await sleep(4000);
+  if (!(await c2.evaluate(() => TG._village.live().online))) throw new Error('the newest tab lost its connection (reconnect loop)');
+  if ((await a.evaluate(() => [...TG._village.live().others.values()].filter((o) => o.name === 'Тэмүүлэн').length)) !== 1) throw new Error('the same profile shows up twice');
+  ok('opening the same profile twice keeps the newest tab without a reconnect loop');
+  await c.close(); await c2.close();
+  await until(() => a.evaluate(() => TG._village.live().others.size === 1), 'C left');
+
+  // a phone that drops off the Wi-Fi without closing: removed by the heartbeat instead of staying as a frozen ghost
+  const ghost = net.connect(port, '127.0.0.1');
+  await new Promise((r) => ghost.on('connect', r));
+  ghost.write(`GET /ws HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${crypto.randomBytes(16).toString('base64')}\r\n\r\n`);
+  await sleep(200);
+  const payload = Buffer.from(JSON.stringify({ t: 'join', room: 'NUTAG', id: 'ghost-1', name: 'Сүнс', look: {}, x: 20, y: 13 })), mask = crypto.randomBytes(4);
+  ghost.write(Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, Buffer.from(payload.map((x, i) => x ^ mask[i & 3]))]));
+  ghost.pause();                                                // never answers the server's pings again
+  await until(() => a.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Сүнс')), 'A sees the ghost join');
+  await until(() => a.evaluate(() => ![...TG._village.live().others.values()].some((o) => o.name === 'Сүнс')), 'the silent player is removed', 6000);
+  ghost.destroy();
+  ok('a player whose connection silently died is removed automatically');
 
   await b.close();
   await until(() => a.evaluate(() => TG._village.live().others.size === 0), 'A sees B leave');

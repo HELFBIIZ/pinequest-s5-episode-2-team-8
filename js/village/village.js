@@ -16,7 +16,7 @@
     const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, seeds: { carrot: 4, potato: 2 }, produce: {}, fish: {},
       owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, can: 5, water: 5, rod: 1, room: 'NUTAG',
       garden: [], quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
-      lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
+      energy: 100, ate: {}, lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
     for (const k in d) if (v[k] === undefined) v[k] = d[k];
     while (v.garden.length < R.PLOTS) v.garden.push(null);
     while (v.lots.length < R.LOTS) v.lots.push(null);
@@ -58,8 +58,9 @@
     archery: { n: 3, c: 25, x: 35, t: Tx('Сур харваанд 3 бай онох', 'Hit 3 archery targets') },
     wrestle: { n: 1, c: 25, x: 35, t: Tx('Бөхийн барилдаанд 1 удаа давах', 'Win 1 wrestling round') },
     etiquette: { n: 1, c: 30, x: 40, t: Tx('Эмээгийн гэрт ёсоор зочлох', 'Visit Grandma’s ger with good manners') },
+    eat: { n: 3, c: 15, x: 20, t: Tx('3 удаа хоол идэх, ундаа уух', 'Eat or drink 3 times') },
   };
-  const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz'];
+  const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz', 'eat'];
   function quests() {
     const v = V(), d = S.dkey();
     if (v.quests.d !== d || v.quests.list.some((q) => !QUESTS[q.k])) { // new day, or quests from an older version
@@ -111,6 +112,75 @@
   const pic = (key, size = 32) => PX.icon(key, size);
   const ZASUUL = { deel: 'gold', skin: '#D9A06E', hat: 'mongol', face: null, neck: 'khadag', pet: null };
   TG.drawAvatarPixel = (ctx, look, scale) => { ctx.imageSmoothingEnabled = false; ctx.drawImage(PX.char(look, 0, 0), 0, 0, 16 * scale, 28 * scale); };
+
+  // ================================================================ eating and drinking: energy for running, and a taste of Mongolian food
+  const F = (id, e, kind, mn, en, energy, price, fmn, fen) => ({ id, e, kind, name: Tx(mn, en), energy, price, fact: Tx(fmn, fen) });
+  const FOODS = [
+    F('buuz', '🥟', 'meat', 'Бууз', 'Buuz', 30, 12, 'Бууз бол Цагаан сарын гол хоол. Айл бүр олон зуун бууз чимхдэг.', 'Buuz are the main dish of Tsagaan Sar. Families pinch hundreds of them.'),
+    F('khuushuur', '🥟', 'meat', 'Хуушуур', 'Khuushuur', 25, 10, 'Хуушуур бол бууз шиг махтай боов, гэхдээ тосонд шардаг. Наадмаар хамгийн их иддэг.', 'Khuushuur are like buuz but fried flat in oil. Everyone eats them at Naadam.'),
+    F('khorkhog', '🍖', 'meat', 'Хорхог', 'Khorkhog', 45, 25, 'Хорхогийг махыг халуун чулуутай хамт саванд битүү жигнэж хийдэг. Баяр ёслолоор хийнэ.', 'Khorkhog is meat cooked with hot stones in a closed pot, made for celebrations.'),
+    F('tsuivan', '🍝', 'meat', 'Цуйван', 'Tsuivan', 35, 14, 'Цуйван: гоймон, мах, ногоог хуурч жигнэдэг. Олон хүн үндэсний хоол гэж нэрлэдэг.', 'Tsuivan is noodles stir-fried with meat and vegetables, often called the national dish.'),
+    F('shul', '🍜', 'meat', 'Гурилтай шөл', 'Noodle soup', 30, 12, 'Гурилтай шөл: мах, төмс, лууван, гоймонтой. Хүйтэн өвөл дулаацуулна.', 'Guriltai shul has meat, potato, carrot and noodles. It warms you up in winter.'),
+    F('borts', '🥩', 'meat', 'Борц', 'Borts', 20, 8, 'Борц бол өвөл салхинд хатаасан мах. Нунтаглаад халуун усанд хийж шөл болгодог.', 'Borts is meat dried in the winter wind. Crushed into hot water, it becomes soup.'),
+    F('salad', '🥗', 'veg', 'Ногоон салат', 'Vegetable salad', 15, 8, 'Байцаа, лууван, өргөст хэмхээр хийсэн салат витаминаар баян.', 'A salad of cabbage, carrot and cucumber is full of vitamins.'),
+    F('tarvas', '🍉', 'veg', 'Тарвас', 'Watermelon', 15, 10, 'Ховд аймгийн Мянгад сумын тарвас алдартай.', 'Watermelons from Myangad in Khovd province are famous.'),
+    F('aaruul', '🧀', 'milk', 'Ааруул', 'Aaruul', 10, 3, 'Ааруулыг ээдмийг нарны гэрэлд хатааж хийдэг. Удаан хадгалагддаг.', 'Aaruul is milk curd dried in the sun. It keeps for a very long time.'),
+    F('boortsog', '🍪', 'milk', 'Боорцог', 'Boortsog', 12, 4, 'Боорцог бол тосонд шарсан гурилан боов. Цагаан сараар өндөр ул боов засдаг.', 'Boortsog are fried dough cookies. At Tsagaan Sar they are stacked into a tall ul boov.'),
+    F('urum', '🧈', 'milk', 'Өрөм', 'Öröm cream', 15, 6, 'Өрөм бол сүүг зөөлөн буцалгаж хөргөхөд дээр нь тогтдог өтгөн цөцгий.', 'Öröm is the thick cream that forms when milk is gently boiled and left to cool.'),
+    F('tarag', '🥣', 'milk', 'Тараг', 'Tarag yogurt', 15, 6, 'Тараг бол исгэсэн сүү. Сарлагийн сүүгээр хийсэн тараг их өтгөн байдаг.', 'Tarag is a yogurt. Made from yak milk, it is extra thick.'),
+    F('baursak', '🍩', 'milk', 'Баурсак', 'Baursak', 15, 6, 'Баурсак бол казахуудын тосонд шарсан зөөлөн боов. Зочинд цайтай хамт тавьдаг.', 'Baursak are soft fried dough balls from Kazakh families, served to guests with tea.'),
+    F('tsai', '🍵', 'drink', 'Сүүтэй цай', 'Milk tea', 15, 4, 'Монгол сүүтэй цайнд бага зэрэг давс хийдэг! Зочинд хамгийн түрүүнд цай өргөнө.', 'Mongolian milk tea has a pinch of salt! Guests are always offered tea first.'),
+    F('airag', '🥛', 'drink', 'Айраг', 'Airag', 20, 10, 'Айргийг гүүний сүүг хөхүүрт мянга гаруй удаа бүлж исгэдэг. Исгэлэн ундаа тул бага багаар уудаг.', 'Airag is mare’s milk churned over a thousand times in the khukhuur. It is sour and fermented, so drink only a little.'),
+    F('khoormog', '🥛', 'drink', 'Хоормог', 'Khoormog', 20, 12, 'Хоормог бол тэмээний сүүгээр исгэсэн говийн ундаа. Айргаас ч илүү тэжээллэг.', 'Khoormog is fermented camel milk from the Gobi, even richer than airag.'),
+    F('chatsargana', '🧃', 'drink', 'Чацарганы шүүс', 'Sea buckthorn juice', 15, 8, 'Чацаргана С витаминаар маш баян. Увс нутагт элбэг ургадаг.', 'Sea buckthorn is packed with vitamin C. It grows thickly in Uvs.'),
+    F('us', '💧', 'drink', 'Цэвэр ус', 'Clean water', 5, 0, 'Ус бол амьдралын эх. Монголчууд ус, голоо бохирдуулдаггүй, хайрлан гамнадаг.', 'Water is the source of life. Mongolians never dirty their rivers and use water with care.'),
+  ];
+  const FOOD_TABS = [['meat', '🍖', Tx('Мах', 'Meat')], ['veg', '🥕', Tx('Ногоо, жимс', 'Veg & fruit')], ['milk', '🧀', Tx('Цагаан идээ', 'Dairy')], ['drink', '🥛', Tx('Уух', 'Drinks')]];
+  const ENERGY_MAX = 100;
+  const food = (id) => FOODS.find((f) => f.id === id);
+  /** Eat or drink something: costs coins (free for your own harvest, at home or when a family offers it), fills energy, teaches a fact. */
+  function eat(id, opts = {}) {
+    const v = V(); if (!v) return false;
+    const crop = R.CROPS[id], f = crop ? { id, e: crop.e, kind: 'veg', name: crop.name, energy: 12, price: 0, fact: crop.fact } : food(id);
+    if (!f) return false;
+    if (crop) { if (!(v.produce[id] > 0)) return false; v.produce[id]--; }
+    const cost = crop || opts.free ? 0 : f.price;
+    if (cost > v.coins) { TG.sfx.bad(); TG.toast('🪙 ' + L('Зоос хүрэлцэхгүй байна.', 'Not enough coins.')); return false; }
+    v.coins -= cost;
+    v.energy = Math.min(ENERGY_MAX, (v.energy ?? ENERGY_MAX) + f.energy);
+    v.ate = v.ate || {}; const first = !v.ate[id]; v.ate[id] = (v.ate[id] || 0) + 1;
+    f.kind === 'drink' ? TG.sfx.pour && TG.sfx.pour(0.5) : TG.sfx.pop && TG.sfx.pop();
+    if (live) live.me.bubble = { text: f.e, t0: performance.now() };
+    quest('eat'); S.save();
+    if (first) { reward(0, 5); TG.toast(`${f.e} ${L('Анх удаа амсав!', 'First taste!')} ${tx(f.name)} · 💡 ${tx(f.fact)}`); }
+    else TG.toast(`${f.e} ${tx(f.name)} +${f.energy} 🍖 · ${tx(f.fact)}`);
+    if (live) hud();
+    setTimeout(() => TG.achievements && TG.achievements.check(), 0);
+    return true;
+  }
+  TG.villageEat = (id, opts) => eat(id, opts);   // used by the aimag trips (a herder family's local food)
+  TG.FOODS = FOODS;
+  function eatModal(opts = {}) {
+    const v = V(); let cur = opts.tab || 'meat';
+    const body = h('div');
+    const draw = () => {
+      const crops = Object.keys(R.CROPS).filter((k) => v.produce[k] > 0);
+      const list = cur === 'veg' ? [...crops.map((k) => ({ crop: k })), ...FOODS.filter((f) => f.kind === 'veg')] : FOODS.filter((f) => f.kind === cur);
+      const free = (f) => opts.home && (f.kind === 'milk' || f.kind === 'drink');
+      rc(body, h('h2', null, '🍽️ ', L('Хоол, ундаа', 'Food & drink')),
+        h('p', { class: 'muted' }, L(`Хүч: ${Math.round(v.energy ?? ENERGY_MAX)}/${ENERGY_MAX} 🍖. Shift дарж гүйхэд хүч зарцуулагдана, хоол идвэл нөхөгдөнө.`, `Energy: ${Math.round(v.energy ?? ENERGY_MAX)}/${ENERGY_MAX} 🍖. Running (Shift) uses energy; food fills it up.`), opts.home ? h('b', null, ' ', L('Гэртээ цагаан идээ, ундаа үнэгүй!', 'At home, dairy and drinks are free!')) : null),
+        h('div', { class: 'chips v-tabs' }, FOOD_TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, e, ' ', tx(t)))),
+        h('div', { class: 'v-list' }, list.length ? list.map((it) => {
+          if (it.crop) { const cr = R.CROPS[it.crop]; return h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, cr.e), h('div', { class: 'v-row-b' }, h('b', null, tx(cr.name), ' ', h('small', null, `×${v.produce[it.crop]} · ${L('өөрийн ургац', 'your harvest')}`)), h('small', null, '+12 🍖')), h('button', { class: 'btn sm primary', onclick: () => { if (eat(it.crop)) draw(); } }, L('Идэх', 'Eat'))); }
+          const price = free(it) ? 0 : it.price;
+          return h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name), v.ate && v.ate[it.id] ? '' : h('small', { class: 'v-new' }, ` ${L('шинэ', 'new')}`)), h('small', null, `+${it.energy} 🍖 · ${tx(it.fact)}`)),
+            h('button', { class: 'btn sm primary', onclick: () => { if (eat(it.id, { free: free(it) })) draw(); } }, it.kind === 'drink' ? L('Уух', 'Drink') : L('Идэх', 'Eat'), price ? ` ${price}🪙` : ''));
+        }) : h('p', { class: 'muted' }, L('Цэцэрлэгтээ ногоо тарьж хураавал энд идэж болно.', 'Grow and harvest vegetables in the garden to eat them here.'))),
+        h('p', { class: 'privacy' }, '🙏 ', L('Монгол ёсоор хоолны дээжийг ахмад хүнд өргөж, хоол идэхээс өмнө гараа угаадаг.', 'By Mongolian custom the first portion goes to the eldest, and you wash your hands before eating.')));
+    };
+    draw();
+    TG.modal(body, { cls: 'v-modal' });
+  }
 
   // ================================================================ multiplayer connection
   const net = {
@@ -166,6 +236,16 @@
         if (who) who.bubble = { text: m.k === 'e' ? R.EMOTES[m.i] : tx(R.PHRASES[m.i]), t0: performance.now() };
         break;
       }
+      case 'census': {
+        const first = !live.census; live.census = { total: m.total, nutag: m.nutag }; hud();
+        const away = m.total - live.others.size - 1;                    // people on this server but in another room
+        if (first && away > 0 && !live.others.size) TG.toast(live.room !== 'NUTAG' && m.nutag ? '👥 ' + L(`Үндсэн Нутагт ${m.nutag} хүн тоглож байна. Нэгдэхийн тулд өрөөний товч дээр дараарай.`, `${m.nutag} people are playing in the main village. Tap the room button to join them.`) : '👥 ' + L(`Энэ серверт өөр өрөөнд ${away} хүн байна. Ижил өрөөний код оруулбал хамт тоглоно.`, `${away} people on this server are in another room. Use the same room code to play together.`));
+        break;
+      }
+      case 'replaced': // this profile was opened in another tab or device: stop here instead of fighting over it
+        net.closed = true; live.replaced = true; live.online = false; live.others.clear(); setStatus('solo');
+        TG.toast('🔁 ' + L('Энэ профайл өөр цонх эсвэл төхөөрөмж дээр нээгдлээ. Тэнд үргэлжлүүлэн тоглоорой.', 'This profile was opened in another tab or device. Keep playing there.'));
+        break;
       case 'plot': onPlot(m); break;
       case 'deny': deny(m.why); break;
       case 'error': TG.toast(L('Өрөөнд нэвтэрч чадсангүй.', 'Could not join the room.')); break;
@@ -222,7 +302,7 @@
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
     const els = {
       me: h('button', { class: 'v-me px-frame', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
-      water: h('div', { class: 'v-pill px-frame' }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
+      water: h('div', { class: 'v-pill px-frame' }), energy: h('button', { class: 'v-pill px-frame v-energy', title: L('Хоол, ундаа', 'Food & drink'), onclick: () => eatModal() }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
       season: h('button', { class: 'v-pill px-frame v-season', onclick: () => TG.seasons.open() }),
       loc: h('button', { class: 'v-loc px-frame', onclick: () => TG.go('passport') }),
       ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
@@ -232,13 +312,14 @@
         onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       mini: h('canvas', { class: 'v-mini px-frame', width: WD.W * 3, height: WD.H * 3, 'aria-label': L('Газрын зураг', 'Map'), title: L('Газрын зураг: дарж томруулна', 'Map: tap to enlarge') }),
+      run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), onclick: () => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); } }, '🏃'),
       jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.water, els.season, els.net)),
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.water, els.season, els.net)),
       els.race,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
@@ -249,7 +330,7 @@
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
           els.music),
-        els.hotbar, els.jump, els.ctx, els.sprint));
+        els.hotbar, els.run, els.jump, els.ctx, els.sprint));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -280,7 +361,7 @@
     if (!v.tips) tips();
     setCleanup(stop);
   }
-  const clearKeys = () => { if (live) live.keys.clear(); };
+  const clearKeys = () => { if (live) { live.keys.clear(); live.run = false; } };
   function stop() {
     if (!live) return;
     live.race = null;
@@ -288,7 +369,7 @@
     window.removeEventListener('resize', resize); window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
     net.close();
     if (live.unMusic) live.unMusic();
-    const v = V(); if (v) { v.pos = { x: +live.me.px.toFixed(2), y: +live.me.py.toFixed(2) }; S.save(); }
+    const v = V(); if (v) { v.pos = { x: +live.me.px.toFixed(2), y: +live.me.py.toFixed(2) }; v.energy = Math.round(v.energy * 10) / 10; S.save(); }
     live = null;
   }
   function resize() {
@@ -309,18 +390,22 @@
   }
 
   // ---------------------------------------------------------------- HUD
+  function hudEnergy() { if (!live) return; const en = Math.round(V().energy ?? 100); live.els.energy.textContent = `🍖 ${en}`; live.els.energy.classList.toggle('low', en < 20); }
   function hud() {
     if (!live) return;
     const v = V(), L1 = R.level(v.xp), e = live.els;
     rc(e.me, portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
     rc(e.coins, pic('ui:coin', 20), h('span', null, v.coins));
     rc(e.water, pic('ui:drop', 20), h('span', null, `${v.water}/${v.can}`));
+    hudEnergy();
     const n = live.others.size + 1;
     e.net.className = 'v-pill px-frame v-net ' + live.status;
     const sea = TG.seasons.current(); e.season.textContent = `${sea.icon} ${tx(sea.name)}`;
     const prof = S.active(), ai = TG.aimags && TG.aimags.byId(prof.aimag), et = TG.ethnic && TG.ethnic.byId(prof.eth);
     e.loc.textContent = ai ? `📍 ${tx(ai.name)}${et ? ' · ' + tx(et.name) : ''}` : `📍 ${L('Нутгаа сонго', 'Pick home')}`;
-    e.net.textContent = live.status === 'online' ? `● ${n} · ${live.room}` : live.status === 'solo' ? `○ ${L('Ганцаараа', 'Solo')}` : `◌ ${L('Холбогдож…', 'Connecting…')}`;
+    const away = live.status === 'online' && live.census ? Math.max(0, live.census.total - n) : 0;
+    e.net.classList.toggle('alert', away > 0 && n === 1);
+    e.net.textContent = live.status === 'online' ? `● ${n} · ${live.room}${away ? ` (+${away})` : ''}` : live.status === 'solo' ? `○ ${L('Ганцаараа', 'Solo')}` : `◌ ${L('Холбогдож…', 'Connecting…')}`;
     hotbar();
     e.horse.classList.toggle('hidden', !live.ride || !!live.race);
     if (TG.music) { e.music.classList.toggle('hidden', !TG.music.available); e.music.textContent = '♪'; e.music.classList.toggle('off', !TG.music.playing); e.music.title = TG.music.title; }
@@ -436,7 +521,7 @@
     if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
-    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && live.race) { live.race.sprint = true; return; }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = true; if (live.race) live.race.sprint = true; return; } // hold Shift to run (in a race: the horse's sprint)
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space jumps, E uses what is next to you; neither ever re-presses a focused HUD button
       e.preventDefault(); e.stopPropagation();
@@ -456,7 +541,7 @@
   function onKeyUp(e) {
     if (!live) return;
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
-    if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && live.race) live.race.sprint = false;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = false; if (live.race) live.race.sprint = false; }
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
   }
 
@@ -507,7 +592,11 @@
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
   function update(dt) {
-    const m = live.me, k = live.keys, SP = live.ride ? (live.race ? raceSpeed() : 7.2) : SPEED;
+    const m = live.me, k = live.keys, v0 = V();
+    const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || m.path.length > 0);
+    if (wantRun && v0.energy <= 0 && !live.tiredSaid) { live.tiredSaid = true; TG.toast('😮‍💨 ' + L('Ядарчихлаа! Хоол идэж, ундаа уугаад хүчээ нөхөөрэй (🍖 дээр дар).', 'Out of energy! Eat or drink to get it back (tap 🍖).')); }
+    m.running = wantRun && v0.energy > 0;
+    const SP = live.ride ? (live.race ? raceSpeed() : m.running ? 11 : 7.2) : m.running ? 7.6 : SPEED;
     if (live.race && live.race.phase === 'count') { k.clear(); m.path = []; }
     let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), tvx = 0, tvy = 0;
     if (ix || iy) { m.path = []; live.pending = null; const n = Math.hypot(ix, iy); tvx = (ix / n) * SP; tvy = (iy / n) * SP; }
@@ -533,6 +622,11 @@
     if (speed > 0.3) m.dir = Math.abs(m.vx) > Math.abs(m.vy) * 0.9 ? (m.vx < 0 ? 1 : 2) : (m.vy < 0 ? 3 : 0);
     if (Math.abs(m.vx) > 0.3) m.face = m.vx < 0 ? 1 : 2;
     if (live.ride && speed > 0.3) V().horse.dist += speed * dt;
+    if (m.running && speed > 0.3) { // running tires you (a little less on a horse); eating fills it up again
+      v0.energy = Math.max(0, v0.energy - dt * (live.ride ? 0.6 : 1.1));
+      if (v0.energy > 0) live.tiredSaid = false;
+      live.eT = (live.eT || 0) + dt; if (live.eT > 1) { live.eT = 0; hudEnergy(); live.eS = (live.eS || 0) + 1; if (live.eS >= 5) { live.eS = 0; S.save(); } }
+    }
     if (live.race) raceTick(dt);
     if (m.path.length) { m.stuck = Math.hypot(m.px - ox, m.py - oy) < 0.002 ? m.stuck + dt : 0; if (m.stuck > 0.5) { m.path = []; live.pending = null; } }
     const tx = Math.floor(m.px + 0.5), ty = Math.floor(m.py + 0.82);
@@ -620,7 +714,7 @@
       if (flip) { ctx.save(); ctx.translate(X + w, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, hh); ctx.restore(); } else ctx.drawImage(img, X, Y, w, hh);
     };
     const shadow = (wx, wy) => { const X = SX(wx), Y = SY(wy); ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(X + 4 * k, Y + 13 * k, 9 * k, k); ctx.fillRect(X + 3 * k, Y + 14 * k, 11 * k, k); ctx.fillRect(X + 4 * k, Y + 15 * k, 9 * k, k); };
-    const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
+    const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * (o.running ? 13 : 8)) % 2) : 0);
     live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
     if (live.season === 'spring') live.sheep.forEach((q) => ents.push({ y: q.py + 0.3, f: () => sprite(PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.flip) })); // spring: the lambs are born
     const person = (o) => {
@@ -631,7 +725,7 @@
     };
     // a rider on a Mongolian horse; face 1 = left, 2 = right
     const drawRider = (look, face, moving, wx, wy, z = 0) => {
-      const hf = z ? 2 : moving ? 1 + (Math.floor(t * 12) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
+      const hf = z ? 2 : moving ? 1 + (Math.floor(t * (live.me.running && wx === live.me.px ? 17 : 12)) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
       const HX = wx * T - 6, HY = wy * T + 16 - hs.height - z;
       ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(SX(HX + 4), SY(HY + 21 + z), 20 * k, 2 * k);
       sprite(PX.char({ ...look, pet: null }, left ? 1 : 2, 0), HX + 6, HY - 15);
@@ -1282,13 +1376,13 @@
     const things = [
       spot('door', cx, 192, 'Гарах', 'Go outside', () => sc.close()),
       spot('khoimor', cx, 105, 'Хойморт суух', 'Sit in the khoimor', () => sayIt(L('Хоймор бол гэрийн хамгийн хүндэт газар. Гэр бүлийн шүтээн, зураг энд байдаг. Ахмад хүн, хүндтэй зочныг хойморт урьдаг.', 'The khoimor, opposite the door, is the place of honour. The family shrine and photos are kept here, and elders and honoured guests are invited to sit here.'))),
-      spot('table', 138, 118, 'Ааруул идэх', 'Eat aaruul', () => { TG.sfx.pop && TG.sfx.pop(); sayIt('🧀 ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); }),
+      spot('table', 138, 118, 'Хоол идэх', 'Eat a meal', () => { sayIt('🍽️ ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); eatModal({ home: own }); }),
       spot('bagana', 184, 132, 'Баганыг харах', 'Look at the posts', () => sayIt(L('Хоёр багана тоноо даадаг. Хоёр баганын дундуур гарч болохгүй, баганыг түшиж болохгүй гэдэг ёс бий.', 'The two bagana posts hold up the toono. By custom you never walk between the two posts and never lean on them.'))),
       spot('toono', 132, 168, 'Тооно руу харах', 'Look up at the toono', () => sayIt(L('Тооноор тусах нарны гэрэл униар гулсаж явдгаар малчид цагийг мэддэг байжээ. Тооно бол гэрийн нар цаг!', 'Herders told the time by the patch of sunlight from the toono creeping across the roof poles. The toono is the ger’s sun clock!'))),
       spot('saddle', 90, 176, 'Эмээл үзэх', 'Look at the saddle', () => sayIt(L('Баруун тал бол эрэгтэй хүний тал: эмээл, хазаар, уурга энд байна. Монгол эмээл өндөр бүүрэгтэй, мөнгөн товруудтай.', 'The west side is the men’s side: the saddle, bridle and lasso pole live here. A Mongol saddle has a high front and back and silver studs.'))),
-      spot('khukhuur', 60, 158, 'Айраг бүлэх', 'Churn the airag', () => { fx.churn = performance.now(); TG.sfx.scrub && TG.sfx.scrub(); sayIt(L('🥛 Хөхүүрт гүүний сүүг мянга гаруй удаа бүлж айраг исгэдэг. Гэрт орж ирсэн хүн бүр бүлүүрээр хэдэн удаа бүлээд өгдөг заншилтай!', '🥛 Mare’s milk is churned more than a thousand times in the khukhuur to make airag. Everyone who comes in gives it a few stirs!')); if (dayOnce('churn')) reward(0, 5); }),
-      spot('cupboard', 244, 178, 'Аяга таваг үзэх', 'Look at the cupboard', () => sayIt(L('Зүүн тал бол эмэгтэй хүний тал: аяга таваг, тогоо шанага, хоол хүнс энд байдаг.', 'The east side is the women’s side: bowls, pots, ladles and food are kept here.'))),
-      spot('water', 210, 190, 'Ус утгах', 'Scoop some water', () => { TG.sfx.pour && TG.sfx.pour(0.5); sayIt(L('💧 Усыг худаг, булгаас зөөж авчирдаг. Усыг хэзээ ч бохирдуулдаггүй, хайрлан гамнадаг.', '💧 Water is carried in from the well or spring. It is never wasted or made dirty.')); }),
+      spot('khukhuur', 60, 158, 'Айраг бүлж уух', 'Churn and drink airag', () => { fx.churn = performance.now(); TG.sfx.scrub && TG.sfx.scrub(); setTimeout(() => eat('airag', { free: true }), 700); sayIt(L('🥛 Хөхүүрт гүүний сүүг мянга гаруй удаа бүлж айраг исгэдэг. Гэрт орж ирсэн хүн бүр бүлүүрээр хэдэн удаа бүлээд өгдөг заншилтай!', '🥛 Mare’s milk is churned more than a thousand times in the khukhuur to make airag. Everyone who comes in gives it a few stirs!')); if (dayOnce('churn')) reward(0, 5); }),
+      spot('cupboard', 244, 178, 'Цай уух', 'Have some milk tea', () => { sayIt(L('Зүүн тал бол эмэгтэй хүний тал: аяга таваг, тогоо шанага, хоол хүнс энд байдаг. Зочинд цайг баруун гараараа өргөдөг.', 'The east side is the women’s side: bowls, pots, ladles and food are kept here. Tea is offered with the right hand.')); eat('tsai', { free: true }); }),
+      spot('water', 210, 190, 'Ус уух', 'Drink some water', () => { eat('us', { free: true }); sayIt(L('💧 Усыг худаг, булгаас зөөж авчирдаг. Усыг хэзээ ч бохирдуулдаггүй, хайрлан гамнадаг.', '💧 Water is carried in from the well or spring. It is never wasted or made dirty.')); }),
     ];
     if (has('tulga')) things.push(spot('tulga', cx, 158, 'Цай чанах', 'Make milk tea', () => { fx.steam = performance.now(); TG.sfx.pour ? TG.sfx.pour(0.6) : TG.sfx.tap(); sayIt('🍵 ' + tx(TG.pick(GER_TEA))); if (dayOnce('tea')) reward(5, 10); }));
     else things.push(spot('tulga', cx, 158, 'Голомт', 'The hearth', () => sayIt(L('Гал голомт бол гэрийн зүрх. Тулга авбал энд цай чанаж болно.', 'The hearth is the heart of the ger. Get a stove and you can make tea here.'))));
@@ -1372,7 +1466,8 @@
       code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (!R.ROOM_RE.test(code)) return TG.toast(L('Код 3–8 үсэг, тоо байна.', 'A code is 3–8 letters or digits.'));
       v.room = code; S.save(); live.room = code; close();
-      if (live.status !== 'solo') net.rejoin(); else TG.toast(L('Сервертэй холбогдоогүй тул ганцаараа горимд байна.', 'No server connection, so you are in solo mode.'));
+      live.census = null;
+      if (live.status !== 'solo' || live.replaced) { live.replaced = false; net.rejoin(); } else TG.toast(L('Сервертэй холбогдоогүй тул ганцаараа горимд байна.', 'No server connection, so you are in solo mode.'));
     };
     const others = live ? [...live.others.values()] : [];
     const local = /^(localhost|127\.0\.0\.1|\[?::1\]?)$/.test(location.hostname);
@@ -1391,6 +1486,11 @@
         : h('div', { class: 'hint' }, live.status === 'solo'
           ? L('Одоо ганцаараа горимд байна. Найзуудтайгаа хамт тоглохын тулд багш эсвэл эцэг эх компьютер дээр "node server.js" ажиллуулж, бүгд нэг Wi-Fi-аас тэр хаягаар нэвтэрнэ.', 'You are in solo mode. To play with friends, a teacher or parent runs "node server.js" on a computer and everyone on the same Wi-Fi opens its address.')
           : L('Холбогдож байна…', 'Connecting…')),
+      live.status === 'online' && live.census && live.census.total > others.length + 1 ? h('div', { class: 'v-invite' },
+        h('b', null, '👥 ', L(`Энэ серверт өөр өрөөнд ${live.census.total - others.length - 1} хүн байна.`, `${live.census.total - others.length - 1} more people on this server are in other rooms.`)),
+        h('p', { class: 'muted' }, L('Хамт тоглохын тулд бүгд ижил өрөөний кодтой байх ёстой.', 'To play together, everyone needs the same room code.')),
+        live.room !== 'NUTAG' && live.census.nutag ? h('button', { class: 'btn primary block', onclick: () => join('NUTAG') }, L(`Үндсэн Нутаг руу орох (${live.census.nutag} хүн)`, `Join the main village (${live.census.nutag} here)`)) : null) : null,
+      live.room !== 'NUTAG' ? h('button', { class: 'btn block', style: { marginTop: '10px' }, onclick: () => join('NUTAG') }, '🏡 ', L('Үндсэн Нутаг (NUTAG) руу буцах', 'Back to the main village (NUTAG)')) : null,
       h('label', { class: 'label', style: { display: 'block', marginTop: '14px' } }, L('Өрөөний код (гэр бүл, ангиараа нууц код сонгоорой)', 'Room code (pick a private code for your family or class)')), input,
       h('div', { class: 'row-btns' },
         h('button', { class: 'btn', onclick: () => { const c = Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''); input.value = c; } }, '🎲 ', L('Шинэ код', 'New code')),

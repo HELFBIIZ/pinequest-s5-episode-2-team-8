@@ -46,6 +46,7 @@
     A('passport22', 'nutag', '🇲🇳', 'Монголоор бүрэн аялсан', 'All of Mongolia', 'Улаанбаатар болон 21 аймгаар бүгдээр аялах', 'Visit Ulaanbaatar and all 21 provinces', (c) => TG.passport && TG.passport.stamps(c.p) >= 22, (c) => [TG.passport ? TG.passport.stamps(c.p) : 0, 22]),
     A('seasons4', 'nutag', '🍃', 'Дөрвөн улирал', 'Four seasons', 'Дөрвөн улирал бүрийн даалгаврыг биелүүлэх', 'Complete a season quest in all four seasons', (c) => Object.keys(c.v.seasonDone || {}).length >= 4, (c) => [Object.keys(c.v.seasonDone || {}).length, 4]),
     A('level5', 'nutag', '🌟', 'Нутгийн од', 'Village star', 'Нутагт 5-р түвшинд хүрэх', 'Reach level 5 in Nutag', (c) => lvl(c) >= 5, (c) => [lvl(c), 5]),
+    A('taster', 'nutag', '🍽️', 'Амтлагч', 'Food explorer', '8 төрлийн монгол хоол, ундаа амсах', 'Taste 8 different Mongolian foods and drinks', (c) => Object.keys(c.v.ate || {}).length >= 8, (c) => [Object.keys(c.v.ate || {}).length, 8]),
     A('ger_built', 'nutag', '🏠', 'Өөрийн гэртэй', 'Home of my own', 'Нутагт өөрийн гэрээ барих', 'Build your own ger in Nutag', (c) => !!c.v.gerBuilt),
     A('fisher', 'nutag', '🎣', 'Загасчин', 'Fisher', '5 загас барих', 'Catch 5 fish', (c) => (c.v.fishCaught || 0) >= 5, (c) => [c.v.fishCaught || 0, 5]),
     A('rider', 'nutag', '🐎', 'Морь унаач', 'Rider', 'Морь унаж Нутгаар 200 алхам давхих', 'Ride 200 tiles around Nutag', (c) => (c.h.dist || 0) >= 200, (c) => [Math.floor(c.h.dist || 0), 200]),
