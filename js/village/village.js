@@ -503,7 +503,9 @@
     if (!WD.blocked(tx0, ty0)) return goTo({ x: tx0, y: ty0 }, null);
     const n = WD.nearestOpen(tx0, ty0, live.me.x, live.me.y); if (n) goTo(n, null);
   }
-  const freeAt = (fx, fy) => !WD.blocked(Math.floor(fx - HW), Math.floor(fy - HH)) && !WD.blocked(Math.floor(fx + HW), Math.floor(fy - HH)) && !WD.blocked(Math.floor(fx - HW), Math.floor(fy + HH)) && !WD.blocked(Math.floor(fx + HW), Math.floor(fy + HH));
+  /** over: the feet are off the ground (or already on a rock), so rocks no longer block the way. */
+  const solid = (x, y, over) => WD.blocked(x, y) && !(over && (WD.g[y] || '')[x] === 'r');
+  const freeAt = (fx, fy, over) => !solid(Math.floor(fx - HW), Math.floor(fy - HH), over) && !solid(Math.floor(fx + HW), Math.floor(fy - HH), over) && !solid(Math.floor(fx - HW), Math.floor(fy + HH), over) && !solid(Math.floor(fx + HW), Math.floor(fy + HH), over);
   function los(ax, ay, bx, by) { const n = Math.ceil(Math.hypot(bx - ax, by - ay) / 0.2); for (let i = 1; i <= n; i++) { const q = i / n; if (!freeAt(ax + (bx - ax) * q, ay + (by - ay) * q)) return false; } return true; }
   function goTo(t, action) {
     const m = live.me, path = WD.findPath(m.x, m.y, t.x, t.y);
@@ -613,10 +615,13 @@
     const a = Math.min(1, dt * (ix || iy || m.path.length ? ACCEL : ACCEL * 1.4));
     m.vx += (tvx - m.vx) * a; m.vy += (tvy - m.vy) * a;
     if (Math.abs(m.vx) < 0.01) m.vx = 0; if (Math.abs(m.vy) < 0.01) m.vy = 0;
-    // move with collision, sliding along walls
-    const ox = m.px, oy = m.py;
-    if (m.vx && freeAt(m.px + 0.5 + m.vx * dt, m.py + 0.82)) m.px += m.vx * dt; else m.vx = 0;
-    if (m.vy && freeAt(m.px + 0.5, m.py + 0.82 + m.vy * dt)) m.py += m.vy * dt; else m.vy = 0;
+    // move with collision, sliding along walls; in the air you clear rocks, and walking into one hops over it
+    const ox = m.px, oy = m.py, pn = performance.now();
+    let over = pn - (m.jt || -1e9) < JUMP_MS || !freeAt(m.px + 0.5, m.py + 0.82);
+    const rockAhead = (nx, ny) => !over && (ix || iy) && !freeAt(nx, ny) && freeAt(nx, ny, true);
+    if (rockAhead(m.px + 0.5 + m.vx * dt, m.py + 0.82) || rockAhead(m.px + 0.5, m.py + 0.82 + m.vy * dt)) { jump(); over = true; }
+    if (m.vx && freeAt(m.px + 0.5 + m.vx * dt, m.py + 0.82, over)) m.px += m.vx * dt; else m.vx = 0;
+    if (m.vy && freeAt(m.px + 0.5, m.py + 0.82 + m.vy * dt, over)) m.py += m.vy * dt; else m.vy = 0;
     const speed = Math.hypot(m.vx, m.vy);
     m.moving = speed > 0.3;
     if (speed > 0.3) m.dir = Math.abs(m.vx) > Math.abs(m.vy) * 0.9 ? (m.vx < 0 ? 1 : 2) : (m.vy < 0 ? 3 : 0);
@@ -1706,9 +1711,14 @@
       return { newTitle: updateTitle(), champion: won && round === 9 };
     });
   }
+  // what touches the ground after each move (a fall counts when an elbow, knee, back or shoulder touches)
+  const WR_PART = { push: Tx('нуруу', 'back'), pull: Tx('өвдөг', 'knee'), hook: Tx('нуруу', 'back'), inhook: Tx('нуруу', 'back'), hip: Tx('мөр', 'shoulder'), leg: Tx('тохой', 'elbow'), lift: Tx('нуруу', 'back') };
+  const OPP_TITLE = ['', '', '', '', 'nachin', 'khartsaga', 'zaan', 'garid', 'arslan', 'arslan'];
+  const DEVEE_BEAT = 700, DEVEE_TAPS = 4;
   function wrestleMatch(cfg, onEnd) {
-    const v = V(), mySkin = R.SKINS.includes(v.look.skin) ? v.look.skin : R.SKINS[0];
-    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0, intro: performance.now(), used: {}, flash: null };
+    const v = V(), mySkin = R.SKINS.includes(v.look.skin) ? v.look.skin : R.SKINS[0], oppSkin = cfg.opp.skin || '#D9A06E';
+    const st = { a: 0, b: 0, phase: 'choose', move: null, lastPlayer: null, off: 0, target: 0, pose: ['grip', 'grip'], over: false, t0: performance.now(), marker: 0, intro: performance.now(), used: {}, flash: null,
+      devee: cfg.ai ? { n: 0, good: 0, t0: performance.now(), f: 0 } : null, bonus: 0, lastMove: null, end: 0, left: false };
     // each даваа is harder: more points to win, a faster timing bar, a narrower sweet spot and a sharper opponent
     const rnd = cfg.ai ? cfg.round : 4, need = cfg.ai && cfg.round >= 7 ? 3 : 2;
     const barSpeed = cfg.ai ? 2.7 + rnd * 0.33 : 3.6, sharp = cfg.ai ? 1 + rnd * 0.13 : 1.3;
@@ -1718,13 +1728,21 @@
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
     const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone', style: { width: Math.round(36 / sharp) + '%', left: (50 - 18 / sharp) + '%' } }), marker), goBtn);
     const tail = h('div');
+    // the zasuul calls out both wrestlers by their titles before the bout
+    const myT = titleObj(R.titleFor(v.wr)), opT = cfg.ai ? titleObj(OPP_TITLE[cfg.round]) : null, named = (t, n) => (t ? tx(t.name) + ' ' : '') + n;
+    const herald = h('div', { class: 'v-zasuul' }, h('b', null, '📣 ', L('Засуул', 'Herald'), ': '),
+      L(`«${named(myT, live.name)}, ${named(opT, cfg.opp.name)} хоёр барилдана! Хүчит бөхчүүд дэвээгээ хийцгээ!»`, `"${named(myT, live.name)} and ${named(opT, cfg.opp.name)} will wrestle! Mighty wrestlers, do your eagle dance!"`));
+    // дэвээ: flap like an eagle in time with the beat; a good dance gives power to your first move
+    const feathers = Array.from({ length: DEVEE_TAPS }, () => h('i', { class: 'v-wr-feather' }));
+    const deveeBtn = h('button', { class: 'btn primary big', onclick: () => deveeTap() }, '🦅 ', L('Дэвэх (Space)', 'Flap (Space)'));
+    const deveeBox = h('div', { class: 'v-wr-devee hidden' }, h('div', { class: 'v-wr-feathers' }, ...feathers), deveeBtn);
     const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
-      h('h2', null, `${live.name} · ${cfg.opp.name}`), cv, score, msg, moves, timing, tail);
+      h('h2', null, `${live.name} · ${cfg.opp.name}`), cv, herald, score, msg, deveeBox, moves, timing, tail);
     const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(Math.max(0, need - st.a))), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(Math.max(0, need - st.b)), ' ', cfg.opp.name));
     const moveLabel = (id) => tx(R.MOVES.find((m) => m.id === id).name);
     const setPhase = (p) => {
       st.phase = p;
-      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing');
+      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee');
       if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; st.t0 = performance.now(); setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); } },
         h('b', null, tx(m.name)), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
     };
@@ -1732,6 +1750,7 @@
     const loop = (ts) => {
       const dt = Math.min(0.05, (ts - lastT) / 1000); lastT = ts;
       st.off += (st.target - st.off) * Math.min(1, dt * 8);
+      if (st.phase === 'devee') deveeBtn.classList.toggle('beat', deveeOnBeat(ts));
       if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * barSpeed) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
       // pixel scene: crowd stands, flags, sand ring, the zasuul watching
       const Wc = 192, Hc = 108, ground = 100;
@@ -1744,11 +1763,18 @@
       const zs = PX.char(ZASUUL, 0, Math.floor(ts / 900) % 2 && st.over ? 1 : 0); cx.fillStyle = 'rgba(40,20,0,.25)'; cx.fillRect(167, ground - 1, 12, 2); cx.drawImage(zs, 165, ground - 28);
       const f = Math.floor(ts / 260) % 2, o = Math.round(st.off), ent = Math.min(1, (ts - st.intro) / 600);
       const myPose = st.pose[0], opPose = st.pose[1];
-      const A = PX.wrestler(RED, mySkin, myPose === 'grip' && f && st.phase === 'timing' ? 'push' : myPose, f), B = PX.wrestler(BLUE, cfg.opp.skin || '#D9A06E', opPose, f);
+      const A = PX.wrestler(RED, mySkin, myPose === 'grip' && f && st.phase === 'timing' ? 'push' : myPose, st.phase === 'devee' ? st.devee.f : f), B = PX.wrestler(BLUE, oppSkin, opPose, f);
       const cxm = 92, ax = Math.round(cxm - 30 - (1 - ent) * 24) + o + (myPose === 'dance' ? -12 : 0), bx = Math.round(cxm - 4 + (1 - ent) * 24) + o + (opPose === 'dance' ? 12 : 0);
-      const draw1 = (img, X, flip, fallen) => { const Y = ground - img.height; cx.fillStyle = 'rgba(40,20,0,.28)'; cx.fillRect(X + 4, ground - 1, img.width - 8, 2); if (flip) { cx.save(); cx.translate(X + img.width, Y); cx.scale(-1, 1); cx.drawImage(img, 0, 0); cx.restore(); } else cx.drawImage(img, X, Y); };
-      draw1(A, ax - (myPose === 'fall' ? 16 : 0), false);
-      draw1(B, bx + (opPose === 'fall' ? 2 : 0), true);
+      const draw1 = (img, X, flip, dy = 0) => { const Y = ground - img.height + dy; cx.fillStyle = 'rgba(40,20,0,.28)'; cx.fillRect(X + 4, ground - 1, img.width - 8, 2); if (flip) { cx.save(); cx.translate(X + img.width, Y); cx.scale(-1, 1); cx.drawImage(img, 0, 0); cx.restore(); } else cx.drawImage(img, X, Y); };
+      const cross = st.end && !st.left ? clamp((ts - st.end - 1100) / 1600, 0, 1) : 0;
+      if (cross > 0) {   // custom: the fallen wrestler gets up and passes under the winner's raised arm
+        const won = myPose === 'dance', win = PX.wrestler(won ? RED : BLUE, won ? mySkin : oppSkin, 'dance', cross < 1 ? 1 : f), lose = PX.wrestler(won ? BLUE : RED, won ? oppSkin : mySkin, 'idle', 0);
+        const from = won ? bx : ax, to = won ? ax - 26 : bx + 26;
+        draw1(win, won ? ax : bx, !won); draw1(lose, Math.round(from + (to - from) * cross), won, 2);
+      } else {
+        draw1(A, ax - (myPose === 'fall' ? 16 : 0), false);
+        draw1(B, bx + (opPose === 'fall' ? 2 : 0), true);
+      }
       if (st.flash && ts - st.flash.t0 < 1300) {   // the technique's name pops up over the ring
         const q = (ts - st.flash.t0) / 1300, fy = 60 - q * 10;
         cx.font = '700 12px Rubik, sans-serif'; cx.textAlign = 'center'; cx.globalAlpha = q > 0.75 ? (1 - q) * 4 : 1;
@@ -1757,9 +1783,23 @@
       }
       raf = requestAnimationFrame(loop);
     };
+    function deveeOnBeat(ts) { const q = ((ts - st.devee.t0) % DEVEE_BEAT) / DEVEE_BEAT; return q < 0.2 || q > 0.84; }
+    function deveeTap() {
+      const d = st.devee; if (st.phase !== 'devee' || d.n >= DEVEE_TAPS) return;
+      const good = deveeOnBeat(performance.now());
+      feathers[d.n].classList.add(good ? 'good' : 'miss'); d.n++; d.f ^= 1; if (good) d.good++;
+      if (good) TG.sfx.chime(); else TG.sfx.tap();
+      if (d.n < DEVEE_TAPS) return;
+      st.bonus = d.good * 0.06;
+      msg.textContent = d.good >= 3 ? L(`Гоё дэвлээ! Бүргэд шиг! Эхний мэх +${Math.round(st.bonus * 100)}% хүчтэй.`, `Beautiful dance, like an eagle! First move +${Math.round(st.bonus * 100)}% power.`)
+        : d.good ? L(`Дэвээ дууслаа. Эхний мэх +${Math.round(st.bonus * 100)}% хүчтэй.`, `Dance done. First move +${Math.round(st.bonus * 100)}% power.`) : L('Дэвээ хэмнэлээсээ алдлаа. Одоо барилдъя!', 'The dance was off the beat. Now wrestle!');
+      setTimeout(() => { if (st.over) return; st.pose = ['grip', 'grip']; herald.remove(); setPhase('choose'); }, 900);
+    }
     function lock() {
       if (st.phase !== 'timing') return;
+      herald.remove();
       let power = Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
+      if (st.bonus) { power = Math.min(1, power + st.bonus); st.bonus = 0; } // the eagle dance's power
       const repeated = st.move === st.lastPlayer;
       if (repeated) power *= 0.8; // the same move twice in a row is easier to read
       st.used[st.move] = (st.used[st.move] || 0) + 1;
@@ -1777,7 +1817,7 @@
     }
     function apply(r, mm, mp, om, op) {
       const wasRepeat = mm === st.lastPlayer;
-      st.lastPlayer = mm;
+      st.lastPlayer = mm; if (r) st.lastMove = r > 0 ? mm : om;
       if (r > 0) { st.a++; TG.sfx.good(); const wr = V().wr; wr.techs = wr.techs || {}; wr.techs[mm] = (wr.techs[mm] || 0) + 1; S.save(); } else if (r < 0) { st.b++; TG.sfx.bad(); } else TG.sfx.tap();
       st.flash = { text: (r >= 0 ? moveLabel(mm) : moveLabel(om)).toUpperCase() + '!', good: r > 0, t0: performance.now() };
       if (wasRepeat && r < 0) setTimeout(() => { if (!st.over) msg.textContent += ' ' + L('(Давтсан мэхийг өрсөлдөгч таньчихлаа!)', '(They saw your repeated move coming!)'); }, 30);
@@ -1789,13 +1829,18 @@
       else if (!(st.a >= 2 || st.b >= 2)) setTimeout(() => { if (!st.over) setPhase('choose'); }, 1100);
     }
     function finish(won, reason) {
-      if (st.over) return; st.over = true; setPhase('done');
-      st.pose = won ? ['dance', 'fall'] : ['fall', 'dance']; st.target = won ? 18 : -18;
+      if (st.over) return; st.over = true; setPhase('done'); herald.remove();
+      st.pose = won ? ['dance', 'fall'] : ['fall', 'dance']; st.target = won ? 18 : -18; st.end = performance.now(); st.left = !!reason;
       if (won) { TG.sfx.win(); TG.confetti(60); } else TG.sfx.bad();
       const res = onEnd ? onEnd(won) || {} : {};
       const t = res.newTitle && titleObj(res.newTitle);
-      msg.textContent = reason === 'left' ? L('Өрсөлдөгч гарчихлаа. Та яллаа!', 'Your opponent left. You win!') : won ? L('Та яллаа! Бүргэд шиг дэвээрэй! 🦅', 'You won! Do the eagle dance! 🦅') : L('Уналаа… Дараагийн удаа заавал ялна!', 'You fell… you will win next time!');
-      rc(tail, 
+      const part = st.lastMove && WR_PART[st.lastMove] ? tx(WR_PART[st.lastMove]) : null;
+      const touch = part ? (won ? L(`Өрсөлдөгчийн ${part} газарт хүрлээ! `, `Their ${part} touched the ground! `) : L(`Таны ${part} газарт хүрлээ. `, `Your ${part} touched the ground. `)) : '';
+      msg.textContent = reason === 'left' ? L('Өрсөлдөгч гарчихлаа. Та яллаа!', 'Your opponent left. You win!') : touch + (won ? L('Та яллаа! Бүргэд шиг дэвээрэй! 🦅', 'You won! Do the eagle dance! 🦅') : L('Уналаа… Дараагийн удаа заавал ялна!', 'You fell… you will win next time!'));
+      rc(tail,
+        reason ? null : h('div', { class: 'teach' }, h('b', null, '🇲🇳 ', L('Бөхийн ёс', 'Wrestling custom')), h('p', null, won
+          ? L('Унасан бөх ялсан бөхийн суган доогуур гарч хүндэтгэл үзүүлдэг. Ялсан бөх дараа нь тугаа тойрон дэвдэг.', 'The fallen wrestler passes under the winner\'s arm as a sign of respect. The winner then dances around the flag.')
+          : L('Унасан бөх ялсан бөхийн суган доогуур гарч хүндэтгэл үзүүлдэг. Ялагдсан ч хүндэтгэлтэй байх нь бөхийн ёс.', 'The fallen wrestler passes under the winner\'s arm as a sign of respect. Losing with honour is the wrestler\'s way.'))),
         t ? h('div', { class: 'v-zasuul' }, h('b', null, '📣 ', L('Засуул', 'Herald'), ': '), L(`«Хүчит бөх ${live.name} ${tx(t.name)} цол хүртлээ!»`, `"The mighty wrestler ${live.name} earns the ${tx(t.name)} title!"`), h('p', null, tx(t.fact))) : null,
         res.champion ? h('div', { class: 'v-zasuul' }, '🏆 ', L('Та Наадамд түрүүллээ!', 'You won the whole Naadam!')) : null,
         h('div', { class: 'row-btns' },
@@ -1804,7 +1849,7 @@
             : h('button', { class: 'btn primary', onclick: () => { close(); tournament(1); } }, L('Шинэ Наадам', 'New Naadam'))) : null));
       if (cfg.remote && live) live.match = null;
     }
-    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) lock(); } };
+    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) { if (st.phase === 'devee') deveeTap(); else lock(); } } };
     window.addEventListener('keydown', key, true); window.addEventListener('keyup', key, true);
     goBtn.addEventListener('click', lock);
     if (cfg.remote) cfg.remote.ui = (m) => {
@@ -1812,7 +1857,9 @@
       if (m.t === 'wr-result') { const mineA = cfg.remote.side === 'a'; apply(mineA ? m.r : -m.r, mineA ? m.ma : m.mb, mineA ? m.pa : m.pb, mineA ? m.mb : m.ma, mineA ? m.pb : m.pa); }
       if (m.t === 'wr-end') setTimeout(() => finish(m.winner === v.id, m.reason), m.reason ? 0 : 900);
     };
-    drawScore(); setPhase('choose');
+    drawScore();
+    if (st.devee) { st.pose = ['dance', 'dance']; setPhase('devee'); msg.textContent = L('Дэвээ! Товч гэрэлтэх үед дарж бүргэд шиг дэв (4 удаа).', 'Eagle dance! Tap when the button glows (4 times).'); }
+    else setPhase('choose');
     const close = TG.modal(body, { cls: 'v-modal', onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', key, true); window.removeEventListener('keyup', key, true); if (cfg.remote && !st.over) { net.send({ t: 'wr-quit' }); if (live) live.match = null; } } });
     raf = requestAnimationFrame(loop);
   }
