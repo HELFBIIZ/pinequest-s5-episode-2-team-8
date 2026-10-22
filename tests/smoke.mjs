@@ -55,8 +55,20 @@ try {
   await check('mascot picker', '.mascot-grid');
   await page.evaluate(() => document.querySelectorAll('.mascot')[2].click()); await next(); await sleep(200);
   for (const k of [0, 4, 8]) await page.evaluate((k) => document.querySelectorAll('.pic-key')[k].click(), k);
-  await sleep(900);
-  await check('straight into Нутаг after register', '.village canvas');
+  await sleep(600);
+  // character creator: ethnic group -> home province -> outfit -> welcome
+  step = 'character creator';
+  await check('character creator', '.create .eth-grid');
+  await page.evaluate(() => [...document.querySelectorAll('.eth')].find((x) => /Буриад/.test(x.textContent)).click()); await sleep(150);
+  const cnext = () => page.evaluate(() => [...document.querySelectorAll('.create-card .btn.primary')].pop().click());
+  await cnext(); await sleep(200); await check('home province step', '.create .aimag-grid .aimag.on');
+  await cnext(); await sleep(200); await check('outfit step', '.create-preview canvas');
+  await cnext(); await sleep(200); await check('welcome step', '.create-welcome');
+  await cnext(); await sleep(900);
+  await check('straight into Нутаг after creating the character', '.village canvas');
+  const who = await page.evaluate(() => { const p = TG.store.active(); return { eth: p.eth, aimag: p.aimag, hat: p.village.look.hat }; });
+  if (who.eth !== 'buriad' || !['dornod', 'khentii', 'selenge', 'bulgan', 'khuvsgul'].includes(who.aimag) || who.hat !== 'buriad') errors.push(`character creator: wrong result ${JSON.stringify(who)}`);
+  if (!(await page.evaluate(() => /📍/.test(document.querySelector('.v-loc').textContent)))) errors.push('village: the home province chip is missing');
   const prof = await page.evaluate(() => { const p = TG.store.active(); return p && { name: p.name, age: p.age, avatar: p.avatar, code: p.code }; });
   if (!prof || prof.name !== 'Тест' || prof.age !== 8 || !prof.code) errors.push(`register: profile not saved correctly: ${JSON.stringify(prof)}`);
   await page.evaluate(() => { TG.store.state.settings.sound = false; document.querySelectorAll('.modal-x').forEach((x) => x.click()); });
@@ -182,7 +194,16 @@ try {
   await page.evaluate(() => TG.go('village')); await sleep(700);
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.lot(0); }); await sleep(300);
   await check('ger builder unlocked', '.modal .v-gerbox + .label, .modal .v-chips');
-  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  // buy it, furnish it and walk inside
+  step = 'inside my ger';
+  await page.evaluate(() => { TG.store.active().village.coins = 2000; TG.store.active().village.xp = 3000; [...document.querySelectorAll('.modal .btn.primary')].pop().click(); }); await sleep(700);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => { const l = TG._village.lots()[0]; if (l) l.furn = ['tulga', 'or', 'avdar', 'morinkhuur', 'shirdeg', 'shagai']; TG._village.enterGer(0); }); await sleep(500);
+  await check('walkable ger interior', '.ger-inside .ger-cv');
+  await page.evaluate(() => { const c = document.querySelector('.ger-cv'), r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + r.width * 0.5, clientY: r.top + r.height * (100 / 170), bubbles: true })); }); await sleep(1600);
+  await page.evaluate(() => document.querySelector('.ger-act').click()); await sleep(300);
+  if (!(await page.evaluate(() => /🍵/.test(document.querySelector('.ger-say').textContent)))) errors.push('ger interior: making tea at the stove did not work');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
   // horse riding and the Naadam horse race
   step = 'horse riding';
@@ -191,11 +212,56 @@ try {
   step = 'horse race';
   await page.evaluate(() => TG._village.race()); await sleep(3300);
   if ((await page.evaluate(() => TG._village.raceState() && TG._village.raceState().phase)) !== 'go') errors.push('horse race: the race did not start after the countdown');
-  for (let i = 1; i < 7; i++) { await page.evaluate((i) => { const L = TG._village.live(), q = TG.vworld.RACE[i]; L.me.px = q.x - 0.5; L.me.py = q.y - 0.82; }, i); await sleep(120); }
+  const nPts = await page.evaluate(() => TG._village.raceState().path.P.length);
+  for (let i = 1; i < nPts; i++) { await page.evaluate((i) => { const L = TG._village.live(), q = L.race.path.P[i]; L.me.px = q.x - 0.5; L.me.py = q.y - 0.82; }, i); await sleep(120); }
   await sleep(300);
   if (!(await page.evaluate(() => TG.store.active().village.horse.races === 1))) errors.push('horse race: finishing the race was not recorded');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => TG._village.dismount()); await sleep(100);
+  step = 'race classes';
+  if (!(await page.evaluate(() => TG.store.active().village.horse.cls >= 1))) errors.push('horse race: winning the Daaga race should unlock the next class');
+  await page.evaluate(() => TG._village.race(1)); await sleep(300);
+  if ((await page.evaluate(() => TG._village.raceState().C.id)) !== 'shudlen') errors.push('horse race: could not start the Shüdlen class');
+  await page.evaluate(() => { TG._village.live().race = null; }); await sleep(100);
+  // Grandma's etiquette visit: wrong answers get a gentle explanation, then the visit continues
+  step = 'grandma visit';
+  await page.evaluate(() => TG._village.emee()); await sleep(400);
+  await check('grandma visit', '.emee-visit .l-scene');
+  for (let k = 0; k < 12; k++) {
+    const done = await page.evaluate(() => !!document.querySelector('.emee-visit .l-reward'));
+    if (done) break;
+    const zone = await page.evaluate(() => !!document.querySelector('.emee-visit .l-hint'));
+    if (zone) { const box = await (await page.$('.emee-visit .l-scene')).boundingBox(); await page.mouse.click(box.x + (22 / 120) * box.width, box.y + (40 / 80) * box.height); }
+    else await page.evaluate((k) => { const o = [...document.querySelectorAll('.emee-visit .l-opt:not(:disabled)')]; const wrong = k === 0 ? o.find((b) => /гишгэнэ/.test(b.textContent)) : null; (wrong || o.find((b) => /давна|Сайн байна|Нар зөв|Баруун гараараа|Баярлалаа/.test(b.textContent)) || o[0]).click(); }, k);
+    await sleep(600);
+    if (k === 0) { const gentle = await page.evaluate(() => !!document.querySelector('.emee-say .gentle')); if (!gentle) errors.push('grandma visit: a wrong move should get a gentle explanation'); }
+  }
+  if (!(await page.evaluate(() => (TG.store.active().village.emee || {}).visits === 1))) errors.push('grandma visit: the visit was not completed');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  // archery: one arrow
+  step = 'archery';
+  await page.evaluate(() => TG._village.archery()); await sleep(400);
+  await check('archery game', '.v-archery canvas');
+  await page.evaluate(() => document.querySelector('.v-archery .btn.primary').click()); await sleep(400);
+  await page.evaluate(() => document.querySelector('.v-archery .btn.primary').click()); await sleep(3200);
+  if (!(await page.evaluate(() => (TG.store.active().village.arch || {}).shots === 1))) errors.push('archery: the arrow was not shot');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  step = 'seasons';
+  await page.evaluate(() => TG.seasons.open()); await sleep(250);
+  await check('season explainer', '.season-modal .season-wheel .sw-i.on');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  if (!(await page.evaluate(() => TG.store.active().village.quests.list.some((q) => q.season)))) errors.push('seasons: there is no season quest today');
+  // townspeople: accept a task, do it, collect the reward
+  step = 'townspeople quests';
+  await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
+  await check('townsperson dialogue', '.npc-talk .npc-head');
+  await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(200);
+  await page.evaluate(() => TG.villageQuest('plant', 4)); await sleep(200);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
+  await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(250);
+  if ((await page.evaluate(() => TG.store.active().village.npc.farmer.step)) !== 1) errors.push('townspeople: finishing the first task did not advance the quest chain');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   step = 'wrestling techniques';
   await page.evaluate(() => TG._village.tournament(8)); await sleep(400);
   const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
@@ -222,6 +288,37 @@ try {
   await page.evaluate(() => { const g = document.querySelector('.gate-q'); if (!g) return; const q = g.textContent.match(/(\d+) × (\d+)/); document.querySelector('.gate-input').value = q[1] * q[2]; [...document.querySelectorAll('.gate .btn')].pop().click(); }); await sleep(400);
   await check('parent sees badges', '.ach-earned .ach-chip');
   await check('parent sees what was learned', '.learned li');
+
+  // aimag passport: Ulaanbaatar first, then the next province unlocks
+  step = 'aimag passport';
+  await page.evaluate(() => TG.go('passport')); await sleep(300);
+  await check('passport', '.pp-grid .pp-slot.next');
+  await page.evaluate(() => TG.go('aimag', { id: 'tuv' })); await sleep(250);
+  if (await page.evaluate(() => !!document.querySelector('.pp-visit'))) errors.push('passport: Töv should be locked before Ulaanbaatar is stamped');
+  await page.evaluate(() => TG.go('aimag', { id: 'ub' })); await sleep(400);
+  await check('aimag visit', '.pp-visit .pp-land');
+  // actually travel there: visit the 3 places, then the local guide gives the stamp
+  step = 'travel to Ulaanbaatar';
+  await page.evaluate(() => document.querySelector('.pp-go .btn.primary').click()); await sleep(600);
+  await check('travel map', '.travel .travel-cv');
+  const goToThing = (sel) => page.evaluate((sel) => { const c = TG.travel._cur, t = sel === 'guide' ? c.things.find((q) => q.kind === 'guide') : c.things.filter((q) => q.kind === 'mark')[sel]; c.me.x = c.me.tx = t.x; c.me.y = c.me.ty = t.y + 4; }, sel);
+  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(200);
+  if (await page.evaluate(() => !!document.querySelector('.travel-info .l-opt'))) errors.push('travel: the guide should ask you to visit the 3 places first');
+  for (let i = 0; i < 3; i++) { await goToThing(i); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(200); }
+  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(250);
+  await page.evaluate(() => [...document.querySelectorAll('.travel-info .l-opt')].find((x) => /Өргөө/.test(x.textContent)).click()); await sleep(400);
+  if (!(await page.evaluate(() => !!(TG.store.active().passport || { stamps: {} }).stamps.ub))) errors.push('travel: the guide did not give the Ulaanbaatar stamp');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(400);
+  await page.evaluate(() => TG.go('aimag', { id: 'tuv' })); await sleep(700);
+  await check('next province unlocked after the stamp', '.pp-visit + .card .pp-go, .pp-visit ~ .pp-go');
+  // family tree: fill one branch -> one star
+  step = 'family tree';
+  await page.evaluate(() => TG.go('tree')); await sleep(300);
+  await check('family tree', '.tree .tree-node');
+  await page.evaluate(() => document.querySelectorAll('.tree-node')[10].click()); await sleep(250);
+  await page.evaluate(() => { document.querySelector('.form .input').value = 'Дорж'; [...document.querySelectorAll('.form .btn.primary')].pop().click(); }); await sleep(400);
+  if ((await page.evaluate(() => TG.familyTree.filled(TG.store.active()))) !== 1) errors.push('family tree: saving a branch did not count');
+  await check('a lit star on the tree', '.tree-node.on');
 
   for (const screen of ['memories', 'about']) {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);

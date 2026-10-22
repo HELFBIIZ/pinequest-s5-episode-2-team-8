@@ -10,6 +10,8 @@
     idee: { icon: '🥛', name: { mn: 'Цагаан идээ', en: 'Dairy foods' } },
     naadam: { icon: '🐎', name: { mn: 'Наадам', en: 'Naadam' } },
     customs: { icon: '🙏', name: { mn: 'Ёс заншил', en: 'Customs' } },
+    nomad: { icon: '🐑', name: { mn: 'Нүүдэлчин амьдрал', en: 'Nomadic life' } },
+    arts: { icon: '🎻', name: { mn: 'Урлаг, хөгжим', en: 'Music & arts' } },
   };
 
   // Q(topic, question mn, question en, [4 options mn], [4 options en], correct index, explanation mn, explanation en)
@@ -163,6 +165,22 @@
       ['Морь', 'Луу', 'Арслан', 'Тэмээ'], ['A horse', 'A dragon', 'A lion', 'A camel'], 0,
       'Хөөрхөн Намжилын домогт хайртай хурдан морио дурсаж анхны морин хуурыг хийсэн гэдэг.', 'In the legend of Khökhöö Namjil, the first fiddle was made in memory of a beloved horse.'),
   ];
+
+  B.QUIZ.push(
+    Q('nomad', 'Таван хошуу малд аль нь ордоггүй вэ?', 'Which is NOT one of the five kinds of herd animals?', ['Гахай', 'Морь', 'Тэмээ', 'Ямаа'], ['Pig', 'Horse', 'Camel', 'Goat'], 0, 'Таван хошуу мал: морь, үхэр, тэмээ, хонь, ямаа.', 'The five animals are horse, cattle, camel, sheep and goat.'),
+    Q('nomad', 'Малчин айл жилд хэдэн улирлын бууцанд нүүдэг вэ?', 'How many seasonal camps do herding families move between?', ['4', '1', '10', '20'], ['4', '1', '10', '20'], 0, 'Хаваржаа, зуслан, намаржаа, өвөлжөө.', 'Spring, summer, autumn and winter camps.'),
+    Q('nomad', 'Зуны бууцыг юу гэдэг вэ?', 'What is the summer camp called?', ['Зуслан', 'Өвөлжөө', 'Хаваржаа', 'Намаржаа'], ['Zuslan', 'Övöljöö', 'Khavarjaa', 'Namarjaa'], 0, 'Зусланд гол, нуурын дэргэд буудаг.', 'The summer camp is beside rivers and lakes.'),
+    Q('nomad', 'Ноолуурыг аль малаас самнаж авдаг вэ?', 'Which animal gives cashmere?', ['Ямаа', 'Хонь', 'Морь', 'Тэмээ'], ['Goat', 'Sheep', 'Horse', 'Camel'], 0, 'Хавар ямааны ноолуурыг самнаж авдаг.', 'Goat cashmere is combed out in spring.'),
+    Q('nomad', 'Хоормогийг ямар малын сүүгээр хийдэг вэ?', 'Khoormog is made from which animal’s milk?', ['Тэмээ', 'Морь', 'Хонь', 'Ямаа'], ['Camel', 'Horse', 'Sheep', 'Goat'], 0, 'Тэмээний сүүгээр исгэсэн ундаа.', 'It is a fermented drink from camel’s milk.'),
+    Q('nomad', 'Цас их орж мал бэлчиж чадахгүй болохыг юу гэдэг вэ?', 'What is it called when snow stops animals from grazing?', ['Зуд', 'Ган', 'Үер', 'Шороон шуурга'], ['Zud', 'Drought', 'Flood', 'Dust storm'], 0, 'Зуд бол малчдын хамгийн аюултай байгалийн гамшиг.', 'A zud is the herders’ most dangerous natural disaster.'),
+    Q('nomad', 'Монгол Улс хэдэн аймагтай вэ?', 'How many provinces does Mongolia have?', ['21', '12', '30', '7'], ['21', '12', '30', '7'], 0, '21 аймаг, нийслэл Улаанбаатар.', '21 provinces plus the capital, Ulaanbaatar.'),
+    Q('arts', 'Хоёр утастай, морин толгойтой хөгжмийг юу гэдэг вэ?', 'What is the two-string fiddle with a horse head called?', ['Морин хуур', 'Ятга', 'Ёочин', 'Лимбэ'], ['Morin khuur', 'Yatga', 'Yoochin', 'Limbe'], 0, 'Морин хуур ЮНЕСКО-гийн биет бус өвд бүртгэлтэй.', 'The morin khuur is on UNESCO’s intangible heritage list.'),
+    Q('arts', 'Нэг хүн нэгэн зэрэг хоёр дуу авиа гаргадаг урлагийг юу гэдэг вэ?', 'What is the art of singing two sounds at once called?', ['Хөөмий', 'Биелгээ', 'Уртын дуу', 'Ёохор'], ['Khöömii', 'Biyelgee', 'Long song', 'Yokhor'], 0, 'Хөөмий 2010 онд ЮНЕСКО-д бүртгэгдсэн.', 'Khöömii was listed by UNESCO in 2010.'),
+    Q('arts', 'Удаан, сунжирсан аялгуутай монгол дууг юу гэдэг вэ?', 'What is the slow Mongolian song with long notes called?', ['Уртын дуу', 'Богино дуу', 'Магтаал', 'Ерөөл'], ['Long song', 'Short song', 'Praise poem', 'Blessing'], 0, 'Уртын дуу нэг үеийг маш удаан сунжруулан дуулдаг.', 'In a long song, a single syllable can stretch for a long time.'),
+    Q('arts', 'Баруун Монголын голчлон дээд биеэрээ бүжиглэдэг бүжиг аль вэ?', 'Which western Mongolian dance uses mostly the upper body?', ['Биелгээ', 'Вальс', 'Ёохор', 'Балет'], ['Biyelgee', 'Waltz', 'Yokhor', 'Ballet'], 0, 'Биелгээг гэрийн бага зайд ч бүжиглэж болдог.', 'Biyelgee can even be danced in the small space of a ger.'),
+    Q('arts', 'Буриадуудын гар гараасаа барьж тойрон бүжиглэдэг бүжиг аль вэ?', 'Which Buryat dance is done holding hands in a circle?', ['Ёохор', 'Биелгээ', 'Цам', 'Хөөмий'], ['Yokhor', 'Biyelgee', 'Tsam', 'Khöömii'], 0, 'Ёохорыг дуулж, тойрон бүжиглэдэг.', 'Yokhor is sung and danced in a circle.'),
+    Q('arts', 'Домогт хайртай морио дурсаж морин хуур хийсэн хүн хэн бэ?', 'In the legend, who made the morin khuur in memory of a beloved horse?', ['Хөөрхөн Намжил', 'Чингис хаан', 'Жамуха', 'Занабазар'], ['Khökhöö Namjil', 'Chinggis Khaan', 'Jamukha', 'Zanabazar'], 0, 'Хөөрхөн Намжилын домог олон хүүхдийн дуртай үлгэр.', 'The legend of Khökhöö Namjil is a favourite story.'),
+  );
 
   // Offline answers: keywords (lower case, Cyrillic or English stems) -> answer.
   const A = (k, mn, en) => ({ k, a: { mn, en } });

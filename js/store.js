@@ -44,8 +44,8 @@
     save() { try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch (e) { /* storage full/blocked */ } },
     active() { return this.state.profiles.find((p) => p.id === this.state.activeId) || this.state.profiles[0] || null; },
     ageGroupOf(age) { return age <= 6 ? '3-6' : age <= 10 ? '7-10' : age <= 14 ? '11-14' : '15-18'; },
-    addProfile({ name, age, avatar, code }) {
-      const p = { id: 'p' + Date.now().toString(36), name, age, avatar, code: code || null, learn: {}, basar: { asked: 0, right: 0, total: 0 }, created: dkey() };
+    addProfile({ name, age, avatar, code, aimag }) {
+      const p = { id: 'p' + Date.now().toString(36), name, age, avatar, code: code || null, aimag: aimag || null, learn: {}, basar: { asked: 0, right: 0, total: 0 }, created: dkey() };
       this.state.profiles.push(p); this.state.activeId = p.id; this.save(); return p;
     },
     removeProfile(id) {

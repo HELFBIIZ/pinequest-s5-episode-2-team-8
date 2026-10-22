@@ -42,7 +42,7 @@
   const EMOTES = ['👋', '❤️', '😂', '🎉', '👍', '🌱', '😮', '⭐'];
 
   const SKINS = ['#F6D3B3', '#EDBB93', '#D9A06E', '#B97A4A'];
-  const DEELS = { blue: '#2F6BFF', red: '#E8453C', green: '#12A05F', purple: '#7A5AF8', pink: '#F06CA8', gold: '#E0A21A' };
+  const DEELS = { blue: '#2F6BFF', red: '#E8453C', green: '#12A05F', purple: '#7A5AF8', pink: '#F06CA8', gold: '#E0A21A', teal: '#1FA3A3', brown: '#8A5A33', white: '#F2EEE4', black: '#2D2A33' };
   const TITLES = [
     { id: 'nachin', name: T('Начин', 'Falcon'), need: 5, fact: T('Начин (шонхор) цол Улсын наадамд 5 давж авдаг.', 'The Nachin (falcon) title is earned by winning 5 rounds at the State Naadam.') },
     { id: 'khartsaga', name: T('Харцага', 'Hawk'), need: 6, fact: T('Харцага (хартсага шувуу) цол 6 давсан бөхөд олгогддог.', 'The Khartsaga (hawk) title goes to a wrestler who wins 6 rounds.') },
@@ -83,7 +83,7 @@
   ];
   const LOOKS = {
     title: TITLES.map((t) => t.id),
-    hat: ['mongol', 'flower', 'cap', 'loovuuz', 'crown'],
+    hat: ['mongol', 'flower', 'cap', 'loovuuz', 'crown', 'kazakh', 'buriad', 'oirat', 'fur'],
     face: ['glasses', 'sun'],
     neck: ['scarf', 'khadag', 'medal'],
     pet: ['lamb', 'puppy', 'kitten', 'camel', 'foal'],

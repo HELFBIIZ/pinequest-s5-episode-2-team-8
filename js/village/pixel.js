@@ -15,7 +15,8 @@
     sky: '#9fd8f7', crop: '#4fa03a', cropD: '#357a28', cropL: '#86d05a', light: '#8fd0ff',
   };
   const DEEL = { blue: ['#3f76db', '#2b52a5', '#7fa6ee'], red: ['#e14b3d', '#a8312a', '#f08a7e'], green: ['#2ea35f', '#1d7442', '#6fd096'],
-    purple: ['#9466e0', '#6a42b5', '#c2a2f2'], pink: ['#f06ca8', '#c2427e', '#f8a8cc'], gold: ['#e9a91f', '#b07a10', '#f7d071'] };
+    purple: ['#9466e0', '#6a42b5', '#c2a2f2'], pink: ['#f06ca8', '#c2427e', '#f8a8cc'], gold: ['#e9a91f', '#b07a10', '#f7d071'],
+    teal: ['#1fa3a3', '#137474', '#6fd0cf'], brown: ['#8a5a33', '#5e3b1e', '#b98a5a'], white: ['#f2eee4', '#c9c1ad', '#ffffff'], black: ['#2d2a33', '#17151b', '#5a5566'] };
   const SKIN = { '#F6D3B3': ['#f6d3b3', '#e0b18c'], '#EDBB93': ['#edbb93', '#d29a6e'], '#D9A06E': ['#d9a06e', '#b9824f'], '#B97A4A': ['#b97a4a', '#94592f'] };
 
   const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.max(0, Math.min(255, Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f)))); return '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''); };
@@ -315,7 +316,7 @@
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => o.kind !== 'npc').map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
@@ -387,6 +388,11 @@
       case 'cap': ell(x, 8, 7, 5, 3, K.blue, 7); P(x, 6, 5, '#7fa6ee'); if (front) R(x, 4, 8, 8, 1, K.blueD); if (side) R(x, 11, 7, 4, 2, K.blueD); break;
       case 'flower': for (let i = 3; i <= 13; i++) P(x, i, 6, i % 2 ? [K.pink, K.gold, K.white][i % 3] : K.crop); P(x, 5, 5, K.pink); P(x, 9, 5, K.gold); P(x, 12, 5, K.white); break;
       case 'loovuuz': ell(x, 8, 6, 6, 4, K.brown, 7); P(x, 6, 3, '#a8784a'); R(x, 2, 7, 12, 2, K.fur); if (!side) { R(x, 2, 8, 2, 5, K.fur); R(x, 12, 8, 2, 5, K.fur); } else R(x, 3, 8, 2, 5, K.fur); P(x, 8, 1, K.red); break;
+      // traditional hats of Mongolia's peoples
+      case 'kazakh': ell(x, 8, 5, 5, 4, K.white, 7); R(x, 3, 6, 10, 2, '#c9c1ad'); for (let i = 4; i <= 12; i += 2) P(x, i, 4, K.red); P(x, 6, 2, K.gold); P(x, 10, 2, K.gold); line(x, 9, 1, 12, -2, '#4a3426'); P(x, 12, -1, '#d8cfba'); break; // embroidered hat with an owl feather
+      case 'buriad': for (let r = 0; r < 5; r++) R(x, 8 - r, 2 + r, r * 2 + 1, 1, K.blue); R(x, 2, 7, 12, 2, K.fur); P(x, 8, 1, K.red); P(x, 8, 0, K.red); if (back) { R(x, 7, 8, 1, 4, K.red); R(x, 9, 8, 1, 4, K.red); } break; // pointed hat, fur brim, red top
+      case 'oirat': ell(x, 8, 5, 4, 3, K.blueD, 6); R(x, 2, 6, 12, 2, K.gold); R(x, 7, 0, 2, 3, K.red); P(x, 8, -1, K.red); if (back) { R(x, 6, 8, 1, 6, K.red); R(x, 9, 8, 1, 6, K.red); } break; // tall western hat with a red tassel
+      case 'fur': ell(x, 8, 6, 6, 4, '#7a5a3a', 7); P(x, 6, 3, '#a8784a'); P(x, 10, 4, '#a8784a'); if (!side) { R(x, 2, 8, 3, 6, '#7a5a3a'); R(x, 11, 8, 3, 6, '#7a5a3a'); } else R(x, 3, 8, 3, 6, '#7a5a3a'); break; // reindeer-fur hat with ear flaps
       case 'crown': R(x, 4, 4, 9, 3, K.gold); R(x, 4, 6, 9, 1, K.goldD); [[4, 2], [4, 3], [8, 1], [8, 2], [8, 3], [12, 2], [12, 3]].forEach(([a, b]) => P(x, a, b, K.gold)); P(x, 8, 5, K.red); break;
     }
     return c;
@@ -434,6 +440,20 @@
     R(x, X + 2, Y + 2, 3, 14, K.out); R(x, X + 3, Y + 3, 1, 13, K.wood); R(x, X + w - 5, Y + 2, 3, 14, K.out); R(x, X + w - 4, Y + 3, 1, 13, K.wood);
     R(x, X + 3, Y + 4, w - 6, 1, K.woodD); [K.blue, K.red, K.gold, K.white].forEach((col, i) => R(x, X + 8 + i * Math.floor((w - 16) / 3), Y + 4, 3, 2, col));
     x.drawImage(horse('bay', 0, true), X + 3, Y - 10); x.drawImage(horse('white', 0, true), X + w - 31, Y - 9);
+  }
+
+  // сурын талбай: a Mongolian archery range with the low wall of leather "сур" targets at the far end
+  function archery(x, o) {
+    const X = o.x * 16, Y = o.y * 16, w = o.w * 16, hh = o.h * 16;
+    R(x, X, Y + 6, w, hh - 10, K.dirtL); R(x, X, Y + 6, w, 1, K.dirtD); R(x, X, Y + hh - 5, w, 1, K.dirtD);
+    for (let i = 0; i < 9; i++) P(x, X + 6 + i * 13, Y + 18 + (i % 3) * 6, K.dirtD);
+    R(x, X + 4, Y + 10, 2, 24, K.woodD); R(x, X + 10, Y + 10, 2, 24, K.woodD); R(x, X + 3, Y + 12, 10, 2, K.wood); // bow rack
+    line(x, X + 5, Y + 14, X + 5, Y + 30, K.woodL); line(x, X + 11, Y + 15, X + 11, Y + 29, K.woodL);
+    const tx = X + w - 22; // target wall: three rows of small red, white and blue cylinders
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) { const cx = tx + c * 3 + (r % 2), cy = Y + 18 + r * 4; R(x, cx, cy, 3, 4, K.out); R(x, cx, cy, 2, 3, [K.red, K.white, K.blue][(c + r) % 3]); }
+    R(x, tx - 2, Y + 30, 20, 2, K.woodD);
+    R(x, X + w - 4, Y + 2, 1, 16, K.woodD); for (let r = 0; r < 5; r++) R(x, X + w - 3, Y + 2 + r, 6 - Math.abs(r - 2) * 2, 1, K.gold);
+    R(x, X + 20, Y + 2, 1, 14, K.woodD); for (let r = 0; r < 5; r++) R(x, X + 21, Y + 2 + r, 6 - Math.abs(r - 2) * 2, 1, K.blue);
   }
 
   // Басар: a Mongolian Bankhar dog. Big, fluffy, black coat with tan "four-eye" spots above the eyes,
@@ -556,6 +576,8 @@
         menu: () => { [4, 8, 12].forEach((ly) => { R(x, 2, ly - 1, 12, 3, K.out); R(x, 3, ly, 10, 1, K.paper); }); },
         horse: () => { const hs = horse('bay', 0, true); x.drawImage(hs, 0, 0, 28, 22, 0, 2, 16, 13); },
         trophy: () => { R(x, 4, 2, 8, 6, K.out); R(x, 5, 3, 6, 5, K.gold); R(x, 2, 3, 2, 3, K.goldD); R(x, 12, 3, 2, 3, K.goldD); R(x, 7, 8, 2, 3, K.goldD); R(x, 5, 11, 6, 3, K.out); R(x, 6, 12, 4, 1, K.woodL); P(x, 6, 4, K.white); },
+        bow: () => { for (let r = 0; r < 13; r++) { const bx = 4 + Math.round(4 * Math.sin((r / 12) * Math.PI)); P(x, bx, 2 + r, K.woodD); P(x, bx + 1, 2 + r, K.wood); } line(x, 4, 2, 4, 14, K.white); line(x, 3, 8, 14, 8, K.woodD); R(x, 13, 7, 2, 3, '#8a8a99'); R(x, 2, 7, 2, 1, K.red); R(x, 2, 9, 2, 1, K.red); },
+        tree: () => { R(x, 7, 9, 2, 6, K.woodD); line(x, 8, 10, 3, 5, K.woodD); line(x, 8, 10, 13, 5, K.woodD); line(x, 8, 8, 8, 3, K.woodD); [[3, 4], [13, 4], [8, 2], [5, 7], [11, 7]].forEach(([a, b]) => blob(x, a, b, 1, 1, K.gold, K.goldD)); },
         logo: () => { ell(x, 8, 15, 8, 3, K.grass); blob(x, 12, 3, 2, 2, K.gold, K.goldD); for (let c2 = 2; c2 < 14; c2++) { const dx = (c2 - 8) / 6; const top = 9 - Math.round(4 * Math.sqrt(Math.max(0, 1 - dx * dx))); R(x, c2, top, 1, 10 - top, K.white); P(x, c2, top - 1, K.out); } R(x, 3, 9, 10, 4, K.out); R(x, 4, 9, 8, 3, K.felt); R(x, 4, 9, 8, 1, K.blue); R(x, 7, 10, 2, 3, K.red); },
       })[id]();
     }
