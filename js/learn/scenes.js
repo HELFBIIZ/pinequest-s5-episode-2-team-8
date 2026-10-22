@@ -54,10 +54,22 @@
   function idee(x, st, t) {
     bg(x, t);
     const s = st.stage || 0, q = st.sub || 0;
+    const pn = performance.now(), since = (pn - (st.fx || -1e9)) / 1000, pull = st.pull || 0;
     if (s === 0) {
       cow(x);
-      R(x, 44, 52, 12, 11, K.out); R(x, 45, 53, 10, 9, '#a5a5b0'); const f = Math.round(8 * q); R(x, 45, 62 - f, 10, f, '#ffffff');
-      if (q > 0 && Math.floor(t * 8) % 2) P(x, 50, 50, '#ffffff');
+      // two teats under the udder; the one being milked stretches as you pull, and a jet of milk hits the bucket
+      for (const [side, tx0] of [['l', 25], ['r', 28]]) {
+        const len = 2 + (st.side === side ? Math.round(pull * 4) : 0);
+        R(x, tx0, 56, 2, len, '#e98c8c'); P(x, tx0, 56 + len - 1, '#f2a0a0');
+        if (st.side === side && pull > 0) { R(x, tx0 - 1, 55 + Math.round(pull * 3), 4, 2, '#edbb93'); P(x, tx0 - 1, 56 + Math.round(pull * 3), '#c98a5a'); }
+        if (st.side === side && since < 0.3) for (let y = 57 + len; y < 62; y++) P(x, tx0 + (y % 2), y, '#ffffff');
+      }
+      R(x, 21, 60, 12, 5, K.out); R(x, 22, 61, 10, 3, '#a5a5b0'); const f = st.tsatsal ? 3 : Math.round(3 * q); if (f) R(x, 22, 64 - f, 10, f, '#ffffff');
+      if (st.tsatsal) {   // offering the first milk: a ladle swings up and drops fly to the sky
+        const ly = 52 - Math.round(pull * 16); line(x, 50, ly + 2, 58, ly + 10, K.woodD); R(x, 46, ly, 6, 3, '#a5a5b0'); R(x, 47, ly, 4, 1, '#ffffff');
+        if (since < 1.2) for (let i = 0; i < 9; i++) { const k = since * 40 + i * 3, dx = (i - 4) * (1 + since * 6); P(x, Math.round(49 + dx), Math.round(ly - k + since * since * 25), '#ffffff'); }
+        for (let i = 0; i < Math.round((st.flick || 0) * 3); i++) P(x, 46 + i * 6, 6 + (Math.floor(t * 3 + i) % 2), '#fff7a8');
+      }
     } else if (s <= 5) {
       // stove + pot
       R(x, 46, 50, 28, 14, '#4a4a55'); R(x, 47, 51, 26, 2, '#6a6a77'); R(x, 66, 30, 3, 20, '#5a5a66');
@@ -70,15 +82,29 @@
         if (s === 1 && temp > 0.75) for (let i = 0; i < 4; i++) P(x, 50 + ((i * 7 + Math.floor(t * 6)) % 20), 38, '#ffffff');
         if (s === 1 && st.over) { R(x, 46, 36, 28, 3, '#ffffff'); R(x, 45, 39, 3, 8, '#ffffff'); R(x, 72, 39, 3, 6, '#ffffff'); }
         if (s >= 2) { const fh = s === 2 ? Math.round(4 * q) : 4; for (let i = 0; i < fh; i++) ell(x, 60, 38 - i, 11 - i * 2, 1, '#fffbe8'); }
-        if (s === 2) { const ly = 18 + Math.round(Math.abs(Math.sin(t * 3)) * 10); line(x, 70, ly, 82, ly - 8, K.woodD); R(x, 66, ly, 6, 3, '#a5a5b0'); if (ly > 24) R(x, 68, ly + 3, 1, 34 - ly, '#ffffff'); }
+        if (s === 2) {   // the ladle follows your hand up; let go and the milk pours down into foam
+          const ly = 30 - Math.round(pull * 18); line(x, 70, ly, 82, ly - 8, K.woodD); R(x, 66, ly, 6, 3, '#a5a5b0');
+          if (pull === 0 && since < 0.6) { R(x, 68, ly + 3, 1, 35 - ly, '#ffffff'); for (let i = 0; i < 4; i++) P(x, 64 + i * 3, 37 - ((Math.floor(t * 12) + i) % 2), '#ffffff'); }
+        }
         if (s >= 3 && s < 5) for (let i = 0; i < (s === 3 ? 3 - Math.round(3 * q) : 0); i++) ell(x, 54 + i * 6, 32 - ((t * 6 + i * 4) % 10), 1, 1, 'rgba(255,255,255,.7)');
         if (s === 4) { line(x, 64, 28, 58, 37, '#a5a5b0'); ell(x, 57, 37, 2, 1, '#fff6e0'); }
       }
       if (s === 5) { x.fillStyle = `rgba(20,24,70,${0.55 * (1 - Math.abs(q * 2 - 1))})`; x.fillRect(0, 0, W, H); if (q > 0.2 && q < 0.8) { blob(x, 20, 12, 4, 4, '#fff3c4', '#e6d8a0'); } }
     } else if (s === 6) {
-      R(x, 40, 56, 40, 4, K.woodD); const sq = Math.round(5 * q);
-      blob(x, 60, 50 + Math.round(sq / 2), 12, 6 - Math.round(sq / 2), '#f4efe3', '#b6a68a'); R(x, 46, 36 + sq, 28, 8, K.rock); R(x, 47, 37 + sq, 26, 2, K.rockL);
-      if (q > 0 && Math.floor(t * 6) % 2) { P(x, 50, 61, K.light); P(x, 70, 62, K.light); }
+      R(x, 40, 56, 40, 4, K.woodD); const sq = Math.min(5, Math.round(5 * q + pull * 1.5));
+      if (st.molding) {   // a carved wooden mould: push the curd into each hole by hand, a patterned piece forms
+        const k = Math.round((st.mold || 0) * 3);
+        for (let i = 0; i < 3; i++) {
+          const mx = 44 + i * 11; R(x, mx, 44, 10, 11, K.out); R(x, mx + 1, 45, 8, 9, K.woodD); R(x, mx + 2, 46, 6, 7, i < k ? '#f3e6c4' : '#5a3a20');
+          if (i < k) for (const [px, py] of [[4, 48], [3, 49], [5, 49], [4, 50], [4, 49]]) P(x, mx + px, py, '#d8c69c');
+        }
+        if (k < 3) { const cx0 = 49 + k * 11, dy = Math.round(pull * 6); blob(x, cx0, 40 + dy, 4, 3, '#f4efe3', '#b6a68a'); if (pull > 0) { R(x, cx0 - 5, 35 + dy, 11, 3, '#edbb93'); R(x, cx0 - 5, 35 + dy, 11, 1, '#c98a5a'); } }
+        if (since < 0.4) { P(x, 44 + (k - 1) * 11 + 1, 43, K.light); P(x, 44 + (k - 1) * 11 + 8, 43, K.light); }
+        return dog(x, 92, 46);
+      }
+      blob(x, 60, 50 + Math.round(sq / 2), 12, 6 - Math.round(sq / 2), '#f4efe3', '#b6a68a');
+      R(x, 46, 36 + sq, 28, 8, K.rock); R(x, 47, 37 + sq, 26, 2, K.rockL);
+      if (since < 0.5 || (q > 0 && Math.floor(t * 6) % 2)) { P(x, 50, 61, K.light); P(x, 70, 62, K.light); if (since < 0.5) { P(x, 47, 58 + Math.floor(since * 8), K.light); P(x, 73, 58 + Math.floor(since * 8), K.light); } }
     } else {
       R(x, 28, 44, 64, 3, K.woodD); R(x, 30, 47, 2, 16, K.woodD); R(x, 88, 47, 2, 16, K.woodD);
       for (let i = 0; i < 12; i++) { const ax = 32 + (i % 6) * 9, ay = 38 + Math.floor(i / 6) * 3; R(x, ax, ay, 6, 4, '#f3e6c4'); R(x, ax, ay + 3, 6, 1, '#d8c69c'); P(x, ax + 1, ay, '#ffffff'); }

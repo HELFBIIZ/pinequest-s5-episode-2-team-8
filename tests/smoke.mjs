@@ -155,7 +155,7 @@ try {
     step = `lesson ${id}`;
     await page.evaluate((id) => TG.go('lesson', { id }), id); await sleep(300);
     let finished = false;
-    for (let guard = 0; guard < 120 && !finished; guard++) {
+    for (let guard = 0; guard < 200 && !finished; guard++) {
       const st = await page.evaluate(() => {
         const panel = document.querySelector('.l-panel'); if (!panel) return 'none';
         if (panel.querySelector('.l-done')) return 'done';
@@ -165,6 +165,7 @@ try {
         if (nx) { nx.click(); return 'next'; }
         const opt = panel.querySelector('.l-opt:not(:disabled)'); if (opt) { opt.click(); return 'opt'; }
         if (panel.querySelector('.l-gauge')) return 'gauge';
+        if (panel.querySelector('.l-drag:not(.done)')) return 'drag';
         const tap = panel.querySelector('.l-tap:not(:disabled)'); if (tap) { tap.click(); return 'tap'; }
         if (panel.querySelector('.l-hint')) return 'zones';
         return 'wait';
@@ -175,6 +176,14 @@ try {
         const [zx, zy] = { khoimor: [60, 14], hearth: [60, 40], west: [22, 40], east: [98, 40], door: [60, 72] }[z];
         const box = await (await page.$('.l-scene')).boundingBox();
         await page.mouse.click(box.x + (zx / 120) * box.width, box.y + (zy / 80) * box.height);
+      } else if (st === 'drag') {   // a hand gesture: pull down / lift up / swipe sideways, alternating hands when asked
+        const d = await page.evaluate(() => { const p = document.querySelector('.l-drag'); return { dir: ['down', 'up', 'side'].find((c) => p.classList.contains(c)), alt: p.classList.contains('alt'), n: parseInt(p.querySelector('small').textContent, 10) }; });
+        const box = await (await page.$('.l-drag')).boundingBox();
+        const x0 = box.x + box.width * (d.alt ? (d.n % 2 ? 0.75 : 0.25) : 0.5), y0 = box.y + (d.dir === 'up' ? box.height - 20 : d.dir === 'down' ? 20 : box.height / 2);
+        const [dx, dy] = { down: [0, 1], up: [0, -1], side: [1, 0] }[d.dir];
+        await page.mouse.move(x0, y0); await page.mouse.down();
+        for (let k = 1; k <= 6; k++) await page.mouse.move(x0 + dx * k * 17, y0 + dy * k * 17);
+        await page.mouse.up();
       } else if (st === 'gauge') {
         const hold = await page.evaluate(() => document.querySelector('.l-tap').textContent.includes('🔥'));
         const box = await (await page.$('.l-tap')).boundingBox();

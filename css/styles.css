@@ -1118,6 +1118,21 @@ html.rm ::view-transition-old(root), html.rm ::view-transition-new(root) { anima
 .l-opt:disabled:not(.right):not(.wrong) { opacity: .55; }
 .l-tap { margin: 10px 0; flex-direction: column; gap: 0; min-height: 70px !important; font-size: 1.25rem !important; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .l-tap small { font-size: .85rem; opacity: .75; }
+.l-drag { position: relative; height: 150px; margin: 10px 0; background: repeating-linear-gradient(0deg, #fff7e2 0 10px, #fbefd2 10px 20px); box-shadow: inset 0 0 0 3px #8a4b1f; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; overflow: hidden; }
+.l-drag.side { height: 110px; }
+.l-drag-knob { position: absolute; left: 50%; width: 56px; height: 56px; margin-left: -28px; display: grid; place-items: center; font-style: normal; font-size: 30px; background: var(--lc, #e9a91f); box-shadow: inset 0 0 0 3px #2b1e2e, 0 3px 0 #2b1e2e; z-index: 1; }
+.l-drag.down .l-drag-knob { top: 8px; } .l-drag.up .l-drag-knob { bottom: 8px; } .l-drag.side .l-drag-knob { top: 27px; }
+.l-drag.alt .l-drag-knob { left: 28%; }
+.l-drag.alt::before, .l-drag.alt::after { content: ''; position: absolute; top: 8px; bottom: 8px; width: 4px; background: rgba(233, 140, 140, .55); left: calc(28% - 2px); }
+.l-drag.alt::after { left: calc(72% - 2px); }
+.l-drag-arrow { position: absolute; inset: 0; display: grid; place-items: center; font-size: 44px; color: rgba(138, 75, 31, .22); animation: l-nudge 1.2s ease-in-out infinite; }
+.l-drag b, .l-drag small { position: absolute; right: 10px; font-weight: 800; color: #5a2d10; pointer-events: none; }
+.l-drag b { bottom: 26px; } .l-drag small { bottom: 8px; opacity: .75; }
+.l-drag.done { opacity: .6; cursor: default; }
+@keyframes l-nudge { 50% { transform: translateY(6px); } }
+.l-drag.up .l-drag-arrow { animation-name: l-nudge-up; }
+@keyframes l-nudge-up { 50% { transform: translateY(-6px); } }
+.l-drag.side .l-drag-arrow { animation: none; }
 .l-hint { font-weight: 800; color: #8a4b1f; animation: bob 1.6s ease-in-out infinite; }
 .l-basar { display: flex; gap: 8px; align-items: center; margin: 10px 0; animation: pop .3s var(--spring); }
 .l-basar p { margin: 0; padding: 9px 12px; background: #fff3c4; box-shadow: inset 0 0 0 2px #e5a157; font-weight: 700; flex: 1; }
