@@ -263,6 +263,7 @@
         h('div', null, h('div', { class: 'eyebrow' }, L('Өв соёлын сургууль', 'Heritage school')), h('h1', null, L('Хамтдаа сурцгаая!', 'Let’s learn together!')),
           h('p', null, L('Тоглоод сур, сурснаа гэр бүлтэйгээ бодит амьдрал дээр хий.', 'Learn by playing, then do it for real with your family.')))),
       h('div', { class: 'hub-row' },
+        h('button', { class: 'hub-card px-card', onclick: () => TG.go('bichig') }, h('span', { class: 'hub-mong', lang: 'mn-Mong' }, 'ᠮᠣᠩᠭᠣᠯ'), h('b', null, L('Монгол бичиг', 'Mongol script')), h('small', null, `✍️ ${TG.bichig.done(p)}/${TG.bichig.ALL.length}`)),
         h('button', { class: 'hub-card px-card', onclick: () => TG.go('passport') }, h('span', null, '🛂'), h('b', null, L('Аймгийн паспорт', 'Aimag passport')), h('small', null, L(`${TG.passport.stamps(p)}/22 тамга`, `${TG.passport.stamps(p)}/22 stamps`))),
         h('button', { class: 'hub-card px-card', onclick: () => TG.go('tree') }, h('span', null, '🌳'), h('b', null, L('Ургийн мод', 'Family tree')), h('small', null, `⭐ ${TG.familyTree.filled(p)}/12`)),
         h('button', { class: 'hub-card px-card', onclick: () => TG.seasons.open() }, h('span', null, TG.seasons.current().icon), h('b', null, tx(TG.seasons.current().name)), h('small', null, L('Улирлын тухай', 'About the season')))),

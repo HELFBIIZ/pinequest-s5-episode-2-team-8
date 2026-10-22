@@ -119,22 +119,80 @@
   const ICON7 = {
     heart: ['.xx.xx.', 'xxxxxxx', 'xxxxxxx', '.xxxxx.', '..xxx..', '...x...'],
     pad: ['.kkkkk.', 'kwkwwgk', 'kkkwgwk', 'kwkwwgk', '.kkkkk.'],
+    book: ['kkk.kkk', 'kwwkwwk', 'kwwkwwk', 'kwwkwwk', 'kkkkkkk'],
     coin: ['.yyy.', 'yYyYy', 'yyYyy', 'yYyYy', '.yyy.'],
   };
   function glyph(x, X, Y, rows, map) { rows.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.' && map[ch]) P(x, X + i, Y + j, map[ch]); })); }
+  /** A real Mongol ger seen from the south: white canvas over felt on a round lattice wall, three wall ropes (бүслүүр),
+      a low cone roof with a patterned trim band, the toono crown with its felt flap (өрх) folded back, the stovepipe,
+      and a short carved, painted wooden door with its threshold (босго). Lit from the left so it reads as a cylinder. */
   function ger(x, o) {
-    const X = o.x * 16, Y = o.y * 16, acc = o.roof ? [o.roof, shade(o.roof, -0.3)] : o.accent === '#7A5AF8' ? [K.purple, K.purpleD] : [K.blue, K.blueD], dc = o.doorCol || K.red;
-    ell(x, X + 24, Y + 46, 22, 2, 'rgba(20,40,10,.25)');
-    R(x, X + 3, Y + 24, 42, 22, K.out); R(x, X + 4, Y + 25, 40, 20, K.felt); R(x, X + 36, Y + 25, 8, 20, K.feltD);
-    R(x, X + 4, Y + 28, 40, 3, acc[0]); for (let i = 5; i < 44; i += 3) P(x, X + i, Y + 29, K.white);
-    for (let cx = 1; cx < 47; cx++) { const dx = (cx - 24) / 23; const top = Y + 26 - Math.round(19 * Math.sqrt(Math.max(0, 1 - dx * dx))); P(x, X + cx, top - 1, K.out); R(x, X + cx, top, 1, Y + 26 - top, cx > 36 ? '#ece6d8' : K.white); }
-    for (let i = 0; i < 6; i++) line(x, X + 24, Y + 9, X + 5 + i * 7.6 | 0, Y + 25, acc[0]);
-    R(x, X + 1, Y + 25, 46, 1, K.out);
-    blob(x, X + 24, Y + 8, 3, 1, '#e8a33d');
-    R(x, X + 19, Y + 32, 10, 14, K.out); R(x, X + 20, Y + 33, 8, 13, dc); R(x, X + 21, Y + 34, 6, 11, shade(dc, -0.3)); R(x, X + 22, Y + 35, 4, 9, dc);
-    R(x, X + 21, Y + 34, 6, 1, K.gold); P(x, X + 26, Y + 40, K.gold);
-    if (o.id === 'arcade' || o.id === 'home') glyph(x, X + 33, Y + 34, o.id === 'arcade' ? ICON7.pad : ICON7.heart, { x: K.red, k: K.out, w: K.white, g: K.gold });
-    else { R(x, X + 33, Y + 33, 7, 5, K.out); R(x, X + 34, Y + 34, 5, 3, acc[0]); P(x, X + 36, Y + 35, K.gold); }
+    const X = o.x * 16, Y = o.y * 16, cx = X + 24;
+    const acc = o.roof ? o.roof : o.accent === '#7A5AF8' ? K.purple : o.accent === '#E9A91F' ? '#2f7d5b' : K.blue, accD = shade(acc, -0.32), dc = o.doorCol || '#e8892b';
+    const WR = 20, RR = 23;                                                       // wall and roof-eave half widths
+    const arc = (i, r, d) => Math.round(d * Math.sqrt(Math.max(0, 1 - (i / r) ** 2)));
+    const eaveY = (i) => Y + 25 + arc(i, RR, 3), baseY = (i) => Y + 43 + arc(i, WR, 2);
+    const tone = (f, a, b, c, d) => (f < -0.55 ? a : f < 0.15 ? b : f < 0.6 ? c : d);
+    ell(x, cx + 2, Y + 46, 24, 3, 'rgba(20,40,10,.22)');
+    // wall: felt + canvas, shaded round
+    for (let i = -WR; i <= WR; i++) {
+      const f = i / WR, top = eaveY(i), bot = baseY(i);
+      R(x, cx + i, top, 1, bot - top, tone(f, '#fbf8f1', '#f2ede1', '#e4dccb', '#d2c7b0'));
+      R(x, cx + i, bot - 3, 1, 3, tone(f, '#b9aa88', '#ab9b7a', '#998a6a', '#857659'));        // хаяавч: the skirt round the bottom
+      P(x, cx + i, bot, K.out);
+      for (const off of [5, 10, 15]) P(x, cx + i, top + off, (i + off) % 2 ? tone(f, '#a8957a', '#9c896e', '#8a7860', '#776650') : tone(f, '#c2b296', '#b4a488', '#a29276', '#8e7e64')); // twisted hair ropes
+    }
+    R(x, cx - WR - 1, eaveY(-WR), 1, baseY(-WR) - eaveY(-WR) + 1, K.out); R(x, cx + WR + 1, eaveY(WR), 1, baseY(WR) - eaveY(WR) + 1, K.out);
+    // roof: shallow cone with slightly rounded shoulders
+    for (let i = -RR; i <= RR; i++) {
+      const a = Math.abs(i), t = a <= 5 ? 0 : (a - 5) / (RR - 5), top = Y + 12 + Math.round(13 * Math.pow(t, 1.25)), bot = eaveY(i), f = i / RR;
+      P(x, cx + i, top - 1, K.out);
+      R(x, cx + i, top, 1, bot - top, tone(f, '#ffffff', '#f6f2e9', '#e8e1d2', '#d6ccb7'));
+      R(x, cx + i, bot - 3, 1, 3, f > 0.55 ? accD : acc);                                      // trim band of the roof cover
+      if ((i + 40) % 4 === 0) P(x, cx + i, bot - 2, '#ffffff'); else if ((i + 40) % 4 === 2) { P(x, cx + i, bot - 3, shade(acc, 0.45)); P(x, cx + i, bot - 1, shade(acc, 0.45)); } // хээ pattern
+      P(x, cx + i, bot, K.out);
+      if (Math.abs(i) <= WR) P(x, cx + i, bot + 1, tone(f, '#d9cfbb', '#cfc4ae', '#bfb39b', '#ad9f86'));  // the eave's shadow on the wall
+    }
+    for (const s of [-1, 1]) for (const r of [8, 16]) line(x, cx + s * 5, Y + 13, cx + s * r, eaveY(r) - 4, '#cbbfa5');   // roof ropes running down from the crown
+    // toono crown and the felt flap folded back over its north half
+    ell(x, cx, Y + 12, 6, 2, K.out); ell(x, cx, Y + 12, 5, 1, '#c9772f'); R(x, cx - 3, Y + 12, 7, 1, '#5a3a22');
+    R(x, cx - 6, Y + 8, 12, 4, K.out); R(x, cx - 5, Y + 8, 10, 3, '#f1ece0'); R(x, cx + 1, Y + 8, 4, 3, '#ddd5c3');
+    line(x, cx - 6, Y + 10, cx - 11, Y + 17, '#9c896e'); line(x, cx + 6, Y + 10, cx + 11, Y + 17, '#9c896e');
+    // stovepipe
+    R(x, cx + 2, Y + 1, 4, 11, K.out); R(x, cx + 3, Y + 2, 2, 10, '#5d5d6b'); P(x, cx + 3, Y + 3, '#8a8a99'); R(x, cx + 1, Y, 6, 2, '#3a3a44');
+    // door: carved frame, painted leaf with a gold border and a knot ornament, wooden threshold
+    const dB = baseY(0), dT = dB - 15, fr = shade(dc, -0.4);
+    R(x, cx - 6, dT - 1, 13, dB - dT + 1, K.out); R(x, cx - 5, dT, 11, dB - dT, fr);
+    R(x, cx - 4, dT + 2, 9, dB - dT - 2, dc); R(x, cx - 4, dT + 2, 9, 1, shade(dc, 0.3));
+    R(x, cx - 3, dT + 3, 7, 1, K.gold); R(x, cx - 3, dB - 2, 7, 1, K.gold); R(x, cx - 3, dT + 3, 1, dB - dT - 5, K.gold); R(x, cx + 3, dT + 3, 1, dB - dT - 5, K.gold);
+    P(x, cx, dT + 6, '#2b52a5'); P(x, cx - 1, dT + 7, '#2b52a5'); P(x, cx + 1, dT + 7, '#2b52a5'); P(x, cx, dT + 8, '#2b52a5'); P(x, cx, dT + 7, K.gold); // үлзий knot
+    P(x, cx - 1, dT + 11, '#2b52a5'); P(x, cx + 1, dT + 11, '#2b52a5'); P(x, cx + 2, dT + 9, shade(dc, -0.25));
+    for (let i = -5; i <= 5; i += 2) P(x, cx + i, dT, K.gold);
+    R(x, cx - 6, dB, 13, 2, '#6b4220'); R(x, cx - 6, dB, 13, 1, '#a46d3b');
+    // little plaque for the town gers
+    if (o.id === 'arcade' || o.id === 'home') glyph(x, cx + 9, Y + 32, o.id === 'arcade' ? ICON7.book : ICON7.heart, { x: K.red, k: K.out, w: K.white, g: K.gold });
+  }
+  /** Монгол бичгийн академи: a traditional hall with a curved green roof, red posts, carved doors and a signboard in vertical script. */
+  function academy(x, o) {
+    const X = o.x * 16, Y = o.y * 16, G = '#2f7d5b', GL = '#46a077', GD = '#1d5a40';
+    ell(x, X + 32, Y + 46, 32, 3, 'rgba(20,40,10,.25)');
+    R(x, X + 2, Y + 40, 60, 7, K.out); R(x, X + 3, Y + 41, 58, 5, K.stone); R(x, X + 3, Y + 41, 58, 1, K.stoneL); R(x, X + 24, Y + 45, 16, 2, K.stoneD);
+    R(x, X + 6, Y + 19, 52, 22, K.out); R(x, X + 7, Y + 20, 50, 20, '#f2e8d2'); R(x, X + 7, Y + 36, 50, 4, '#c9b48c');
+    for (const wx of [11, 45]) { R(x, X + wx, Y + 24, 8, 9, K.out); R(x, X + wx + 1, Y + 25, 6, 7, '#7a4a2a'); for (let i = 0; i < 3; i++) { R(x, X + wx + 1, Y + 26 + i * 2, 6, 1, K.goldD); } R(x, X + wx + 3, Y + 25, 1, 7, K.goldD); }
+    for (const px of [7, 21, 40, 54]) { R(x, X + px, Y + 20, 3, 20, K.redD); R(x, X + px, Y + 20, 1, 20, K.red); }
+    R(x, X + 25, Y + 24, 14, 16, K.out); R(x, X + 26, Y + 25, 12, 15, '#c2302a'); R(x, X + 31, Y + 25, 2, 15, K.redD);
+    for (let i = 0; i < 3; i++) { P(x, X + 28, Y + 28 + i * 4, K.gold); P(x, X + 35, Y + 28 + i * 4, K.gold); }
+    R(x, X + 5, Y + 18, 54, 3, GD); for (let i = 7; i < 58; i += 4) { P(x, X + i, Y + 19, K.gold); P(x, X + i + 2, Y + 19, '#e14b3d'); }
+    for (let i = -2; i <= 66; i++) {                                         // curved roof with upturned eaves
+      const d = i < 16 ? 16 - i : i > 48 ? i - 48 : 0, top = Y + 5 + Math.round(d * 0.7), lift = i < 3 ? 3 - i : i > 61 ? i - 61 : 0, bot = Y + 18 - lift;
+      P(x, X + i, top - 1, K.out);
+      for (let y = top; y < bot; y++) P(x, X + i, y, (y - Y) % 3 === 0 ? GD : (i + 70) % 4 === 0 ? G : GL);
+      P(x, X + i, bot, K.out); P(x, X + i, bot - 1, K.gold);
+    }
+    R(x, X + 15, Y + 4, 34, 2, K.out); R(x, X + 16, Y + 4, 32, 1, K.gold);
+    R(x, X + 30, Y - 3, 4, 8, K.out); R(x, X + 31, Y - 2, 2, 6, K.gold); R(x, X + 29, Y - 5, 6, 3, K.out); R(x, X + 30, Y - 4, 4, 1, K.gold);
+    R(x, X + 22, Y + 9, 20, 9, K.out); R(x, X + 23, Y + 10, 18, 7, '#24307a');                                   // signboard: vertical script
+    for (let k = 0; k < 4; k++) { const sx = X + 26 + k * 4; R(x, sx, Y + 11, 1, 5, K.gold); P(x, sx - 1, Y + 12 + (k % 2), K.gold); P(x, sx + 1, Y + 14 - (k % 2), K.gold); }
   }
   function shop(x, o) {
     const X = o.x * 16, Y = o.y * 16;
@@ -215,23 +273,155 @@
     const key = roof + door; if (gerCache.has(key)) return gerCache.get(key);
     const m = mk(48, 50); m.x.translate(0, 2); ger(m.x, { x: 0, y: 0, roof, doorCol: door, id: 'own' }); gerCache.set(key, m.c); return m.c;
   }
-  /** Ger interior for the home panel. Items appear when owned. */
+  // ------------------------------------------------------------ inside a ger: 320×210, standing at the south door looking north to the khoimor.
+  // West (left) is the men's side: saddle and the airag bag. East (right) is the women's side: cupboard and water.
+  const ROOM = { W: 320, H: 210, cx: 160, fy: 142, frx: 146, fry: 56 };
+  function gerRoom(roof, door, furn) {
+    const { W, H, cx, fy, frx, fry } = ROOM, has = (id) => (furn || []).includes(id), dc = door || '#e8892b';
+    const ORG = '#d9762b', ORGD = '#9a4a1a', ORGL = '#f3a457', BLU = '#2b52a5', BLUL = '#6a92de', GLD = '#f7c646', OUT = '#2a1a10';
+    const { c, x } = mk(W, H);
+    const floorTop = (X) => fy - fry * Math.sqrt(Math.max(0, 1 - ((X - cx) / frx) ** 2)), wallTop = (X) => floorTop(X) - 44;
+    const TY = 16, TRX = 24, TRY = 9, EDGE = wallTop(cx - frx);
+    R(x, 0, 0, W, H, '#1e140c');
+    // ceiling: felt lining seen between the roof poles
+    for (let X = cx - frx; X <= cx + frx; X++) {
+      const a = Math.abs(X - cx), top = a <= TRX ? TY : TY + ((a - TRX) / (frx - TRX)) * (EDGE - TY), f = a / frx;
+      R(x, X, Math.round(top), 1, Math.round(wallTop(X) - top) + 1, f < 0.35 ? '#efe4cc' : f < 0.65 ? '#e3d5b8' : f < 0.85 ? '#d3c2a0' : '#bba987');
+    }
+    // уни: the roof poles, painted orange, running from the toono down to the head of the wall
+    for (let j = 0; j < 38; j++) {
+      const ex = Math.round(cx - frx + (j * 2 * frx) / 37), ey = Math.round(wallTop(ex)), sx = Math.round(cx + ((ex - cx) / frx) * (TRX - 3)), sy = TY + 4;
+      line(x, sx, sy, ex, ey, ORG); line(x, sx + 1, sy, ex + 1, ey, ORGD);
+      const bx = Math.round(sx + (ex - sx) * 0.86), by = Math.round(sy + (ey - sy) * 0.86); P(x, bx, by, BLU); P(x, bx + 1, by, GLD);
+    }
+    // sunlight falling through the toono
+    x.fillStyle = 'rgba(255,238,190,.10)'; x.beginPath(); x.moveTo(cx - 14, TY + 3); x.moveTo(cx - 14, TY + 3); x.lineTo(cx + 12, TY + 3); x.lineTo(cx - 4, fy + 30); x.lineTo(cx - 46, fy + 30); x.closePath(); x.fill();
+    // тооно: the crown, with sky and a cloud showing through and its bent spokes
+    ell(x, cx, TY, TRX + 1, TRY + 1, OUT); ell(x, cx, TY, TRX, TRY, ORG); ell(x, cx, TY + 1, TRX, TRY - 1, ORGD); ell(x, cx, TY, TRX - 4, TRY - 3, '#8fd0ff');
+    R(x, cx - 9, TY - 3, 7, 2, '#ffffff'); R(x, cx - 7, TY - 4, 3, 1, '#ffffff');
+    R(x, cx - TRX + 4, TY - 1, 2 * TRX - 8, 2, ORG); R(x, cx - 1, TY - TRY + 3, 2, 2 * TRY - 6, ORG);
+    for (const s of [-1, 1]) { line(x, cx + s * 11, TY - 5, cx + s * 8, TY - 1, ORG); line(x, cx + s * 8, TY + 1, cx + s * 11, TY + 5, ORG); }
+    // хана: the lattice wall behind, over its felt
+    for (let X = cx - frx; X <= cx + frx; X++) {
+      const top = Math.round(wallTop(X)), bot = Math.round(floorTop(X)), f = Math.abs(X - cx) / frx, felt = f < 0.5 ? '#efe1c3' : f < 0.8 ? '#e2d0ad' : '#cdb994';
+      for (let y = top; y <= bot; y++) { const u = (X + y) % 7, v = ((X - y) % 7 + 7) % 7; P(x, X, y, u === 0 || v === 0 ? (f > 0.75 ? ORGD : ORG) : felt); }
+      R(x, X, top, 1, 2, ORGD); R(x, X, bot - 1, 1, 2, '#5a3a22');
+    }
+    // wall carpet behind the khoimor
+    for (let X = 112; X <= 208; X++) {
+      const top = Math.round(wallTop(X)) + 6, bot = Math.round(floorTop(X)) - 4, edge = X < 115 || X > 205;
+      R(x, X, top, 1, bot - top, edge ? GLD : '#a8312a'); R(x, X, top, 1, 2, GLD); R(x, X, bot - 2, 1, 2, GLD);
+      if (!edge && (X - 112) % 8 < 2) { P(x, X, top + 4, BLUL); P(x, X, bot - 5, BLUL); }
+    }
+    for (let r = 0; r < 8; r++) { R(x, cx - r, 56 + r, r * 2 + 1, 1, r < 2 ? GLD : BLU); R(x, cx - r, 71 - r, r * 2 + 1, 1, r < 2 ? GLD : BLU); }
+    // floor: wooden boards
+    ell(x, cx, fy, frx + 1, fry + 1, OUT);
+    for (let dy = -fry; dy <= fry; dy++) {
+      const hw = Math.round(frx * Math.sqrt(Math.max(0, 1 - (dy * dy) / ((fry + 0.5) * (fry + 0.5))))), y = fy + dy;
+      R(x, cx - hw, y, hw * 2 + 1, 1, y % 6 === 0 ? '#9a6c3e' : '#b98a55');
+      for (let i = 0; i < 6; i++) { const gx = cx - hw + Math.floor(hash(i, y) * hw * 2); P(x, gx, y, y % 6 === 3 ? '#c99a62' : '#a87a48'); }
+    }
+    for (let X = cx - frx; X <= cx + frx; X++) { const y = Math.round(fy + fry * Math.sqrt(Math.max(0, 1 - ((X - cx) / frx) ** 2))); if (Math.abs(X - cx) > 16) R(x, X, y - 2, 1, 4, OUT); }
+    // the big carpet in front of the stove
+    R(x, 92, 158, 136, 32, OUT); R(x, 93, 159, 134, 30, '#b8322a'); R(x, 95, 161, 130, 26, GLD); R(x, 97, 163, 126, 22, '#b8322a'); R(x, 99, 165, 122, 18, BLU); R(x, 100, 166, 120, 16, '#b8322a');
+    for (let i = 0; i < 5; i++) { const mx = 112 + i * 24; for (let r = 0; r < 5; r++) { R(x, mx - r, 169 + r, r * 2 + 1, 1, r % 2 ? GLD : BLUL); R(x, mx - r, 179 - r, r * 2 + 1, 1, r % 2 ? GLD : BLUL); } }
+    for (let i = 0; i < 33; i++) { P(x, 94 + i * 4, 189, '#f6dca8'); P(x, 94 + i * 4, 157, '#f6dca8'); }
+    if (has('shirdeg')) { // quilted felt rug with stitched хээ
+      R(x, 66, 136, 58, 22, OUT); R(x, 67, 137, 56, 20, '#ecdcb8'); R(x, 69, 139, 52, 16, '#7a4a2a'); R(x, 70, 140, 50, 14, '#ecdcb8');
+      for (let i = 0; i < 4; i++) { const sx = 76 + i * 12; R(x, sx, 143, 6, 1, '#7a4a2a'); R(x, sx + 5, 143, 1, 5, '#7a4a2a'); R(x, sx + 2, 147, 4, 1, '#7a4a2a'); R(x, sx + 2, 145, 1, 3, '#7a4a2a'); }
+    }
+    ell(x, cx - 26, fy + 24, 18, 5, 'rgba(255,238,190,.16)');                 // sun spot on the floor
+    if (has('shagai')) [[206, 164], [212, 166], [218, 163], [224, 166]].forEach(([sx, sy], i) => { R(x, sx, sy, 4, 3, OUT); R(x, sx, sy, 3, 2, i % 2 ? '#f6ecd8' : '#e2cfa8'); });
+    // the door to the south, open to the bright steppe
+    const dT = fy + fry - 8;
+    R(x, cx - 17, dT - 3, 34, H - dT + 3, OUT); R(x, cx - 16, dT - 2, 32, H - dT + 2, ORGD); R(x, cx - 14, dT, 28, H - dT, '#fff2c8'); R(x, cx - 14, H - 7, 28, 7, '#94d260'); R(x, cx - 14, H - 9, 28, 2, '#c5ec9a');
+    for (let i = -14; i <= 13; i += 3) P(x, cx + i, dT - 2, GLD);
+    R(x, cx - 16, H - 3, 32, 3, '#6b4220'); R(x, cx - 16, H - 3, 32, 1, '#a46d3b');
+
+    // ---- props: standing things, depth-sorted with the people by their base line (y)
+    const props = [], blocks = [];
+    const prop = (x0, y0, w, h2, base, draw, block) => { const m = mk(w, h2); draw(m.x, w, h2); props.push({ x: x0, y: y0, base, c: m.c }); if (block) blocks.push(block); };
+    // two багана posts holding up the toono, painted with bands of ornament
+    for (const px of [149, 171]) prop(px - 3, TY + 6, 7, 136 - TY - 6, 136, (q, w, hh) => {
+      R(q, 1, 0, 5, hh, OUT); R(q, 2, 0, 3, hh, ORG); R(q, 2, 0, 1, hh, ORGL); R(q, 4, 0, 1, hh, ORGD);
+      R(q, 0, 0, 7, 4, OUT); R(q, 1, 1, 5, 2, GLD);
+      for (let y = 12; y < hh - 8; y += 18) { R(q, 2, y, 3, 2, BLU); P(q, 3, y + 2, GLD); R(q, 2, y + 3, 3, 1, '#a8312a'); }
+      R(q, 0, hh - 3, 7, 3, OUT); R(q, 1, hh - 3, 5, 2, '#6b4220');
+    });
+    if (has('tulga')) prop(cx - 15, TY + 8, 30, 150 - TY - 8, 150, (q, w, hh) => {   // iron stove with the tea pot, pipe up through the toono
+      const sb = hh - 16;
+      R(q, 13, 0, 5, sb - 6, OUT); R(q, 14, 0, 3, sb - 6, '#4a4a55'); R(q, 14, 0, 1, sb - 6, '#7a7a88');
+      for (let y = 10; y < sb - 6; y += 22) R(q, 13, y, 5, 1, '#2f2f38');
+      ell(q, 15, sb - 3, 9, 4, OUT); ell(q, 15, sb - 3, 8, 3, '#8a8a99'); ell(q, 14, sb - 5, 6, 1, '#b4b4c2'); R(q, 6, sb - 3, 18, 1, '#5d5d6b');   // тогоо pot
+      R(q, 2, sb, 26, 12, OUT); R(q, 3, sb + 1, 24, 10, '#3a3a44'); R(q, 3, sb + 1, 24, 2, '#5d5d6b');
+      R(q, 9, sb + 4, 12, 6, OUT); R(q, 10, sb + 5, 10, 4, '#f39b2c'); R(q, 12, sb + 6, 6, 2, '#f7c646');
+      R(q, 4, hh - 4, 3, 4, OUT); R(q, 23, hh - 4, 3, 4, OUT);
+    }, [146, 134, 174, 150]);
+    else { prop(cx - 15, 136, 30, 14, 150, (q) => { ell(q, 15, 8, 12, 4, '#77778a'); ell(q, 15, 8, 9, 3, '#4a3e3e'); ell(q, 15, 8, 5, 1, '#7a6a5a'); }, [148, 138, 172, 150]); }
+    // low table with aaruul, boortsog and a cup of milk tea, and two little stools
+    prop(cx - 18, 104, 36, 18, 120, (q) => {
+      R(q, 1, 3, 34, 8, OUT); R(q, 2, 4, 32, 6, ORG); R(q, 2, 4, 32, 1, ORGL); R(q, 5, 6, 26, 2, BLU); for (let i = 7; i < 30; i += 5) P(q, i, 7, GLD);
+      R(q, 3, 11, 2, 6, OUT); R(q, 31, 11, 2, 6, OUT);
+      ell(q, 9, 2, 4, 1, '#ffffff'); P(q, 8, 1, '#f3e6c4'); P(q, 10, 1, '#f3e6c4');                  // aaruul bowl
+      ell(q, 19, 2, 4, 1, '#d8b47e'); P(q, 18, 1, '#a46d3b'); P(q, 20, 1, '#a46d3b');                // boortsog
+      R(q, 27, 0, 3, 3, '#ffffff'); P(q, 28, 0, '#e8d6b0');                                         // tea cup
+    }, [142, 110, 178, 121]);
+    // хоймор: the place of honour, with the family shrine and photos
+    prop(118, 62, 84, 40, 100, (q) => {
+      if (has('avdar')) for (const ax of [0, 44]) {                                                 // two painted chests
+        R(q, ax, 22, 40, 18, OUT); R(q, ax + 1, 23, 38, 16, ORG); R(q, ax + 1, 23, 38, 2, ORGL);
+        for (const px2 of [4, 22]) { R(q, ax + px2, 27, 14, 9, BLU); R(q, ax + px2 + 1, 28, 12, 7, BLUL); R(q, ax + px2 + 5, 30, 4, 3, GLD); }
+      } else { R(q, 14, 26, 56, 14, OUT); R(q, 15, 27, 54, 12, ORG); R(q, 15, 27, 54, 1, ORGL); R(q, 20, 30, 44, 6, BLU); }
+      R(q, 26, 6, 32, 17, OUT); R(q, 27, 7, 30, 15, ORGD); R(q, 28, 8, 28, 13, '#a8312a');           // shrine cabinet
+      R(q, 30, 10, 7, 9, GLD); R(q, 31, 11, 5, 7, '#fff2c8'); R(q, 33, 13, 1, 3, '#c98f22');        // framed picture
+      R(q, 39, 11, 6, 8, '#ffffff'); R(q, 40, 12, 4, 4, '#9fd8f7'); R(q, 40, 16, 4, 2, '#76b947');   // family photo
+      R(q, 47, 10, 7, 9, GLD); R(q, 48, 11, 5, 7, '#f6dca8'); P(q, 50, 13, '#2b1e2e');
+      R(q, 20, 18, 3, 4, GLD); P(q, 21, 16, '#ffd34e'); P(q, 21, 17, '#f39b2c');                     // butter lamps
+      R(q, 61, 18, 3, 4, GLD); P(q, 62, 16, '#ffd34e'); P(q, 62, 17, '#f39b2c');
+      R(q, 34, 3, 16, 4, '#ffffff'); R(q, 34, 3, 16, 1, '#dce8f5');                                  // a khadag over the shrine
+    }, [120, 86, 200, 101]);
+    if (has('morinkhuur')) prop(100, 60, 12, 44, 104, (q) => {                                      // morin khuur on the west of the khoimor
+      R(q, 4, 0, 4, 5, OUT); R(q, 5, 1, 3, 3, '#6b4220'); P(q, 7, 2, '#2b1e2e'); P(q, 3, 3, OUT);    // the horse head
+      R(q, 5, 5, 2, 22, OUT); R(q, 5, 5, 1, 22, '#8a5a33');
+      R(q, 1, 27, 10, 14, OUT); R(q, 2, 28, 8, 12, '#a46d3b'); R(q, 2, 28, 8, 1, '#c99257'); R(q, 5, 28, 2, 12, '#f6dca8');
+    }, null);
+    if (has('or')) for (const [bx, blanket] of [[22, BLU], [248, '#c2427e']]) prop(bx, 104, 50, 32, 134, (q) => { // painted beds along the wall
+      R(q, 0, 0, 50, 12, OUT); R(q, 1, 1, 48, 10, ORG); R(q, 4, 3, 42, 6, BLU); for (let i = 7; i < 44; i += 6) P(q, i, 5, GLD);
+      R(q, 0, 12, 50, 18, OUT); R(q, 1, 12, 48, 16, '#f2eee4'); R(q, 1, 17, 48, 11, blanket); R(q, 1, 17, 48, 1, shade(blanket, 0.3)); R(q, 4, 13, 12, 4, '#ffffff');
+      R(q, 0, 28, 50, 4, OUT); R(q, 1, 28, 48, 2, ORGD);
+    }, [bx, 114, bx + 50, 135]);
+    prop(52, 158, 30, 22, 180, (q) => {                                                            // эмээл: a saddle on its stand (men's side)
+      R(q, 2, 12, 26, 3, OUT); R(q, 3, 12, 24, 2, '#8a5a33'); R(q, 4, 15, 2, 7, OUT); R(q, 24, 15, 2, 7, OUT);
+      R(q, 6, 6, 18, 7, OUT); R(q, 7, 7, 16, 5, '#a8312a'); R(q, 4, 2, 5, 9, OUT); R(q, 5, 3, 3, 7, ORG); R(q, 21, 2, 5, 9, OUT); R(q, 22, 3, 3, 7, ORG);
+      P(q, 6, 4, '#d3d3dc'); P(q, 23, 4, '#d3d3dc'); P(q, 10, 9, '#d3d3dc'); P(q, 15, 9, '#d3d3dc'); P(q, 20, 9, '#d3d3dc');
+      R(q, 9, 13, 1, 5, '#5a3a22'); R(q, 7, 18, 5, 2, '#77778a'); R(q, 20, 13, 1, 5, '#5a3a22'); R(q, 18, 18, 5, 2, '#77778a');
+    }, [54, 170, 80, 181]);
+    prop(32, 128, 22, 32, 160, (q) => {                                                            // хөхүүр: the leather airag bag with its churn stick
+      R(q, 10, 0, 2, 14, '#c99257'); R(q, 9, 0, 4, 2, '#a46d3b');
+      blob(q, 11, 18, 8, 9, '#6b4220', OUT); ell(q, 8, 15, 3, 4, '#8a5a33'); R(q, 4, 27, 14, 3, OUT); R(q, 5, 27, 12, 2, '#a46d3b');
+    }, [34, 150, 52, 161]);
+    prop(248, 140, 32, 36, 176, (q) => {                                                           // painted cupboard with the tea things (women's side)
+      R(q, 0, 8, 32, 28, OUT); R(q, 1, 9, 30, 26, ORG); R(q, 1, 9, 30, 2, ORGL);
+      for (const dx2 of [3, 17]) { R(q, dx2, 13, 12, 18, BLU); R(q, dx2 + 1, 14, 10, 16, BLUL); R(q, dx2 + 4, 19, 4, 5, GLD); P(q, dx2 + 5, 21, '#a8312a'); }
+      R(q, 3, 1, 5, 8, '#c2302a'); R(q, 3, 1, 5, 1, '#ffffff');                                     // thermos
+      R(q, 12, 3, 9, 6, '#d6a23a'); R(q, 20, 4, 3, 2, '#d6a23a'); P(q, 16, 2, '#f7d071');           // brass dom tea pot
+      ell(q, 27, 7, 3, 1, '#ffffff');                                                               // bowls
+    }, [248, 162, 280, 177]);
+    prop(216, 172, 20, 22, 194, (q) => {                                                           // water barrel and ladle
+      R(q, 2, 4, 16, 18, OUT); R(q, 3, 5, 14, 16, '#a46d3b'); R(q, 3, 5, 3, 16, '#c99257'); R(q, 3, 8, 14, 1, '#77778a'); R(q, 3, 17, 14, 1, '#77778a');
+      ell(q, 10, 4, 7, 2, OUT); ell(q, 10, 4, 6, 1, '#4aa6e2'); R(q, 12, 0, 1, 5, '#8a5a33'); R(q, 10, 0, 4, 1, '#8a5a33');
+    }, [218, 184, 234, 195]);
+    const inFloor = (px, py) => ((px - cx) / (frx - 8)) ** 2 + ((py - fy - 1) / (fry - 5)) ** 2 <= 1 || (Math.abs(px - cx) < 10 && py > fy && py < H - 6);
+    const free = (px, py) => inFloor(px, py) && !blocks.some(([a, b, c2, d]) => px > a && px < c2 && py > b && py < d);
+    return { bg: c, props, free, W, H };
+  }
+  /** Ger interior picture (decorate panel): the full room scaled into a small canvas. */
   function interior(canvas, roof, furn) {
-    const x = canvas.getContext('2d'); x.imageSmoothingEnabled = false; const W2 = canvas.width, H2 = canvas.height, cx = W2 / 2;
-    R(x, 0, 0, W2, H2, '#3a2a1e');
-    ell(x, cx, H2 / 2 + 6, W2 / 2 - 6, H2 / 2 - 10, '#8c6a46'); ell(x, cx, H2 / 2 + 6, W2 / 2 - 10, H2 / 2 - 14, '#e9dcc0');
-    for (let a = 0; a < 28; a++) { const t = (a / 28) * Math.PI * 2; line(x, cx, 22, Math.round(cx + Math.cos(t) * (W2 / 2 - 8)), Math.round(H2 / 2 + 6 + Math.sin(t) * (H2 / 2 - 12)), 'rgba(181,118,58,.35)'); }
-    ell(x, cx, H2 / 2 + 6, W2 / 2 - 6, H2 / 2 - 10, 'rgba(0,0,0,0)');
-    for (let i = 0; i < 40; i++) { const t = (i / 40) * Math.PI * 2, px = Math.round(cx + Math.cos(t) * (W2 / 2 - 8)), py = Math.round(H2 / 2 + 6 + Math.sin(t) * (H2 / 2 - 12)); R(x, px - 1, py - 1, 3, 3, roof); }
-    blob(x, cx, 22, 7, 4, '#e8a33d'); line(x, cx - 7, 22, cx + 7, 22, K.woodD); line(x, cx, 18, cx, 26, K.woodD);
-    R(x, cx - 9, H2 - 12, 18, 10, shade(roof, -0.2)); R(x, cx - 7, H2 - 10, 14, 8, K.red);
-    const has = (id) => furn.includes(id);
-    if (has('shirdeg')) { R(x, cx - 26, H2 / 2 + 12, 52, 22, K.out); R(x, cx - 25, H2 / 2 + 13, 50, 20, K.red); R(x, cx - 22, H2 / 2 + 16, 44, 14, K.gold); R(x, cx - 18, H2 / 2 + 19, 36, 8, K.blue); for (let i = 0; i < 5; i++) P(x, cx - 14 + i * 7, H2 / 2 + 22, K.white); }
-    if (has('tulga')) { R(x, cx - 8, H2 / 2 - 6, 16, 14, K.out); R(x, cx - 7, H2 / 2 - 5, 14, 12, '#5a5a66'); R(x, cx - 5, H2 / 2 + 1, 10, 4, K.orange); P(x, cx - 2, H2 / 2 + 2, K.gold); R(x, cx - 1, 26, 3, H2 / 2 - 32, '#4a4a55'); }
-    if (has('avdar')) { R(x, cx - 22, 30, 44, 16, K.out); R(x, cx - 21, 31, 42, 14, K.orange); R(x, cx - 21, 31, 42, 3, K.red); for (let i = 0; i < 4; i++) R(x, cx - 17 + i * 10, 36, 6, 6, K.blue); }
-    if (has('morinkhuur')) { R(x, cx + 26, 26, 4, 30, K.out); R(x, cx + 27, 27, 2, 28, K.wood); blob(x, cx + 28, 56, 4, 6, K.wood); R(x, cx + 25, 24, 6, 4, K.woodD); }
-    if (has('or')) { R(x, 18, H2 / 2 - 8, 22, 40, K.out); R(x, 19, H2 / 2 - 7, 20, 38, K.wood); R(x, 21, H2 / 2 - 5, 16, 34, K.white); R(x, 21, H2 / 2 - 5, 16, 8, K.light); R(x, W2 - 40, H2 / 2 - 8, 22, 40, K.out); R(x, W2 - 39, H2 / 2 - 7, 20, 38, K.wood); R(x, W2 - 37, H2 / 2 - 5, 16, 34, K.white); R(x, W2 - 37, H2 / 2 - 5, 16, 8, K.pink); }
-    if (has('shagai')) { blob(x, cx + 34, H2 - 26, 5, 4, K.woodL); P(x, cx + 32, H2 - 27, K.white); P(x, cx + 35, H2 - 25, K.white); }
+    const rm = gerRoom(roof, null, furn), x = canvas.getContext('2d'); x.imageSmoothingEnabled = false;
+    const k = Math.min(canvas.width / rm.W, canvas.height / rm.H), ox = (canvas.width - rm.W * k) / 2, oy = (canvas.height - rm.H * k) / 2;
+    x.fillStyle = '#1e140c'; x.fillRect(0, 0, canvas.width, canvas.height);
+    x.drawImage(rm.bg, ox, oy, rm.W * k, rm.H * k);
+    rm.props.slice().sort((a, b) => a.base - b.base).forEach((p) => x.drawImage(p.c, ox + p.x * k, oy + p.y * k, p.c.width * k, p.c.height * k));
   }
   /** Mongolian wrestler (32×48, facing right): open-front zodog jacket with long sleeves, back panel and waist cord,
       tight shuudag briefs, knee-high gutal boots with upturned toes, wrestling hat for the eagle dance.
@@ -316,7 +506,7 @@
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery, academy })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
@@ -590,5 +780,5 @@
     return img;
   }
 
-  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, wrestler };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, crop, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler };
 })(window.TG);

@@ -10,7 +10,7 @@ import puppeteer from 'puppeteer-core';
 const root = process.env.ROOT || resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = process.env.CHROME_PATH || (process.platform === 'darwin'
   ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : '/usr/bin/google-chrome');
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.webmanifest': 'application/manifest+json', '.txt': 'text/plain' };
 
 const server = createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
@@ -199,11 +199,24 @@ try {
   await page.evaluate(() => { TG.store.active().village.coins = 2000; TG.store.active().village.xp = 3000; [...document.querySelectorAll('.modal .btn.primary')].pop().click(); }); await sleep(700);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => { const l = TG._village.lots()[0]; if (l) l.furn = ['tulga', 'or', 'avdar', 'morinkhuur', 'shirdeg', 'shagai']; TG._village.enterGer(0); }); await sleep(500);
-  await check('walkable ger interior', '.ger-inside .ger-cv');
-  await page.evaluate(() => { const c = document.querySelector('.ger-cv'), r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + r.width * 0.5, clientY: r.top + r.height * (100 / 170), bubbles: true })); }); await sleep(1600);
-  await page.evaluate(() => document.querySelector('.ger-act').click()); await sleep(300);
-  if (!(await page.evaluate(() => /🍵/.test(document.querySelector('.ger-say').textContent)))) errors.push('ger interior: making tea at the stove did not work');
-  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await check('full-screen ger interior', '.fscene.ger-scene .scene-cv');
+  if (!(await page.evaluate(() => { const r = document.querySelector('.ger-scene').getBoundingClientRect(); return r.width >= innerWidth - 1 && r.height >= innerHeight - 1; }))) errors.push('ger interior: should fill the whole screen');
+  // tap the floor to walk, then walk up to the stove and press E
+  const p0 = await page.evaluate(() => ({ x: TG._village.ger.me.x, y: TG._village.ger.me.y }));
+  await page.evaluate(() => { const c = document.querySelector('.ger-scene .scene-cv'), r = c.getBoundingClientRect(); c.dispatchEvent(new PointerEvent('pointerdown', { clientX: r.left + r.width * 0.35, clientY: r.top + r.height * 0.5, bubbles: true })); }); await sleep(900);
+  if (await page.evaluate((p0) => Math.hypot(TG._village.ger.me.x - p0.x, TG._village.ger.me.y - p0.y) < 8, p0)) errors.push('ger interior: tapping the floor did not walk there');
+  await page.evaluate(() => { const m = TG._village.ger.me; m.x = m.tx = 160; m.y = m.ty = 160; }); await sleep(250);
+  await page.keyboard.press('KeyE'); await sleep(300);
+  if (!(await page.evaluate(() => /🍵/.test(document.querySelector('.ger-scene .scene-info').textContent)))) errors.push('ger interior: pressing E at the stove did not make tea');
+  await page.keyboard.down('Space'); await sleep(150); await page.keyboard.up('Space');
+  if (!(await page.evaluate(() => TG._village.ger.me.z > 0))) errors.push('ger interior: Space did not jump');
+  await sleep(500); await page.keyboard.press('Escape'); await sleep(300);
+  if (await page.evaluate(() => !!document.querySelector('.fscene'))) errors.push('ger interior: Escape did not leave the ger');
+  // the village: Space jumps, E interacts, the minimap is shown
+  step = 'village jump + minimap';
+  await check('village minimap', '.village .v-mini');
+  await page.keyboard.down('Space'); await sleep(100); await page.keyboard.up('Space');
+  if (!(await page.evaluate(() => performance.now() - (TG._village.live().me.jt || 0) < 1000))) errors.push('village: Space did not jump');
 
   // horse riding and the Naadam horse race
   step = 'horse riding';
@@ -300,17 +313,29 @@ try {
   // actually travel there: visit the 3 places, then the local guide gives the stamp
   step = 'travel to Ulaanbaatar';
   await page.evaluate(() => document.querySelector('.pp-go .btn.primary').click()); await sleep(600);
-  await check('travel map', '.travel .travel-cv');
+  await check('travel map', '.travel-scene .scene-cv');
+  await check('travel minimap', '.travel-scene .scene-mini');
   const goToThing = (sel) => page.evaluate((sel) => { const c = TG.travel._cur, t = sel === 'guide' ? c.things.find((q) => q.kind === 'guide') : c.things.filter((q) => q.kind === 'mark')[sel]; c.me.x = c.me.tx = t.x; c.me.y = c.me.ty = t.y + 4; }, sel);
-  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(200);
-  if (await page.evaluate(() => !!document.querySelector('.travel-info .l-opt'))) errors.push('travel: the guide should ask you to visit the 3 places first');
-  for (let i = 0; i < 3; i++) { await goToThing(i); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(200); }
-  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel .btn.primary').click()); await sleep(250);
-  await page.evaluate(() => [...document.querySelectorAll('.travel-info .l-opt')].find((x) => /Өргөө/.test(x.textContent)).click()); await sleep(400);
+  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel-scene .scene-act').click()); await sleep(200);
+  if (await page.evaluate(() => !!document.querySelector('.travel-scene .scene-info .l-opt'))) errors.push('travel: the guide should ask you to visit the 3 places first');
+  for (let i = 0; i < 3; i++) { await goToThing(i); await sleep(250); await page.keyboard.press('KeyE'); await sleep(200); }
+  if ((await page.evaluate(() => TG.travel._cur.seen.length)) !== 3) errors.push('travel: pressing E at the landmarks did not visit them');
+  await goToThing('guide'); await sleep(250); await page.evaluate(() => document.querySelector('.travel-scene .scene-act').click()); await sleep(250);
+  await page.evaluate(() => [...document.querySelectorAll('.travel-scene .scene-info .l-opt')].find((x) => /Өргөө/.test(x.textContent)).click()); await sleep(400);
   if (!(await page.evaluate(() => !!(TG.store.active().passport || { stamps: {} }).stamps.ub))) errors.push('travel: the guide did not give the Ulaanbaatar stamp');
-  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(400);
+  await page.evaluate(() => TG.travel._cur.close()); await sleep(400);
   await page.evaluate(() => TG.go('aimag', { id: 'tuv' })); await sleep(700);
   await check('next province unlocked after the stamp', '.pp-visit + .card .pp-go, .pp-visit ~ .pp-go');
+  // Mongol script academy: a good tracing earns stars, a scribble does not
+  step = 'mongol script academy';
+  await page.evaluate(() => TG.go('bichig')); await sleep(900);
+  await check('academy', '.bichig .bc-cv');
+  if (!(await page.evaluate(() => !!TG.bichig._cur.lay))) errors.push('academy: the Mongol script letter did not render');
+  const scribble = await page.evaluate(() => { const c = TG.bichig._cur; c.setStrokes([[{ x: 4, y: 4 }, { x: 30, y: 10 }, { x: 10, y: 30 }]]); c.check(); return (TG.store.active().bichig || { s: {} }).s.a || 0; });
+  if (scribble) errors.push('academy: a scribble in the corner should not pass');
+  const traced = await page.evaluate(() => { const c = TG.bichig._cur, { W, H, lay, item } = c, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d'); TG.bichig.drawGlyph(x, item.g, lay, W, H, '#000'); const d = x.getImageData(0, 0, W, H).data, st = []; for (let y = 0; y < H; y += 5) for (let X = 0; X < W; X += 5) if (d[(y * W + X) * 4 + 3] > 100) st.push([{ x: X, y }]); c.setStrokes(st); c.check(); return (TG.store.active().bichig || { s: {} }).s.a || 0; });
+  if (!traced) errors.push('academy: tracing the letter carefully did not earn a star');
+  await check('academy after a good tracing', '.bc-tile.done');
   // family tree: fill one branch -> one star
   step = 'family tree';
   await page.evaluate(() => TG.go('tree')); await sleep(300);

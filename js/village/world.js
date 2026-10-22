@@ -37,6 +37,7 @@
   const ARENA = { cx: 47.5, cy: 12.5, rx: 6, ry: 4.6 };
   for (let y = 2; y < H - 1; y++) for (let x = 36; x < W - 1; x++) if (((x + 0.5 - ARENA.cx) / ARENA.rx) ** 2 + ((y + 0.5 - ARENA.cy) / ARENA.ry) ** 2 <= 1) set(x, y, 'a');
   rect(46, 18, 47, 24, 'p');
+  rect(48, 20, 50, 20, 'p'); // lane to the Mongol script academy
 
   const objects = [
     { id: 'home', kind: 'ger', x: 3, y: 3, w: 3, h: 3, door: { x: 4, y: 6 }, accent: '#2F6BFF', sign: '🏠' },
@@ -52,6 +53,7 @@
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
     { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
     { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
+    { id: 'academy', kind: 'academy', x: 49, y: 17, w: 4, h: 3, door: { x: 50, y: 20 } }, // Mongol script academy
     { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
     // townspeople with quests (see NPCS in village.js)
     { id: 'herder', kind: 'npcq', x: 25, y: 16, w: 1, h: 1, door: { x: 25, y: 17 } },

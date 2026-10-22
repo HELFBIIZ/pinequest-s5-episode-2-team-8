@@ -79,6 +79,10 @@ try {
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && o.bubble && /Сайн уу/.test(o.bubble.text); }), 'B sees A say hi');
   ok('preset phrases appear as speech bubbles');
 
+  await a.evaluate(() => document.querySelector('.v-jump').click());
+  await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && performance.now() - (o.jt || -1e9) < 2000; }), 'B sees A jump');
+  ok('jumping shows for everyone');
+
   await a.evaluate(() => TG._village.buyLot(2, 'red', 'gold'));
   await until(() => b.evaluate(() => { const l = TG._village.lots()[2]; return l && l.n === 'Бат' && l.roof === 'red'; }), 'B sees A\'s new ger');
   if ((await a.evaluate(() => TG.store.active().village.coins)) !== 400) throw new Error('buying a ger did not cost 200 coins');
