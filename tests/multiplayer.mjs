@@ -1,5 +1,5 @@
 // Multiplayer test: starts server.js, opens two separate players in the village,
-// and checks they see each other, share one garden, and can talk with preset phrases.
+// and checks they see each other, share the village, and can talk with preset phrases.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir, networkInterfaces } from 'node:os';
@@ -36,7 +36,7 @@ async function player(name, look, room, ctxIn) {
     localStorage.clear();
     const p = TG.store.addProfile({ name, age: 9, avatar: '🐎' }); TG.store.state.loggedIn = true;
     TG.store.state.settings.sound = false;
-    p.village = { tips: true, look, seeds: { carrot: 5 }, xp: 200, coins: 600, room: room || 'NUTAG' };
+    p.village = { tips: true, look, xp: 200, coins: 600, room: room || 'NUTAG' };
     TG.go('village');
   }, name, look, room);
   await until(() => page.evaluate(() => TG._village.live() && TG._village.live().online), `${name} online`);
@@ -62,21 +62,6 @@ try {
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && Math.abs(o.x - 15) < 0.01 && Math.abs(o.y - 13) < 0.01; }), 'B sees A move', 12000);
   ok('movement is shared live');
 
-  await a.evaluate(() => TG._village.act('plant', 0, 'carrot'));
-  await until(() => b.evaluate(() => { const p = TG._village.live().plots[0]; return p && p.c === 'carrot' && p.n === 'Бат'; }), 'B sees A\'s carrot');
-  ok('planting appears in the shared garden for everyone');
-
-  await b.evaluate(() => TG._village.act('water', 0));
-  await until(() => a.evaluate(() => TG._village.live().plots[0].w > 0), 'A sees B watered');
-  const helped = await b.evaluate(() => TG.store.active().village.quests.list.find((q) => q.k === 'help').p);
-  if (helped !== 1) throw new Error('watering a friend\'s plant did not count as helping');
-  ok('watering a friend\'s plant syncs and counts as helping');
-
-  const seedsBefore = await b.evaluate(() => TG.store.active().village.seeds.carrot);
-  await b.evaluate(() => TG._village.act('plant', 0, 'carrot'));   // plot is taken: must be refused
-  await sleep(400);
-  if ((await b.evaluate(() => TG.store.active().village.seeds.carrot)) !== seedsBefore) throw new Error('a refused plant still used a seed');
-  ok('planting on a taken plot is refused without losing a seed');
 
   await a.evaluate(() => document.querySelector('.v-bottom .v-round[aria-label="talk"]').click());
   await sleep(300);
@@ -107,7 +92,7 @@ try {
     if (over) break;
     for (const [pg, k] of [[a, 0], [b, 1]]) {
       await until(() => pg.evaluate(() => { const m = document.querySelector('.v-wr-moves'); return (m && !m.classList.contains('hidden')) || !!document.querySelector('.v-wrestle .row-btns'); }), 'move buttons', 6000);
-      await pg.evaluate((k) => { const btns = document.querySelectorAll('.v-wr-moves .btn'); if (btns.length && !document.querySelector('.v-wrestle .row-btns')) { btns[(k + Math.floor(Math.random() * 3)) % 3].click(); setTimeout(() => { const go = document.querySelector('.v-wr-timing .btn'); if (go) go.click(); }, 120 + Math.random() * 300); } }, k);
+      await pg.evaluate((k) => { const btns = document.querySelectorAll('.v-wr-moves .btn'); if (btns.length && !document.querySelector('.v-wrestle .row-btns')) { btns[[0, 4, 12][(k + Math.floor(Math.random() * 3)) % 3]].click(); /* timing moves: push, hip throw, knee grab */ setTimeout(() => { const go = document.querySelector('.v-wr-timing .btn'); if (go) go.click(); }, 120 + Math.random() * 300); } }, k);
     }
     await sleep(1600);
   }

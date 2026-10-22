@@ -103,9 +103,26 @@ try {
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
   if (!(await page.evaluate(() => !!TG._village.dog()))) errors.push('village: Basar the dog is not following the player');
-  await page.evaluate(() => { const v = TG.store.active().village; v.seeds.carrot = 2; TG._village.act('plant', 0, 'carrot'); });
-  await sleep(300);
-  if (!(await page.evaluate(() => { const p = TG.store.active().village.garden[0]; return p && p.c === 'carrot'; }))) errors.push('village: planting in solo mode did not work');
+  // the dairy yard: let the calf suckle, milk the cow in rhythm, then make aaruul at the rack
+  step = 'dairy yard';
+  if (await page.evaluate(() => !!TG.store.active().village.garden)) errors.push('dairy yard: the old garden data was not removed');
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.milk('cow1'); }); await sleep(300);
+  await check('milking', '.modal .v-milk');
+  await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(1600);   // the calf suckles first
+  for (let i = 0; i < 5; i++) { await page.waitForFunction(() => { const m = TG._village.milkNow(); return m.phase === 'milk' && m.pos > 0.42 && m.pos < 0.58; }, { timeout: 5000 }); await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(60); }
+  if ((await page.evaluate(() => TG.store.active().village.produce.milk || 0)) < 2) errors.push('dairy yard: milking the cow gave no milk');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => TG._village.station('rack')); await sleep(250);
+  await check('aaruul rack', '.modal .v-list .v-row');
+  await page.evaluate(() => document.querySelector('.modal .v-row .btn.primary').click()); await sleep(150);
+  for (let i = 0; i < 6; i++) { await page.evaluate(() => { const b = document.querySelector('.modal .btn.primary.big'); if (b) b.click(); }); await sleep(120); }
+  const yard = await page.evaluate(() => { const p = TG.store.active().village.produce; return { milk: p.milk || 0, aaruul: p.aaruul || 0 }; });
+  if (yard.aaruul !== 3 || yard.milk !== 0) errors.push(`dairy yard: making aaruul did not work ${JSON.stringify(yard)}`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  await page.evaluate(() => { const v = TG.store.active().village, e0 = v.energy = 50; TG.villageEat('aaruul'); }); await sleep(150);
+  const ate = await page.evaluate(() => { const v = TG.store.active().village; return { aaruul: v.produce.aaruul, energy: v.energy }; });
+  if (ate.aaruul !== 2 || ate.energy <= 50) errors.push(`dairy yard: eating your own aaruul did not work ${JSON.stringify(ate)}`);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
   for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(300); await check(`village ${btn} panel`, '.modal'); }
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.arena(); }); await sleep(300); await check('village wrestling panel', '.v-wr-head');
@@ -317,7 +334,7 @@ try {
   await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
   await check('townsperson dialogue', '.npc-talk .npc-head');
   await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(200);
-  await page.evaluate(() => TG.villageQuest('plant', 4)); await sleep(200);
+  await page.evaluate(() => TG.villageQuest('milk', 3)); await sleep(200);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => TG._village.npc('farmer')); await sleep(300);
   await page.evaluate(() => [...document.querySelectorAll('.npc-talk .btn.primary')].pop().click()); await sleep(250);
@@ -330,8 +347,56 @@ try {
   for (let i = 0; i < 4; i++) { await page.evaluate(() => document.querySelector('.v-wr-devee .btn').click()); await sleep(150); }
   await sleep(1100);
   const nMoves = await page.evaluate(() => document.querySelectorAll('.v-wr-moves .btn').length);
-  if (nMoves !== 7) errors.push(`wrestling: expected 7 techniques, found ${nMoves}`);
+  if (nMoves !== 13) errors.push(`wrestling: expected 13 techniques, found ${nMoves}`);
+  // a footwork move (хавирах) needs the arrow combo, not Space
+  await page.evaluate(() => [...document.querySelectorAll('.v-wr-moves .btn')].find((b) => /Хавирах/.test(b.querySelector('b').textContent)).click()); await sleep(200);
+  if (!(await page.evaluate(() => document.querySelectorAll('.v-wr-combo .v-wr-arrow').length >= 3))) errors.push('wrestling: хавирах should ask for a footwork combo');
+  for (let i = 0; i < 8 && (await page.evaluate(() => !!document.querySelector('.v-wr-arrow.next'))); i++) { const k = await page.evaluate(() => ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'][['←', '→', '↑', '↓'].indexOf(document.querySelector('.v-wr-arrow.next').textContent)]); await page.keyboard.press(k); await sleep(60); }
+  await sleep(300);
+  if (!(await page.evaluate(() => /%/.test(document.querySelector('.v-wr-msg').textContent)))) errors.push('wrestling: finishing the combo did not perform the move');
+  // first-person wrestling view
+  await page.evaluate(() => document.querySelector('.v-wr-view').click()); await sleep(400);
+  if ((await page.evaluate(() => TG.store.active().village.wrView)) !== 'fp') errors.push('wrestling: the first-person view did not switch on');
+  await page.evaluate(() => document.querySelector('.v-wr-view').click()); await sleep(100);
   if (!(await page.evaluate(() => /3/.test(document.querySelector('.v-wrestle .eyebrow').textContent)))) errors.push('wrestling: late rounds should need 3 falls');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+
+  // defend the homeland: raiders ride in, whistling arrows break their courage, winning teaches the real history
+  step = 'defend the homeland';
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.general(); }); await sleep(250);
+  await check('general', '.modal .v-list .v-row');
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.battle('merkit'); }); await sleep(2600);
+  if (!(await page.evaluate(() => TG._village.battleState() && TG._village.battleState().enemies.length >= 1))) errors.push('battle: no raiders rode in');
+  for (let i = 0; i < 30 && (await page.evaluate(() => TG._village.battleState().repelled < 1)); i++) { await page.evaluate(() => { const bt = TG._village.battleState(), L = TG._village.live(), e = bt.enemies.find((q) => !q.flee); if (e) { L.me.px = e.x - 1.5; L.me.py = e.y - 0.82; } }); await page.keyboard.press('KeyF'); await sleep(250); }
+  if (!(await page.evaluate(() => TG._village.battleState().repelled >= 1))) errors.push('battle: arrows did not make a raider lose courage');
+  await page.evaluate(() => { const bt = TG._village.battleState(); bt.wave = bt.ch.waves.length - 1; bt.toSpawn = 0; bt.enemies = []; }); await sleep(600);
+  if (!(await page.evaluate(() => !!(TG.store.active().village.camp || {}).won && !!TG.store.active().village.camp.won.merkit))) errors.push('battle: winning the Merkit chapter was not recorded');
+  if (!(await page.evaluate(() => /Нууц товчоо|Secret History/.test(document.querySelector('.modal').textContent)))) errors.push('battle: the history lesson after the battle is missing');
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(800);
+  // first-person battle: F looses an arrow in 3D too
+  await page.evaluate(() => TG._village.battle('tatar')); await sleep(300);
+  await page.evaluate(() => TG._village.fp()); await sleep(3500);
+  if (!(await page.evaluate(() => !!document.querySelector('.village-fp .fp-cv')))) errors.push('first-person village: did not open');
+  await sleep(1500);
+  await page.evaluate(() => { const bt = TG._village.battleState(), e = bt && bt.enemies[0], sc = TG._village.fpScene; if (e) { sc.me.x = e.x - 1; sc.me.y = e.y; } }); await sleep(200);
+  await page.keyboard.press('KeyF'); await sleep(100);
+  if (!(await page.evaluate(() => TG._village.battleState().arrows.length >= 1 || TG._village.battleState().repelled >= 1))) errors.push('first-person battle: F did not shoot');
+  await page.evaluate(() => { const bt = TG._village.battleState(); bt.herd = 0; }); await sleep(600);
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(300);
+  await page.evaluate(() => TG._village.fpScene.close()); await sleep(400);
+  // the historian: find an arrowhead in Khentii, hand it in
+  step = 'historian';
+  await page.evaluate(() => TG.history.open()); await sleep(250);
+  await check('historian', '.modal .btn.primary');
+  await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(1200);
+  const art = await page.evaluate(() => { const c = TG.travel._cur, t = c.things.find((q) => q.kind === 'artifact'); if (!t) return false; c.me.x = c.me.tx = t.x; c.me.y = c.me.ty = t.y + 2; return true; });
+  if (!art) errors.push('historian: the arrowhead is not in Khentii');
+  else { await sleep(250); await page.keyboard.press('KeyE'); await sleep(300); }
+  if (!(await page.evaluate(() => TG.store.active().hist && TG.store.active().hist.done))) errors.push('historian: finding the item did not count');
+  await page.evaluate(() => TG.travel._cur.close()); await sleep(400);
+  await page.evaluate(() => TG.history.open()); await sleep(250);
+  await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(300);
+  if ((await page.evaluate(() => TG.store.active().hist.step)) !== 1) errors.push('historian: handing in did not move to the next task');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
   // Basar understands English and does simple maths offline

@@ -6,7 +6,7 @@
   const hash = (x, y) => { let n = x * 374761393 + y * 668265263; n = (n ^ (n >> 13)) * 1274126177; return ((n ^ (n >> 16)) >>> 0) / 4294967295; };
 
   // ---------------------------------------------------------------- map
-  // g grass · p path · s plaza · w water · d dock · o soil (garden plot) · f fence · T tree · B building · r rock
+  // g grass · p path · s plaza · w water · d dock · k trampled earth (dairy yard) · f fence · T tree · B building · r rock
   const g = Array.from({ length: H }, () => Array(W).fill('g'));
   const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < W && y < H) g[y][x] = c; };
   const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
@@ -17,12 +17,11 @@
   rect(15, 10, 20, 15, 's');
   rect(19, 5, 24, 5, 'p'); rect(25, 5, 26, 5, 'd');
   rect(4, 6, 4, 11, 'p'); rect(11, 6, 11, 11, 'p'); rect(22, 11, 23, 11, 'p');
-  // garden (fenced) with 24 shared plots
+  // хот айл: the fenced herding and dairy yard, its ground trampled bare by the animals
   for (let x = 3; x <= 14; x++) { set(x, 15, 'f'); set(x, 23, 'f'); }
   for (let y = 15; y <= 23; y++) { set(3, y, 'f'); set(14, y, 'f'); }
+  rect(4, 16, 13, 22, 'k');
   rect(9, 14, 10, 15, 'p');
-  const plots = [];
-  for (const y of [17, 18, 20, 21]) for (let x = 5; x <= 10; x++) { set(x, y, 'o'); plots.push({ x, y }); }
   // sheep pasture
   for (let x = 22; x <= 33; x++) { set(x, 18, 'f'); set(x, 24, 'f'); }
   for (let y = 18; y <= 24; y++) { set(22, y, 'f'); set(33, y, 'f'); }
@@ -45,6 +44,15 @@
     { id: 'shop', kind: 'shop', x: 21, y: 8, w: 4, h: 3, door: { x: 22, y: 11 } },
     { id: 'board', kind: 'board', x: 19, y: 10, w: 2, h: 1, door: { x: 19, y: 11 } },
     { id: 'well', kind: 'well', x: 12, y: 17, w: 1, h: 1, door: { x: 12, y: 18 } },
+    // the dairy yard: mares and foals on the зэл line, cows, goats, the outdoor stove, the aaruul rack and the airag churn
+    { id: 'zel', kind: 'zel', x: 4, y: 16, w: 5, h: 1, door: { x: 6, y: 17 } },
+    { id: 'cow1', kind: 'cow', x: 9, y: 17, w: 2, h: 1, door: { x: 9, y: 18 } },
+    { id: 'cow2', kind: 'cow', x: 10, y: 19, w: 2, h: 1, door: { x: 10, y: 20 } },
+    { id: 'goat1', kind: 'goat', x: 5, y: 19, w: 1, h: 1, door: { x: 5, y: 20 } },
+    { id: 'goat2', kind: 'goat', x: 7, y: 19, w: 1, h: 1, door: { x: 7, y: 20 } },
+    { id: 'churn', kind: 'churn', x: 5, y: 21, w: 1, h: 1, door: { x: 6, y: 22 } },
+    { id: 'tulga', kind: 'tulga', x: 8, y: 21, w: 1, h: 1, door: { x: 8, y: 22 } },
+    { id: 'rack', kind: 'rack', x: 11, y: 21, w: 2, h: 1, door: { x: 11, y: 22 } },
     { id: 'lantern1', kind: 'lantern', x: 15, y: 10, w: 1, h: 1 },
     { id: 'lantern2', kind: 'lantern', x: 15, y: 15, w: 1, h: 1 },
     { id: 'lantern3', kind: 'lantern', x: 20, y: 15, w: 1, h: 1 },
@@ -53,6 +61,8 @@
     { id: 'ovoo', kind: 'ovoo', x: 46, y: 25, w: 2, h: 2, door: { x: 46, y: 24 } },
     { id: 'uya', kind: 'uya', x: 34, y: 14, w: 3, h: 1, door: { x: 35, y: 13 } },
     { id: 'archery', kind: 'archery', x: 45, y: 33, w: 8, h: 3, door: { x: 44, y: 34 } },
+    { id: 'general', kind: 'general', x: 36, y: 10, w: 1, h: 1, door: { x: 36, y: 11 } },   // the general: the defend-the-homeland campaign
+    { id: 'historian', kind: 'historian', x: 29, y: 10, w: 1, h: 1, door: { x: 29, y: 11 } }, // the historian: history hunts across the aimags
     { id: 'academy', kind: 'academy', x: 49, y: 17, w: 4, h: 3, door: { x: 50, y: 20 } }, // Mongol script academy
     { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
     // townspeople with quests (see NPCS in village.js)
@@ -90,7 +100,6 @@
   for (let y = 2; y < H - 1; y++) for (let x = 1; x < W - 1; x++) if (g[y][x] === 'g' && hash(x * 3, y * 7) < 0.09) flowers.push({ x, y, c: ['#FF8FB1', '#FFD34E', '#FFFFFF', '#B49CFF'][Math.floor(hash(x, y * 5) * 4)] });
 
   const blocked = (x, y) => x < 0 || y < 0 || x >= W || y >= H || 'TwfBr'.includes(g[y][x]);
-  const plotAt = (x, y) => plots.findIndex((p) => p.x === x && p.y === y);
 
   /** A* path on the tile grid with 8 directions (no corner cutting). Returns tiles after the start, or null. */
   function findPath(sx, sy, tx, ty) {
@@ -125,7 +134,7 @@
   }
 
   // drawing lives in pixel.js (16-pixel tiles, pure pixel art)
-  const api = { W, H, T, g, plots, objects, occ, trees, DOCK, ARENA, RACE, LAP, lots, blocked, plotAt, findPath, nearestOpen, hash };
+  const api = { W, H, T, g, objects, occ, trees, DOCK, ARENA, RACE, LAP, lots, blocked, findPath, nearestOpen, hash };
   api.renderStatic = () => TG.pixel.renderStatic(api);
   TG.vworld = api;
 })(window.TG);

@@ -1,4 +1,4 @@
-/* Нутаг — the shared village: walk, garden together, fish, shop, dress up, quests, live multiplayer. */
+/* Нутаг — the shared village: walk, herd and milk in the хот айл, fish, shop, dress up, quests, live multiplayer. */
 (function (TG) {
   const { h, L, tx } = TG;
   const S = TG.store, R = TG.vrules, WD = TG.vworld, T = WD.T;
@@ -13,16 +13,15 @@
   function V() {
     const p = S.active(); if (!p) return null;
     const v = p.village || (p.village = {});
-    const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, seeds: { carrot: 4, potato: 2 }, produce: {}, fish: {},
-      owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, can: 5, water: 5, rod: 1, room: 'NUTAG',
-      garden: [], quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
+    const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, produce: {}, milkT: {}, fish: {},
+      owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, rod: 1, room: 'NUTAG',
+      quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
       energy: 100, ate: {}, lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
     for (const k in d) if (v[k] === undefined) v[k] = d[k];
-    while (v.garden.length < R.PLOTS) v.garden.push(null);
+    if (v.garden || v.seeds) { delete v.garden; delete v.seeds; delete v.can; delete v.water; for (const k of Object.keys(v.produce)) if (!R.DAIRY[k]) delete v.produce[k]; } // the garden became the dairy yard
     while (v.lots.length < R.LOTS) v.lots.push(null);
     return v;
   }
-  const garden = () => (live && live.online && live.plots ? live.plots : V().garden);
   const lotsArr = () => (live && live.online && live.lots ? live.lots : V().lots);
   const myLot = () => lotsArr().findIndex((l) => l && l.by === V().id);
   const now = () => Date.now() + (live && live.online ? live.offset : 0);
@@ -43,9 +42,8 @@
     return { coins, xp, level: after > before ? after : 0 };
   }
   const QUESTS = {
-    water: { n: 5, c: 20, x: 25, t: Tx('5 ургамал услах', 'Water 5 plants') },
-    harvest: { n: 3, c: 25, x: 30, t: Tx('3 ургац хураах', 'Harvest 3 crops') },
-    plant: { n: 4, c: 15, x: 20, t: Tx('4 үр тарих', 'Plant 4 seeds') },
+    milk: { n: 3, c: 20, x: 25, t: Tx('3 удаа мал саах', 'Milk the animals 3 times') },
+    dairy: { n: 2, c: 25, x: 35, t: Tx('2 цагаан идээ хийх', 'Make 2 dairy foods') },
     fish: { n: 2, c: 25, x: 30, t: Tx('2 загас барих', 'Catch 2 fish') },
     basar: { n: 2, c: 15, x: 25, t: Tx('Басараас 2 асуулт асуух', 'Ask Basar 2 questions') },
     quiz: { n: 3, c: 25, x: 35, t: Tx('Басарын 3 асуултад зөв хариулах', 'Answer 3 of Basar’s questions right') },
@@ -53,21 +51,20 @@
     together: { n: 1, c: 40, x: 50, t: Tx('Гэр бүлтэйгээ бодит ажил хийх', 'Do a real activity with family') },
     pet: { n: 3, c: 10, x: 20, t: Tx('Хонийг 3 удаа илбэх', 'Pet the sheep 3 times') },
     sell: { n: 5, c: 15, x: 20, t: Tx('5 зүйл зарах', 'Sell 5 items') },
-    help: { n: 2, c: 30, x: 40, t: Tx('Найзынхаа ургамлыг 2 удаа услах', "Water a friend's plants twice") },
     race: { n: 1, c: 25, x: 35, t: Tx('Морин уралдаанд 1 удаа оролцох', 'Ride in 1 horse race') },
     archery: { n: 3, c: 25, x: 35, t: Tx('Сур харваанд 3 бай онох', 'Hit 3 archery targets') },
     wrestle: { n: 1, c: 25, x: 35, t: Tx('Бөхийн барилдаанд 1 удаа давах', 'Win 1 wrestling round') },
     etiquette: { n: 1, c: 30, x: 40, t: Tx('Эмээгийн гэрт ёсоор зочлох', 'Visit Grandma’s ger with good manners') },
+    defend: { n: 1, c: 40, x: 60, t: Tx('Нутгаа хамгаалах тулаанд ялах', 'Win a defend-the-homeland battle') },
     eat: { n: 3, c: 15, x: 20, t: Tx('3 удаа хоол идэх, ундаа уух', 'Eat or drink 3 times') },
   };
-  const POOL = ['water', 'harvest', 'plant', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz', 'eat'];
+  const POOL = ['milk', 'dairy', 'milk', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz', 'eat'];
   function quests() {
     const v = V(), d = S.dkey();
     if (v.quests.d !== d || v.quests.list.some((q) => !QUESTS[q.k])) { // new day, or quests from an older version
       let hs = 0; for (const ch of d + v.id) hs = (hs * 31 + ch.charCodeAt(0)) >>> 0;
       const pool = [...POOL], pick = [];
       while (pick.length < 3) { hs = (hs * 1103515245 + 12345) >>> 0; const k = pool.splice(hs % pool.length, 1)[0]; if (!pick.includes(k)) pick.push(k); }
-      pick.push('help');
       // one extra quest from today's season, worth +50%
       const sea = TG.seasons ? TG.seasons.current() : null, list = pick.map((k) => ({ k, p: 0, done: false }));
       if (sea) {
@@ -93,7 +90,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { live: () => live, act: (...a) => act(...a), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
+  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race }; // used by automated tests
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -138,13 +135,13 @@
   const FOOD_TABS = [['meat', '🍖', Tx('Мах', 'Meat')], ['veg', '🥕', Tx('Ногоо, жимс', 'Veg & fruit')], ['milk', '🧀', Tx('Цагаан идээ', 'Dairy')], ['drink', '🥛', Tx('Уух', 'Drinks')]];
   const ENERGY_MAX = 100;
   const food = (id) => FOODS.find((f) => f.id === id);
-  /** Eat or drink something: costs coins (free for your own harvest, at home or when a family offers it), fills energy, teaches a fact. */
+  /** Eat or drink something: costs coins (free for dairy you made, at home or when a family offers it), fills energy, teaches a fact. */
   function eat(id, opts = {}) {
     const v = V(); if (!v) return false;
-    const crop = R.CROPS[id], f = crop ? { id, e: crop.e, kind: 'veg', name: crop.name, energy: 12, price: 0, fact: crop.fact } : food(id);
-    if (!f) return false;
-    if (crop) { if (!(v.produce[id] > 0)) return false; v.produce[id]--; }
-    const cost = crop || opts.free ? 0 : f.price;
+    const f = food(id); if (!f) return false;
+    const mine = !opts.free && R.DAIRY[id] && (v.produce[id] || 0) > 0;           // dairy you made yourself is free
+    if (mine) v.produce[id]--;
+    const cost = mine || opts.free ? 0 : f.price;
     if (cost > v.coins) { TG.sfx.bad(); TG.toast('🪙 ' + L('Зоос хүрэлцэхгүй байна.', 'Not enough coins.')); return false; }
     v.coins -= cost;
     v.energy = Math.min(ENERGY_MAX, (v.energy ?? ENERGY_MAX) + f.energy);
@@ -164,18 +161,16 @@
     const v = V(); let cur = opts.tab || 'meat';
     const body = h('div');
     const draw = () => {
-      const crops = Object.keys(R.CROPS).filter((k) => v.produce[k] > 0);
-      const list = cur === 'veg' ? [...crops.map((k) => ({ crop: k })), ...FOODS.filter((f) => f.kind === 'veg')] : FOODS.filter((f) => f.kind === cur);
-      const free = (f) => opts.home && (f.kind === 'milk' || f.kind === 'drink');
+      const list = FOODS.filter((f) => f.kind === cur);
+      const own = (f) => (R.DAIRY[f.id] && v.produce[f.id]) || 0, free = (f) => (opts.home && (f.kind === 'milk' || f.kind === 'drink')) || own(f) > 0;
       rc(body, h('h2', null, '🍽️ ', L('Хоол, ундаа', 'Food & drink')),
         h('p', { class: 'muted' }, L(`Хүч: ${Math.round(v.energy ?? ENERGY_MAX)}/${ENERGY_MAX} 🍖. Shift дарж гүйхэд хүч зарцуулагдана, хоол идвэл нөхөгдөнө.`, `Energy: ${Math.round(v.energy ?? ENERGY_MAX)}/${ENERGY_MAX} 🍖. Running (Shift) uses energy; food fills it up.`), opts.home ? h('b', null, ' ', L('Гэртээ цагаан идээ, ундаа үнэгүй!', 'At home, dairy and drinks are free!')) : null),
         h('div', { class: 'chips v-tabs' }, FOOD_TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, e, ' ', tx(t)))),
         h('div', { class: 'v-list' }, list.length ? list.map((it) => {
-          if (it.crop) { const cr = R.CROPS[it.crop]; return h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, cr.e), h('div', { class: 'v-row-b' }, h('b', null, tx(cr.name), ' ', h('small', null, `×${v.produce[it.crop]} · ${L('өөрийн ургац', 'your harvest')}`)), h('small', null, '+12 🍖')), h('button', { class: 'btn sm primary', onclick: () => { if (eat(it.crop)) draw(); } }, L('Идэх', 'Eat'))); }
           const price = free(it) ? 0 : it.price;
-          return h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name), v.ate && v.ate[it.id] ? '' : h('small', { class: 'v-new' }, ` ${L('шинэ', 'new')}`)), h('small', null, `+${it.energy} 🍖 · ${tx(it.fact)}`)),
-            h('button', { class: 'btn sm primary', onclick: () => { if (eat(it.id, { free: free(it) })) draw(); } }, it.kind === 'drink' ? L('Уух', 'Drink') : L('Идэх', 'Eat'), price ? ` ${price}🪙` : ''));
-        }) : h('p', { class: 'muted' }, L('Цэцэрлэгтээ ногоо тарьж хураавал энд идэж болно.', 'Grow and harvest vegetables in the garden to eat them here.'))),
+          return h('div', { class: 'v-row' }, h('span', { class: 'v-card-e' }, it.e), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name), own(it) ? h('small', { class: 'v-own' }, ` ×${own(it)} ${L('өөрийн', 'yours')}`) : null, v.ate && v.ate[it.id] ? '' : h('small', { class: 'v-new' }, ` ${L('шинэ', 'new')}`)), h('small', null, `+${it.energy} 🍖 · ${tx(it.fact)}`)),
+            h('button', { class: 'btn sm primary', onclick: () => { if (eat(it.id, { free: free(it) && !own(it) })) draw(); } }, it.kind === 'drink' ? L('Уух', 'Drink') : L('Идэх', 'Eat'), price ? ` ${price}🪙` : ''));
+        }) : null),
         h('p', { class: 'privacy' }, '🙏 ', L('Монгол ёсоор хоолны дээжийг ахмад хүнд өргөж, хоол идэхээс өмнө гараа угаадаг.', 'By Mongolian custom the first portion goes to the eldest, and you wash your hands before eating.')));
     };
     draw();
@@ -205,7 +200,7 @@
         if (this.ws !== ws) return;
         this.ws = null;
         if (!live) return;
-        live.online = false; live.others.clear(); live.plots = null; live.lots = null; endRemoteMatch();
+        live.online = false; live.others.clear(); live.lots = null; endRemoteMatch();
         if (this.closed) return setStatus('solo');
         setStatus('reconnecting');
         this.timer = setTimeout(() => this.open(), Math.min(10000, 1500 * ++this.retry));
@@ -213,13 +208,13 @@
     },
     send(m) { if (this.ws && this.ws.readyState === 1 && live && live.online) this.ws.send(JSON.stringify(m)); },
     close() { this.closed = true; clearTimeout(this.timer); if (this.ws) { const w = this.ws; this.ws = null; try { w.close(); } catch (e) { /* closing */ } } },
-    rejoin() { this.close(); if (!live) return; this.closed = false; live.online = false; live.others.clear(); live.plots = null; setStatus('connecting'); this.open(); },
+    rejoin() { this.close(); if (!live) return; this.closed = false; live.online = false; live.others.clear(); setStatus('connecting'); this.open(); },
   };
   function handle(m) {
     const v = V();
     switch (m.t) {
       case 'welcome':
-        live.online = true; live.offset = m.now - Date.now(); live.plots = m.plots; live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room;
+        live.online = true; live.offset = m.now - Date.now(); live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room;
         live.others.clear(); (m.players || []).forEach(addOther);
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
@@ -246,7 +241,6 @@
         net.closed = true; live.replaced = true; live.online = false; live.others.clear(); setStatus('solo');
         TG.toast('🔁 ' + L('Энэ профайл өөр цонх эсвэл төхөөрөмж дээр нээгдлээ. Тэнд үргэлжлүүлэн тоглоорой.', 'This profile was opened in another tab or device. Keep playing there.'));
         break;
-      case 'plot': onPlot(m); break;
       case 'deny': deny(m.why); break;
       case 'error': TG.toast(L('Өрөөнд нэвтэрч чадсангүй.', 'Could not join the room.')); break;
     }
@@ -254,45 +248,127 @@
   function addOther(p) { live.others.set(p.id, { ...p, px: p.x, py: p.y, petPos: { x: p.x, y: p.y + 0.6 }, bubble: null, moving: false }); }
   function setStatus(s) { if (live) { live.status = s; hud(); } }
 
-  // ================================================================ garden actions
-  function act(a, i, c) {
-    const v = V();
-    if (a === 'plant' && !(v.seeds[c] > 0)) return;
-    if (live.online) return net.send({ t: a, i, c });
-    const res = R.applyAction(v.garden, a, i, { c }, { id: v.id, name: live.name }, now());
-    if (res.ok) onPlot({ act: a, i, plot: res.plot, by: v.id, crop: res.crop, planter: res.planter || (res.plot && res.plot.by), helped: false });
-    else deny(res.why);
+  // ================================================================ хот айл: milking the animals and making the white foods (цагаан идээ)
+  const yardKind = (id) => (id === 'zel' ? 'mare' : id.replace(/\d$/, ''));
+  const stock = (k, n) => { const v = V(); v.produce[k] = Math.max(0, (v.produce[k] || 0) + n); };
+  const MILK_FACT = {
+    cow: Tx('Үнээг өглөө, орой саадаг. Саахын өмнө тугалыг нь бага зэрэг хөхүүлж сүүг нь ивлүүлдэг.', 'Cows are milked morning and evening. First the calf suckles a little so the milk starts to flow.'),
+    goat: Tx('Ямааны сүү өтгөн, тэжээллэг. Ямаа, хонины сүүгээр ааруул, бяслаг хийдэг.', 'Goat milk is rich and nourishing. Goat and sheep milk make aaruul and cheese.'),
+    mare: Tx('Зун гүүг 1.5–2 цаг тутам, өдөрт олон удаа саадаг. Унагыг нь зэлд уяж, саахын өмнө хөхүүлж сүүг ивлүүлдэг.', 'In summer mares are milked every 1.5–2 hours, many times a day. Their foals wait on the зэл line and suckle first to start the milk.'),
+  };
+  /** Milking: let the young one suckle to start the milk, then squeeze in rhythm when the marker is in the green. */
+  function milkGame(id) {
+    const kind = yardKind(id), A = R.DAIRY_ANIMALS[kind], v = V(); v.milkT = v.milkT || {};
+    const wait = Math.ceil(((v.milkT[id] || 0) + A.wait * 1000 - Date.now()) / 1000);
+    if (wait > 0) return TG.toast(`${A.e} ${L(`${tx(A.name)} амарч байна. ${wait} секундын дараа дахин саана.`, `The ${tx(A.name).toLowerCase()} is resting. Milk again in ${wait}s.`)}`);
+    const NEED = 5, W2 = 180, H2 = 110;
+    const cv = h('canvas', { class: 'v-milk', width: W2, height: H2 }), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
+    const msg = h('p', { class: 'v-milk-msg' }), btn = h('button', { class: 'btn primary big block' });
+    let phase = 'young', good = 0, pos = 0, dir = 1, raf = 0, nuzzle = 0, done = false;
+    const zone = () => [0.36, 0.64];
+    const setPhase = (p) => {
+      phase = p;
+      if (p === 'young') { msg.textContent = L(`Эхлээд төлийг нь (${tx(A.young).toLowerCase()}) хөхүүлж сүүг нь ивлүүлье. “Тавих” дээр дар.`, `First let the ${tx(A.young).toLowerCase()} suckle so the milk flows. Press “Let it suckle”.`); btn.textContent = L(`${tx(A.young)} тавих`, 'Let it suckle'); }
+      else if (p === 'milk') { msg.textContent = L('Одоо саа! Шар тэмдэг ногоон дотор орох үед дар. Зөөлөн, тайван.', 'Now milk! Press when the yellow marker is in the green. Gently and calmly.'); btn.textContent = L('Саах (Space)', 'Squeeze (Space)'); }
+    };
+    const press = () => {
+      if (done) return;
+      if (phase === 'young') { nuzzle = performance.now(); TG.sfx.pop && TG.sfx.pop(); btn.disabled = true; setTimeout(() => { btn.disabled = false; setPhase('milk'); }, 1400); return; }
+      const [a, b] = zone();
+      if (pos >= a && pos <= b) { good++; TG.sfx.pour && TG.sfx.pour(0.3 + good * 0.1); msg.textContent = '💧 '.repeat(good) + L(' Сайн байна!', ' Nice!'); }
+      else { TG.sfx.tap(); msg.textContent = L('Арай эрт/хожуу. Тайван, хэмнэлтэй саа.', 'A bit early or late. Calm and steady.'); }
+      if (good >= NEED) finish();
+    };
+    function finish() {
+      done = true; v.milkT[id] = Date.now(); stock(A.gives, A.n); quest('milk'); reward(2, 6);
+      const first = !(v.seen && v.seen['milk_' + kind]); v.seen = v.seen || {}; v.seen['milk_' + kind] = 1; S.save(); if (live) hud();
+      TG.sfx.good();
+      rc(box, h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('dairy:' + A.gives, 64)), h('h2', null, `+${A.n} ${tx(R.DAIRY[A.gives].name)}`),
+        h('div', { class: 'teach' }, h('b', null, '💡 ', first ? L('Мэдсэн үү?', 'Did you know?') : L('Сануулга', 'Remember')), h('p', null, tx(MILK_FACT[kind]))),
+        h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: () => close() }, L('Гайхалтай!', 'Great!'))));
+    }
+    const loop = (ts) => {
+      if (!cv.isConnected) return;
+      pos += dir * 0.018; if (pos > 1) { pos = 1; dir = -1; } if (pos < 0) { pos = 0; dir = 1; }
+      x.fillStyle = '#b89462'; x.fillRect(0, 0, W2, H2); x.fillStyle = '#9fd8f7'; x.fillRect(0, 0, W2, 34); x.fillStyle = '#76b947'; x.fillRect(0, 34, W2, 8);
+      const mom = PX.beast(kind, 0), sc = kind === 'goat' ? 3 : 2.6;
+      x.drawImage(mom, 34, 76 - mom.height * sc, mom.width * sc, mom.height * sc);
+      const young = PX.beast(kind === 'mare' ? 'foal' : kind === 'goat' ? 'lamb' : 'botgo', 0), suck = phase === 'young' && ts - nuzzle < 1400 && nuzzle;
+      if (phase === 'young' || suck) x.drawImage(young, suck ? 70 : 128, 76 - young.height * 2, young.width * 2, young.height * 2);
+      x.fillStyle = '#2b1e2e'; x.fillRect(96, 62, 22, 16); x.fillStyle = '#a5a5b0'; x.fillRect(98, 63, 18, 14); x.fillStyle = '#ffffff'; x.fillRect(98, 77 - Math.round((good / NEED) * 13), 18, Math.round((good / NEED) * 13)); // the pail filling up
+      if (phase === 'milk') {
+        const bx = 14, bw = W2 - 28, [a, b] = zone();
+        x.fillStyle = '#2b1e2e'; x.fillRect(bx - 2, 88, bw + 4, 14); x.fillStyle = '#e6c48a'; x.fillRect(bx, 90, bw, 10); x.fillStyle = '#5c9a36'; x.fillRect(bx + a * bw, 90, (b - a) * bw, 10);
+        x.fillStyle = '#f7c646'; x.fillRect(Math.round(bx + pos * bw) - 2, 86, 4, 18);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    btn.addEventListener('click', press);
+    const key = (e) => { if ((e.code === 'Space' || e.code === 'KeyE') && document.querySelectorAll('.modal-back').length === 1) { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) press(); } };
+    window.addEventListener('keydown', key, true);
+    const box = h('div', null, h('h2', null, `${A.e} ${L(`${tx(A.name)} саах`, `Milk the ${tx(A.name).toLowerCase()}`)}`), cv, msg, btn);
+    TG._village.milkNow = () => ({ pos, phase, good, done }); // used by automated tests
+    setPhase('young');
+    const close = TG.modal(box, { cls: 'v-modal', onClose: () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', key, true); } });
+    raf = requestAnimationFrame(loop);
   }
+  // recipes at each station: what milk they need, what they give, the real steps, and how you do them
+  const RECIPES = {
+    rack: [{ id: 'aaruul', need: { milk: 2 }, gives: 3, how: 'steps',
+      steps: [Tx('Сүүгээ исгэж тараг болгоно', 'Let the milk sour into tarag'), Tx('Тарагаа буцалгаж ээдэм гаргана', 'Boil it until curds (ээдэм) form'), Tx('Ээдмээ даавуунд хийж шахна', 'Press the curds in a cloth'), Tx('Хэрчиж хэлбэр оруулна', 'Cut them into pieces'), Tx('Тавиур дээр наранд хатаана', 'Dry them in the sun on the rack')],
+      fact: Tx('Ааруулыг наранд хэд хоног хатаадаг. Хатсан ааруул бүтэн жил хадгалагддаг тул өвөл, аянд авч явдаг.', 'Aaruul dries in the sun for several days. Dried, it keeps for a whole year, so herders take it on journeys and through winter.') }],
+    tulga: [{ id: 'urum', need: { milk: 2 }, gives: 1, how: 'mash', taps: 12, verb: Tx('Самрах', 'Ladle'),
+      steps: [Tx('Сүүгээ бага галд аажмаар буцалгана', 'Heat the milk slowly on a low fire'), Tx('Шанагаар дээш өргөж самарна: хөөс гарна', 'Ladle it up high so it foams'), Tx('Шөнөжин хөргөнө, дээр нь өрөм тогтоно', 'Leave it overnight: the öröm forms on top')],
+      fact: Tx('Өрөм бол сүүг зөөлөн буцалгаж, самраад, хөргөхөд дээр нь тогтдог өтгөн цөцгий. Цагаан сараар хамгийн хүндэт зочинд өргөдөг.', 'Öröm is the thick cream that forms on top of gently boiled, ladled and cooled milk, offered to honoured guests at Tsagaan Sar.') },
+      { id: 'tarag', need: { milk: 1 }, gives: 2, how: 'steps',
+      steps: [Tx('Сүүгээ буцалгана', 'Boil the milk'), Tx('Бүлээн болтол хөргөнө', 'Let it cool until warm'), Tx('Хөрөнгө нэмнэ: өмнөх тарагнаас жаахан', 'Add a starter: a little old tarag'), Tx('Дулаан газар хононо', 'Keep it warm overnight')],
+      fact: Tx('Тарагны “хөрөнгө”-ийг айлууд үеэс үед хадгалж, бие биедээ өгдөг.', 'Families keep their tarag starter for generations and share it with each other.') }],
+    churn: [{ id: 'airag', need: { mare: 2 }, gives: 2, how: 'mash', taps: 30, verb: Tx('Бүлэх', 'Churn'),
+      steps: [Tx('Гүүний сүүгээ хөхүүрт хийнэ', 'Pour the mare’s milk into the khukhuur'), Tx('Бүлүүрээр олон дахин бүлнэ', 'Churn it with the stick, again and again'), Tx('Нэг хоног исгэнэ', 'Let it ferment for a day')],
+      fact: Tx('Айргийг мянга гаруй удаа бүлдэг. Айлд орж ирсэн хүн бүр хэдэн удаа бүлээд өгдөг заншилтай.', 'Airag is churned over a thousand times, and everyone who comes into the ger gives it a few stirs.') }],
+  };
+  /** A dairy station: pick a recipe you have the milk for, then do the real steps (tap each in order, or churn/ladle many times). */
+  function dairyStation(st) {
+    const v = V(), body = h('div');
+    const has = (need) => Object.entries(need).every(([k, n]) => (v.produce[k] || 0) >= n);
+    const title = { rack: L('Ааруулын тавиур', 'Aaruul drying rack'), tulga: L('Тулга: сүү буцалгах', 'Outdoor stove: boil milk'), churn: L('Хөхүүр: айраг бүлэх', 'Khukhuur: churn airag') }[st];
+    const list = () => rc(body, h('h2', null, title), h('p', { class: 'muted' }, L('Танд: ', 'You have: '), `🥛 ${v.produce.milk || 0} · 🍶 ${v.produce.mare || 0}`),
+      h('div', { class: 'v-list' }, RECIPES[st].map((r) => { const d = R.DAIRY[r.id], ok = has(r.need);
+        return h('div', { class: 'v-row' + (ok ? '' : ' locked') }, pic('dairy:' + r.id, 32), h('div', { class: 'v-row-b' }, h('b', null, `${tx(d.name)} ×${r.gives}`), h('small', null, Object.entries(r.need).map(([k, n]) => `${R.DAIRY[k].e} ${n} ${tx(R.DAIRY[k].name)}`).join(' + '))),
+          h('button', { class: 'btn sm primary', disabled: !ok, onclick: () => make(r) }, ok ? L('Хийх', 'Make') : L('Саах хэрэгтэй', 'Milk first'))); })),
+      h('p', { class: 'privacy' }, '🐄 ', L('Сүү авахын тулд үнээ, ямаа, гүүгээ саагаарай.', 'Milk the cows, goats and mares to get milk.')));
+    function make(r) {
+      let step = 0, taps = 0;
+      const show = () => {
+        const s = r.steps[Math.min(step, r.steps.length - 1)];
+        const mashing = r.how === 'mash' && step === 1;
+        rc(body, h('h2', null, `${R.DAIRY[r.id].e} ${tx(R.DAIRY[r.id].name)}`),
+          h('ol', { class: 'v-steps' }, r.steps.map((q, i) => h('li', { class: i < step ? 'done' : i === step ? 'on' : '' }, tx(q)))),
+          mashing ? h('div', { class: 'meter' }, h('span', { style: { width: (taps / r.taps) * 100 + '%' } })) : null,
+          h('button', { class: 'btn primary big block', onclick: () => {
+            if (mashing) { taps++; TG.sfx.scrub && TG.sfx.scrub(); if (taps < r.taps) return show(); }
+            else TG.sfx.tap();
+            step++;
+            if (step >= r.steps.length) return finish();
+            show();
+          } }, mashing ? `${tx(r.verb)}! ${taps}/${r.taps}` : `${step + 1}. ${tx(s)} ✓`));
+      };
+      const finish = () => {
+        Object.entries(r.need).forEach(([k, n]) => stock(k, -n)); stock(r.id, r.gives); quest('dairy'); reward(3, 10);
+        v.seen = v.seen || {}; const first = !v.seen['made_' + r.id]; v.seen['made_' + r.id] = 1; S.save(); if (live) hud(); TG.sfx.good(); if (first) TG.confetti(40);
+        rc(body, h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('dairy:' + r.id, 64)), h('h2', null, `+${r.gives} ${tx(R.DAIRY[r.id].name)}`),
+          h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(r.fact))),
+          h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: list }, L('Дахиад хийх', 'Make more')), h('button', { class: 'btn primary', onclick: () => close() }, L('Боллоо', 'Done')))));
+      };
+      show();
+    }
+    list();
+    const close = TG.modal(body, { cls: 'v-modal' });
+  }
+
   function deny(why) {
     TG.sfx.bad();
-    TG.toast({ taken: L('Энд аль хэдийн тарьчихсан байна.', 'Something is already planted here.'), 'no-need': L('Одоо услах шаардлагагүй.', 'No need to water right now.'), 'not-ready': L('Хараахан болоогүй байна.', 'Not ready yet.'), own: L('Танд аль хэдийн гэр байна.', 'You already have a ger.'), busy: L('Тэр хүн одоо завгүй байна.', 'That player is busy right now.') }[why] || L('Болсонгүй.', "That didn't work."));
-  }
-  function onPlot(m) {
-    const v = V();
-    garden()[m.i] = m.plot;
-    const tile = WD.plots[m.i];
-    if (m.by === v.id) {
-      if (m.act === 'plant') { const c = m.plot.c; v.seeds[c] = Math.max(0, (v.seeds[c] || 0) - 1); quest('plant'); TG.sfx.snap(); floatAt(tile, '+2 XP', '#94d260'); reward(0, 2); }
-      if (m.act === 'water') { v.water = Math.max(0, v.water - 1); quest('water'); if (m.helped) quest('help'); TG.sfx.pour(0.4); floatAt(tile, m.helped ? '+3 XP ♥' : '+1 XP', '#93d4f6'); reward(0, m.helped ? 3 : 1); }
-      if (m.act === 'harvest') {
-        const cr = R.CROPS[m.crop];
-        v.produce[m.crop] = (v.produce[m.crop] || 0) + 1; quest('harvest'); TG.sfx.good(); floatAt(tile, `+${cr.xp} XP`, '#f7c646'); reward(0, cr.xp);
-        if (!v.seen[m.crop]) { v.seen[m.crop] = 1; factCard('crop:' + m.crop, tx(cr.name), tx(cr.fact), L('Шинэ ургац!', 'New crop!')); }
-        else TG.toast(`${tx(cr.name)} · 💡 ${tx(cr.fact)}`);
-      }
-    } else if (m.planter === v.id && m.act === 'water') { TG.toast(`💧 ${m.byName} ${L('таны ургамлыг усаллаа!', 'watered your plant!')}`); }
-    else if (m.planter === v.id && m.act === 'harvest') { reward(5, 5); TG.toast(`🧺 ${m.byName} ${L('таны тарьсныг хураалаа. Хамтын ургац +5 🪙', 'harvested your crop. Shared harvest +5 🪙')}`); }
-    S.save(); if (live) { hud(); updateCtx(); }
-  }
-  function plotAction(i) {
-    const v = V(), p = R.normalize(garden()[i], now());
-    if (!p) return live.sel && V().seeds[live.sel] > 0 ? act('plant', i, live.sel) : seedPicker(i);
-    if (R.mature(p)) return act('harvest', i);
-    if (R.needsWater(p)) {
-      if (v.water <= 0) { TG.sfx.bad(); return TG.toast('🪣 ' + L('Усны сав хоосон. Худгаас ус аваарай!', 'Your can is empty. Refill at the well!')); }
-      return act('water', i);
-    }
-    TG.toast(`${tx(R.CROPS[p.c].name)} · ${L('ургаж байна', 'growing')} ${fmtLeft(R.stageLeft(p, now()))}` + (p.n ? ` · ${L('тарьсан', 'planted by')}: ${p.n}` : ''));
+    TG.toast({ taken: L('Энэ газар аль хэдийн эзэнтэй байна.', 'That spot is already taken.'), own: L('Танд аль хэдийн гэр байна.', 'You already have a ger.'), busy: L('Тэр хүн одоо завгүй байна.', 'That player is busy right now.') }[why] || L('Болсонгүй.', "That didn't work."));
   }
   const fmtLeft = (ms) => { const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}${L('с', 's')}`; };
 
@@ -302,35 +378,38 @@
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
     const els = {
       me: h('button', { class: 'v-me px-frame', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
-      water: h('div', { class: 'v-pill px-frame' }), energy: h('button', { class: 'v-pill px-frame v-energy', title: L('Хоол, ундаа', 'Food & drink'), onclick: () => eatModal() }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
+      energy: h('button', { class: 'v-pill px-frame v-energy', title: L('Хоол, ундаа', 'Food & drink'), onclick: () => eatModal() }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
       season: h('button', { class: 'v-pill px-frame v-season', onclick: () => TG.seasons.open() }),
       loc: h('button', { class: 'v-loc px-frame', onclick: () => TG.go('passport') }),
       ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
-      hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Үр сонгох', 'Choose seeds') }),
+      hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Цагаан идээ', 'Dairy') }),
       race: h('div', { class: 'v-race px-frame hidden', 'aria-live': 'polite' }),
+      battle: h('div', { class: 'v-race v-battle px-frame hidden', 'aria-live': 'polite' }),
+      shoot: h('button', { class: 'v-sprint v-shoot px-frame hidden', 'aria-label': L('Харвах (F)', 'Shoot (F)'), onclick: () => shootNearest() }, '🏹'),
       sprint: h('button', { class: 'v-sprint px-frame hidden', 'aria-label': L('Чү! (Shift)', 'Chü! (Shift)'),
         onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       mini: h('canvas', { class: 'v-mini px-frame', width: WD.W * 3, height: WD.H * 3, 'aria-label': L('Газрын зураг', 'Map'), title: L('Газрын зураг: дарж томруулна', 'Map: tap to enlarge') }),
       run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), onclick: () => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); } }, '🏃'),
+      fp: h('button', { class: 'v-round px-frame v-fpbtn', 'aria-label': L('Өөрийн нүдээр', 'First person'), title: L('Өөрийн нүдээр (3D)', 'First person (3D)'), onclick: () => openFP() }, '👁'),
       jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.water, els.season, els.net)),
-      els.race,
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net)),
+      els.race, els.battle,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
-          els.horse,
+          els.fp, els.horse,
           h('button', { class: 'v-round px-frame v-basar', 'aria-label': 'basar', title: L('Басар (B)', 'Basar (B)'), onclick: () => openBasar() }, pic('ui:dog', 34)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
           h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
           els.music),
-        els.hotbar, els.run, els.jump, els.ctx, els.sprint));
+        els.hotbar, els.run, els.jump, els.ctx, els.sprint, els.shoot));
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -342,7 +421,7 @@
     const qRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
     if (R.ROOM_RE.test(qRoom) && v.room !== qRoom) { v.room = qRoom; S.save(); }
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
-    live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, plots: null, lots: null, room: v.room,
+    live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
       season: TG.seasons.current().id, fx: [], cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
       sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
@@ -396,8 +475,8 @@
     const v = V(), L1 = R.level(v.xp), e = live.els;
     rc(e.me, portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
     rc(e.coins, pic('ui:coin', 20), h('span', null, v.coins));
-    rc(e.water, pic('ui:drop', 20), h('span', null, `${v.water}/${v.can}`));
     hudEnergy();
+    e.battle.classList.toggle('hidden', !live.battle); e.shoot.classList.toggle('hidden', !live.battle); if (live.battle) e.battle.textContent = battleLabel();
     const n = live.others.size + 1;
     e.net.className = 'v-pill px-frame v-net ' + live.status;
     const sea = TG.seasons.current(); e.season.textContent = `${sea.icon} ${tx(sea.name)}`;
@@ -410,17 +489,17 @@
     e.horse.classList.toggle('hidden', !live.ride || !!live.race);
     if (TG.music) { e.music.classList.toggle('hidden', !TG.music.available); e.music.textContent = '♪'; e.music.classList.toggle('off', !TG.music.playing); e.music.title = TG.music.title; }
   }
+  /** The bottom bar: your milk and the dairy foods you made. Tap a food to eat it. */
   function hotbar() {
-    const v = V(), owned = Object.keys(R.CROPS).filter((k) => v.seeds[k] > 0);
-    if (live.sel && !(v.seeds[live.sel] > 0)) live.sel = null;
-    rc(live.els.hotbar, ...(owned.length ? owned.map((k) => h('button', { class: 'v-slot-btn' + (live.sel === k ? ' sel' : ''), title: tx(R.CROPS[k].name), 'aria-pressed': live.sel === k ? 'true' : 'false',
-      onclick: () => { live.sel = live.sel === k ? null : k; TG.sfx.tap(); hotbar(); updateCtx(); } }, pic('crop:' + k, 28), h('small', null, v.seeds[k])))
-      : [h('button', { class: 'v-slot-btn empty', onclick: () => shopModal('seeds') }, pic('ui:seed', 28), h('small', null, '+'))]));
+    const v = V(), have = Object.keys(R.DAIRY).filter((k) => v.produce[k] > 0);
+    rc(live.els.hotbar, ...(have.length ? have.map((k) => h('button', { class: 'v-slot-btn', title: tx(R.DAIRY[k].name),
+      onclick: () => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); } }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
+      : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), h('small', null, '→'))]));
   }
   function contextAction() {
     if (!live || live.me.path.length || live.race) return null;
     const m = live.me, fx = m.px + 0.5, fy = m.py + 0.82;
-    const pi = WD.plotAt(m.x, m.y); if (pi >= 0) return { type: 'plot', i: pi };
+    if (live.battle) { const e = nearestEnemy(fx, fy, 1.7); if (e) return { type: 'lasso', e }; }
     let best = null, bd = 1.05;
     const consider = (d, a) => { if (d < bd) { bd = d; best = a; } };
     for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
@@ -432,19 +511,21 @@
   }
   function labelFor(a) {
     switch (a.type) {
-      case 'plot': {
-        const p = R.normalize(garden()[a.i], now());
-        if (!p) return live.sel ? ['crop:' + live.sel, L('Тарих', 'Plant')] : ['ui:seed', L('Тарих', 'Plant')];
-        if (R.mature(p)) return ['crop:' + p.c, L('Хураах', 'Harvest')];
-        if (R.needsWater(p)) return ['ui:drop', L('Услах', 'Water')];
-        return ['crop:' + p.c, fmtLeft(R.stageLeft(p, now()))];
-      }
       case 'home': return ['ui:house', L('Хувцас', 'Wardrobe')];
       case 'arcade': return ['ui:book', L('Сурах', 'Learn')];
       case 'academy': return ['ui:book', L('Монгол бичиг', 'Mongol script')];
+      case 'lasso': return ['ui:horse', L('Уургадах', 'Lasso')];
+      case 'general': return ['ui:trophy', L('Жанжин', 'General')];
+      case 'historian': return ['ui:book', L('Түүхч', 'Historian')];
       case 'shop': return ['ui:shop', L('Дэлгүүр', 'Shop')];
       case 'board': return ['ui:scroll', L('Даалгавар', 'Quests')];
-      case 'well': return ['ui:drop', L('Ус авах', 'Get water')];
+      case 'well': return ['ui:drop', L('Ус уух', 'Drink water')];
+      case 'zel': return ['beast:mare', L('Гүү саах', 'Milk a mare')];
+      case 'cow1': case 'cow2': return ['beast:cow', L('Үнээ саах', 'Milk the cow')];
+      case 'goat1': case 'goat2': return ['beast:goat', L('Ямаа саах', 'Milk the goat')];
+      case 'churn': return ['dairy:airag', L('Айраг бүлэх', 'Churn airag')];
+      case 'tulga': return ['dairy:urum', L('Өрөм, тараг', 'Öröm & tarag')];
+      case 'rack': return ['dairy:aaruul', L('Ааруул хийх', 'Make aaruul')];
       case 'fish': return ['ui:fish', L('Загасчлах', 'Fish')];
       case 'sheep': return ['ui:heart', L('Илбэх', 'Pet')];
       case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l ? L('Гэр авах', 'Buy ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
@@ -466,13 +547,17 @@
   function doAction(a) {
     if (!a || !live || live.race) return; // no shops or menus in the middle of a race
     switch (a.type) {
-      case 'plot': return plotAction(a.i);
       case 'home': return wardrobe();
       case 'arcade': return TG.go('learn');
       case 'academy': return TG.go('bichig');
+      case 'lasso': return lasso(a.e);
+      case 'general': return generalModal();
+      case 'historian': return TG.history && TG.history.open();
       case 'shop': return shopModal();
       case 'board': return questModal();
-      case 'well': { const v = V(); v.water = v.can; S.save(); TG.sfx.pour(0.7); floatAt(live.me, `${v.water}/${v.can}`, '#93d4f6'); hud(); return; }
+      case 'well': return eat('us', { free: true });
+      case 'zel': case 'cow1': case 'cow2': case 'goat1': case 'goat2': return milkGame(a.type);
+      case 'churn': case 'tulga': case 'rack': return dairyStation(a.type);
       case 'fish': return fishing();
       case 'sheep': return petSheep(a.s);
       case 'lot': return lotAction(a.i);
@@ -493,11 +578,11 @@
     const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
     const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
     const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    if (live.battle) { const e = nearestEnemy(wx, wy + 0.4, 1.4); if (e) { shootAt(e.x, e.y); return; } }   // tap a raider to loose a whistling arrow
     { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
     if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
-    const pi = WD.plotAt(tx0, ty0); if (pi >= 0) return goTo({ x: tx0, y: ty0 }, { type: 'plot', i: pi });
     const o = WD.occ[tx0 + ',' + ty0]; if (o && o.door) return goTo(o.door, o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     if (tx0 === WD.DOCK.x && ty0 === WD.DOCK.y) return goTo(WD.DOCK, { type: 'fish' });
     if (!WD.blocked(tx0, ty0)) return goTo({ x: tx0, y: ty0 }, null);
@@ -520,9 +605,10 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
-    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (!live || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
+    if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = true; if (live.race) live.race.sprint = true; return; } // hold Shift to run (in a race: the horse's sprint)
     if (e.code === 'Space' || e.code === 'KeyE') {
       // Space jumps, E uses what is next to you; neither ever re-presses a focused HUD button
@@ -545,6 +631,198 @@
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = false; if (live.race) live.race.sprint = false; }
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
+  }
+
+  // ================================================================ Эх орноо хамгаалах: defend the homeland (2D and first person)
+  // Raiders ride in along the roads towards the herd and the gers. Whistling arrows and the lasso take away their courage;
+  // when it is gone they turn round and ride home. Nobody is hurt, and the chapters teach what really happened.
+  const GENERAL = { deel: 'green', skin: '#B97A4A', hat: 'loovuuz', face: null, neck: null, pet: null };
+  const HISTORIAN = { deel: 'purple', skin: '#EDBB93', hat: 'mongol', face: 'glasses', neck: null, pet: null };
+  const B_SPAWN = [{ x: 54, y: 12 }, { x: 17, y: 2 }, { x: 1, y: 12 }];
+  const B_TARGET = [{ x: 27, y: 16 }, { x: 9, y: 14 }, { x: 4, y: 7 }, { x: 11, y: 7 }];
+  const HERD_MAX = 5, ARROW_SPEED = 10, SHOOT_CD = 0.45;
+  const camp = () => (V().camp = V().camp || { won: {}, tries: 0 });
+  function generalModal() {
+    const c = camp(), chs = TG.battles.CHAPTERS;
+    const close = TG.modal(h('div', null, h('div', { class: 'v-wr-head' }, portrait(GENERAL, 48), h('div', null, h('h2', null, L('Жанжин Батмөнх', 'General Batmönkh')), h('p', { class: 'muted' }, L('Эх орноо хамгаалсан түүхүүд', 'Stories of defending the homeland')))),
+      h('p', null, L('Монголчууд олон зуун жилийн турш нутаг усаа хамгаалж ирсэн. Түүх бүрийг сонсоод, нутгаа хамгаал! Дуут сум, уурга хоёр зөвхөн дайсны зоригийг мохоодог: хэн ч гэмтэхгүй.', 'For centuries Mongolians have protected their land. Hear each story, then defend the land! Whistling arrows and the lasso only break the raiders’ courage: nobody gets hurt.')),
+      h('div', { class: 'v-list' }, chs.map((ch, i) => { const open = i === 0 || c.won[chs[i - 1].id], won = c.won[ch.id];
+        return h('div', { class: 'v-row' + (open ? '' : ' locked') }, h('span', { class: 'v-card-e' }, won ? '🏆' : open ? '⚔️' : '🔒'), h('div', { class: 'v-row-b' }, h('b', null, tx(ch.name)), h('small', null, tx(ch.year), won ? ` · ${L('Хамгаалсан', 'Defended')} ✓` : '')),
+          open ? h('button', { class: 'btn sm primary', onclick: () => { close(); battleIntro(ch.id); } }, won ? L('Дахин', 'Again') : L('Эхлэх', 'Begin')) : null); })),
+      h('p', { class: 'privacy' }, '🏹 ', L('Сумаа: дайсан дээр дар эсвэл F. Уурга: ойртоод E. 3D-д: харж байгаад дар.', 'Arrows: tap a raider or press F. Lasso: get close and press E. In 3D: aim and click.'))), { cls: 'v-modal' });
+  }
+  function battleIntro(id) {
+    const ch = TG.battles.byId(id);
+    const close = TG.modal(h('div', null, h('div', { class: 'eyebrow' }, `⚔️ ${tx(ch.year)}`), h('h2', null, tx(ch.name)),
+      h('div', { class: 'teach' }, h('b', null, '📜 ', L('Түүх', 'The story')), h('p', null, tx(ch.intro))),
+      h('p', { class: 'muted' }, L(`Холбоотнууд: ${ch.allies.map((a) => a.name.mn).join(', ')}. ${ch.waves.length} давалгаа.`, `Allies: ${ch.allies.map((a) => a.name.en).join(', ')}. ${ch.waves.length} waves.`)),
+      h('div', { class: 'row-btns' }, h('button', { class: 'btn primary', onclick: () => { close(); startBattle(id); } }, '⚔️ ', L('Хамгаалъя!', 'Defend!')),
+        TG.fp && TG.fp.supported() ? h('button', { class: 'btn', onclick: () => { close(); startBattle(id); setTimeout(() => openFP(), 50); } }, '👁 ', L('Өөрийн нүдээр', 'First person')) : null)), { cls: 'v-modal' });
+  }
+  function startBattle(id) {
+    if (!live) return;
+    const ch = TG.battles.byId(id);
+    if (live.race) return;
+    live.battle = { ch, wave: 0, toSpawn: ch.waves[0], spawnT: 1.5, breakT: 0, enemies: [], allies: ch.allies.map((a, i) => ({ ...a, look: { ...a.look, ride: 'horse', coat: a.coat }, x: 18 + i * 2, y: 13 + i, cd: 1 + i * 0.5, face: 2 })), arrows: [], herd: HERD_MAX, repelled: 0, total: ch.waves.reduce((a, b) => a + b, 0), cd: 0, lassoCd: 0, over: false, nid: 0 };
+    camp().tries++; S.save(); TG.sfx.whoosh && TG.sfx.whoosh(); hud();
+    TG.toast('⚔️ ' + L(`${tx(ch.name)}: 1-р давалгаа ирж байна!`, `${tx(ch.name)}: the first wave is coming!`));
+  }
+  const nearestEnemy = (x, y, max = 9) => { let best = null, bd = max; for (const e of live.battle.enemies) if (!e.flee) { const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; best = e; } } return best; };
+  const meXY = () => ({ x: live.me.px + 0.5, y: live.me.py + 0.82 });
+  function shootAt(tx0, ty0, from) {
+    const bt = live.battle; if (!bt || bt.over) return false;
+    const o = from || meXY(); if (!from) { if (bt.cd > 0) return false; bt.cd = SHOOT_CD; TG.sfx.snap(); }
+    const dx = tx0 - o.x, dy = ty0 - o.y, d = Math.hypot(dx, dy) || 1;
+    bt.arrows.push({ x: o.x, y: o.y, dx: dx / d, dy: dy / d, life: 1.1, mine: !from });
+    return true;
+  }
+  function shootNearest() { const bt = live && live.battle; if (!bt) return; const m = meXY(), e = nearestEnemy(m.x, m.y); if (e) shootAt(e.x, e.y); else if (bt.cd <= 0) { bt.cd = 1.2; TG.toast(L('Ойрхон дайсан алга.', 'No raider nearby.')); } }
+  function lasso(e) { const bt = live.battle; if (!bt || bt.lassoCd > 0 || e.flee) return; bt.lassoCd = 1; e.courage -= 2; e.hitT = performance.now(); TG.sfx.whoosh && TG.sfx.whoosh(); floatAt({ x: e.x - 0.5, y: e.y - 0.8 }, L('Уургадлаа!', 'Lassoed!'), '#f7c646'); if (e.courage <= 0) scare(e); }
+  function scare(e) { e.flee = true; e.courage = 0; live.battle.repelled++; floatAt({ x: e.x - 0.5, y: e.y - 1 }, L('Зориг нь мохлоо!', 'Lost courage!'), '#ffffff'); TG.sfx.good(); hud(); }
+  function battleTick(dt) {
+    const bt = live.battle; if (!bt || bt.over) return;
+    bt.cd = Math.max(0, bt.cd - dt); bt.lassoCd = Math.max(0, bt.lassoCd - dt);
+    // waves: spawn the raiders one by one from the edges of the village
+    if (bt.toSpawn > 0) { bt.spawnT -= dt; if (bt.spawnT <= 0) { bt.spawnT = 1.6; bt.toSpawn--; const sp = TG.pick(B_SPAWN), tg = TG.pick(B_TARGET), path = WD.findPath(sp.x, sp.y, tg.x, tg.y) || [];
+      bt.enemies.push({ id: ++bt.nid, x: sp.x + 0.5, y: sp.y + 0.5, home: { x: sp.x + 0.5, y: sp.y + 0.5 }, path, courage: bt.ch.enemy.courage, max: bt.ch.enemy.courage, flee: false, speed: 1.9 + TG.battles.CHAPTERS.indexOf(bt.ch) * 0.15 + bt.wave * 0.1, face: 1, look: { ...bt.ch.enemy.look, ride: 'horse', coat: bt.ch.enemy.coat } }); } }
+    else if (!bt.enemies.length) {
+      if (bt.wave + 1 >= bt.ch.waves.length) return endBattle(true);
+      bt.breakT += dt; if (bt.breakT > 2.5) { bt.breakT = 0; bt.wave++; bt.toSpawn = bt.ch.waves[bt.wave]; bt.spawnT = 0.5; TG.toast('⚔️ ' + L(`${bt.wave + 1}-р давалгаа!`, `Wave ${bt.wave + 1}!`)); hud(); }
+    }
+    // raiders follow the roads to the herd; scared ones ride straight home
+    for (const e of bt.enemies) {
+      let tx0, ty0;
+      if (e.flee) { tx0 = e.home.x; ty0 = e.home.y; } else if (e.path.length) { tx0 = e.path[0].x + 0.5; ty0 = e.path[0].y + 0.5; } else { bt.herd--; e.flee = true; e.scared = true; TG.sfx.bad(); floatAt({ x: e.x - 0.5, y: e.y - 1 }, L('Хонь айлаа!', 'A sheep got scared!'), '#e14b3d'); hud(); continue; }
+      const dx = tx0 - e.x, dy = ty0 - e.y, d = Math.hypot(dx, dy), sp = (e.flee ? 3.4 : e.speed) * dt;
+      if (d <= sp) { e.x = tx0; e.y = ty0; if (!e.flee) e.path.shift(); else e.gone = true; } else { e.x += (dx / d) * sp; e.y += (dy / d) * sp; }
+      if (Math.abs(dx) > 0.05) e.face = dx < 0 ? 1 : 2;
+    }
+    bt.enemies = bt.enemies.filter((e) => !e.gone);
+    // allies ride towards the nearest raider and loose arrows
+    for (const a of bt.allies) {
+      const e = nearestEnemy(a.x, a.y, 30);
+      if (!e) continue;
+      const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy);
+      if (d > 3.5) { a.x += (dx / d) * 2.6 * dt; a.y += (dy / d) * 2.6 * dt; a.moving = true; } else a.moving = false;
+      if (Math.abs(dx) > 0.05) a.face = dx < 0 ? 1 : 2;
+      a.cd -= dt; if (a.cd <= 0 && d < 6) { a.cd = 1.5 + Math.random() * 0.6; const miss = Math.random() < 0.3 ? 1.2 : 0; shootAt(e.x + miss, e.y + miss * 0.5, { x: a.x, y: a.y }); }
+    }
+    // arrows: blunt whistling arrows that only take courage
+    for (const ar of bt.arrows) {
+      ar.x += ar.dx * ARROW_SPEED * dt; ar.y += ar.dy * ARROW_SPEED * dt; ar.life -= dt;
+      for (const e of bt.enemies) if (!e.flee && Math.hypot(e.x - ar.x, e.y - ar.y) < 0.6) { e.courage--; e.hitT = performance.now(); ar.life = 0; if (ar.mine) TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (e.courage <= 0) scare(e); break; }
+    }
+    bt.arrows = bt.arrows.filter((a) => a.life > 0);
+    if (bt.herd <= 0) endBattle(false);
+  }
+  function endBattle(won) {
+    const bt = live.battle; if (!bt || bt.over) return; bt.over = true;
+    const ch = bt.ch, c = camp(), first = won && !c.won[ch.id];
+    if (won) { c.won[ch.id] = Date.now(); reward(first ? 40 : 15, first ? 60 : 20); quest('defend'); TG.sfx.win(); TG.confetti(80); if (TG.history) TG.history.battleWon(ch.id); } else TG.sfx.bad();
+    S.save(); setTimeout(() => { if (live) { live.battle = null; hud(); } }, 600);
+    TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, won ? '🏆' : '🐑'), h('h2', null, won ? L('Нутгаа хамгааллаа!', 'You defended the land!') : L('Дахин оролдоё!', 'Let’s try again!')),
+      h('p', null, won ? L(`${bt.repelled} дайсны зоригийг мохоож, малаа аварлаа. 🐑 ${bt.herd}/${HERD_MAX}`, `You broke the courage of ${bt.repelled} raiders and saved the herd. 🐑 ${bt.herd}/${HERD_MAX}`) : L('Хонинууд айсан ч бүгд эсэн мэнд, буцаад ирлээ. Холбоотнуудтайгаа хамт дахиад хамгаалъя!', 'The sheep got scared, but they’re all safe and back home. Let’s defend again with your allies!')),
+      won ? h('div', { class: 'teach' }, h('b', null, '📜 ', L('Түүхэнд юу болсон бэ?', 'What really happened?')), h('p', null, tx(ch.after))) : null,
+      h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: (e) => e.currentTarget.closest('.modal-back').querySelector('.modal-x').click() }, L('Гайхалтай!', 'Great!'))), { cls: 'v-modal' });
+  }
+  function battleDraw(ents, drawRider, t) {
+    const bt = live && live.battle; if (!bt) return;
+    for (const u of [...bt.enemies, ...bt.allies]) ents.push({ y: u.y - 0.82, f: () => drawRider(u.look, u.face || 2, true, u.x - 0.5, u.y - 0.82) });
+  }
+  function battleOverlay(ctx, S2, k) {
+    const bt = live && live.battle; if (!bt) return;
+    ctx.save(); ctx.lineWidth = Math.max(2, k * 0.8); ctx.strokeStyle = '#3a2516';
+    for (const a of bt.arrows) { const [x1, y1] = S2(a.x * T, a.y * T - 10), [x2, y2] = S2((a.x - a.dx * 0.5) * T, (a.y - a.dy * 0.5) * T - 10); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.fillStyle = '#f7c646'; ctx.fillRect(x1 - k, y1 - k, k * 2, k * 2); }
+    ctx.font = `${Math.round(k * 5)}px Rubik, sans-serif`; ctx.textAlign = 'center';
+    for (const e of bt.enemies) { const [sx, sy] = S2(e.x * T, e.y * T - 38); ctx.fillStyle = e.flee ? '#ffffff' : '#e14b3d'; ctx.fillText(e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), sx, sy); }
+    ctx.restore();
+  }
+  const battleLabel = () => { const bt = live && live.battle; return bt ? `⚔️ ${tx(bt.ch.name)} · ${L('Давалгаа', 'Wave')} ${bt.wave + 1}/${bt.ch.waves.length} · 🐑 ${bt.herd}/${HERD_MAX} · 😨 ${bt.repelled}/${bt.total}` : ''; };
+
+  // ================================================================ Нутаг in first person (3D): roam, ride, use everything, see your friends
+  const CHAR_H = 1.8;
+  const ARROW_IMG = (() => { const c = document.createElement('canvas'); c.width = 12; c.height = 2; const x = c.getContext('2d'); x.fillStyle = '#6b4220'; x.fillRect(0, 0, 10, 2); x.fillStyle = '#f7c646'; x.fillRect(9, 0, 3, 2); x.fillStyle = '#ffffff'; x.fillRect(0, 0, 2, 2); return c; })();
+  function villageThings() {
+    const list = [];
+    for (const o of WD.objects) {
+      if (!o.door) continue;
+      const a = o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id };
+      list.push({ kind: 'obj', x: o.door.x + 0.5, y: o.door.y + 0.5, label: () => labelFor(a)[1] || L('Харах', 'Look'), run: () => doAction(a) });
+    }
+    list.push({ kind: 'fish', x: WD.DOCK.x + 0.5, y: WD.DOCK.y + 0.5, label: () => labelFor({ type: 'fish' })[1], run: () => doAction({ type: 'fish' }) });
+    for (const q of live.sheep) list.push({ kind: 'sheep', q, x: q.px + 0.5, y: q.py + 0.7, penalty: 3, label: () => labelFor({ type: 'sheep', s: q })[1], run: () => petSheep(q) });
+    return list;
+  }
+  function openFP() {
+    if (!live || !TG.fp || !TG.fp.supported()) return TG.toast(L('Энэ төхөөрөмж 3D харагдацыг дэмжихгүй байна.', 'This device can’t show the 3D view.'));
+    if (live.race) return TG.toast(L('Уралдааны үеэр 3D харагдац ажиллахгүй.', 'Not during a race.'));
+    const v = V(), things = villageThings(), m = live.me;
+    let world;
+    try { world = TG.fpworld.createVillage(WD, lotsArr(), R); } catch (e) { console.warn(e); return TG.toast(L('3D ертөнц ачаалж чадсангүй.', 'Could not build the 3D village.')); }
+    const look = (who) => PX.char({ ...who, pet: null, ride: null }, 0, 0);
+    const horseBtn = h('button', { class: 'btn scene-side hidden', onclick: () => { dismount(); } }, '🐎 ', L('Мориноос буух', 'Get off'));
+    const backBtn = h('button', { class: 'btn scene-side', onclick: () => sc && sc.close() }, '🗺️ ', L('Дээрээс харах', 'Top view'));
+    let sc = null;
+    sc = TG.fp.open({
+      cls: 'village-fp', world, scale: TG.fpworld.TILE, look: v.look,
+      start: { x: m.px + 0.5, y: m.py + 0.82 }, W: WD.W, title: L('Нутаг', 'Nutag'), sub: L('Өөрийн нүдээр', 'First person'), buttons: [horseBtn, backBtn], things,
+      onPrimary: (api) => { if (!live.battle || live.battle.over) return false; const d = api.dir(), n = Math.hypot(d[0], d[2]) || 1, m2 = meXY(); shootAt(m2.x + (d[0] / n) * 10, m2.y + (d[2] / n) * 10); return true; },
+      onKey: (code) => { if (code === 'KeyF' && live.battle) { shootNearest(); return true; } return false; },
+      overlay: (x, proj, t, dpr) => { if (!live.battle) return; const txt = battleLabel(); x.font = `800 ${Math.round(15 * dpr)}px Rubik, sans-serif`; x.textAlign = 'center'; const tw = x.measureText(txt).width + 24 * dpr; x.fillStyle = 'rgba(43,30,46,.75)'; x.fillRect(x.canvas.width / 2 - tw / 2, 128 * dpr, tw, 28 * dpr); x.fillStyle = '#f7c646'; x.fillText(txt, x.canvas.width / 2, 147 * dpr); },
+      riding: () => !!live.ride, horseCoat: () => (PX.COATS[V().horse.coat] || PX.COATS.bay)[0],
+      hint: () => L('Ойртож харвал E', 'Face something and press E'),
+      step: () => {
+        // your position back into the village, so friends see you move and quests count where you are
+        const px = sc.me.x - 0.5, py = sc.me.y - 0.82, mv = Math.hypot(px - live.me.px, py - live.me.py);
+        live.me.moving = mv > 0.002; if (Math.abs(px - live.me.px) > 0.002) live.me.face = px < live.me.px ? 1 : 2;
+        live.me.px = px; live.me.py = py; live.me.vx = live.me.vy = 0; live.me.path = []; live.cam.x = px; live.cam.y = py;
+        for (const t of things) if (t.kind === 'sheep') { t.x = t.q.px + 0.5; t.y = t.q.py + 0.7; }
+        // raiders you can lasso when they come close
+        for (let i = things.length - 1; i >= 0; i--) if (things[i].kind === 'enemy' && (!live.battle || !live.battle.enemies.includes(things[i].e) || things[i].e.flee)) things.splice(i, 1);
+        if (live.battle) for (const e of live.battle.enemies) { if (e.flee) continue; let t2 = things.find((q) => q.e === e); if (!t2) things.push(t2 = { kind: 'enemy', e, label: () => L('Уургадах', 'Lasso'), run: () => lasso(e) }); t2.x = e.x; t2.y = e.y; }
+        horseBtn.classList.toggle('hidden', !live.ride);
+      },
+      actors: (t) => {
+        const out = [], f = (o) => (o.moving ? 1 + (Math.floor(t * 8) % 2) : 0);
+        for (const np of WD.objects) {
+          if (np.kind === 'npcq' && NPCS[np.id]) out.push({ img: look(NPCS[np.id].look), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H });
+          if (np.kind === 'npc') out.push({ img: look(ZASUUL), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H });
+          if (np.kind === 'emee') out.push({ img: look(EMEE), x: np.x + 0.5, y: np.y + 0.9, h: CHAR_H * 0.92 });
+          if (np.kind === 'cow' || np.kind === 'goat') out.push({ img: PX.beast(np.kind, Math.floor(t * 2 + np.y) % 5 === 0 ? 1 : 0), x: np.x + (np.kind === 'cow' ? 1 : 0.5), y: np.y + 0.6, h: np.kind === 'cow' ? 1.4 : 0.95 });
+          if (np.kind === 'zel') [[0.6, 'foal', 1.05], [2.2, 'foal', 1.05], [1.4, 'mare', 1.6], [3.2, 'mare', 1.6]].forEach(([dx, k, hh], i) => out.push({ img: PX.beast(k, 0), x: np.x + dx, y: np.y + (k === 'mare' ? 1.1 : 0.5), h: hh, flip: i % 2 === 1 }));
+          if (np.kind === 'uya') { out.push({ img: PX.beast('horse', 0), x: np.x + 0.8, y: np.y + 0.6, h: 1.6 }); out.push({ img: PX.beast('mare', 0), x: np.x + np.w - 0.8, y: np.y + 0.6, h: 1.6, flip: true }); }
+        }
+        for (const q of live.sheep) out.push({ img: PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), x: q.px + 0.5, y: q.py + 0.7, h: 0.95, flip: !q.flip });
+        for (const o of live.others.values()) {
+          if (o.look.ride) out.push({ img: PX.beast('horse', o.moving ? 1 + (Math.floor(t * 8) % 2) : 0), x: o.px + 0.5, y: o.py + 0.82, h: 1.6, flip: o.face === 1 });
+          out.push({ img: PX.char({ ...o.look, pet: null, ride: null }, o.dir, f(o)), x: o.px + 0.5, y: o.py + 0.82, h: CHAR_H, lift: o.look.ride ? 0.9 : 0 });
+        }
+        if (live.race) for (const n of live.race.npcs) out.push({ img: PX.beast('horse', 1 + (Math.floor(t * 10) % 2)), x: n.px + 0.5, y: n.py + 0.82, h: 1.6 });
+        for (const [o, lk] of [[WD.objects.find((q) => q.kind === 'general'), GENERAL], [WD.objects.find((q) => q.kind === 'historian'), HISTORIAN]]) if (o) out.push({ img: look(lk), x: o.x + 0.5, y: o.y + 0.9, h: CHAR_H });
+        const bt = live.battle;
+        if (bt) {
+          for (const u of [...bt.enemies, ...bt.allies]) { out.push({ img: PX.beast(u.look.coat === 'black' ? 'horse' : u.look.coat === 'white' ? 'mare' : 'horse', 1 + (Math.floor(t * 9 + u.x) % 2)), x: u.x, y: u.y, h: 1.6, flip: u.face === 1 }); out.push({ img: PX.char({ ...u.look, ride: null, pet: null }, u.face === 1 ? 1 : 2, 0), x: u.x, y: u.y, h: CHAR_H, lift: 0.85 }); }
+          for (const a of bt.arrows) out.push({ img: ARROW_IMG, x: a.x, y: a.y, h: 0.18, lift: 1.4 });
+        }
+        return out;
+      },
+      markers: () => {
+        const out = [];
+        for (const np of WD.objects) {
+          if (np.kind === 'npcq' && NPCS[np.id]) { const mk = npcMark(np.id); out.push({ x: np.x + 0.5, y: np.y + 0.9, c: mk === '?' ? '#7fe07a' : mk ? '#f7c646' : null, label: tx(NPCS[np.id].name).split(' ').pop(), lift: 2.4 }); }
+          if (np.kind === 'emee') out.push({ x: np.x + 0.5, y: np.y + 0.9, c: V().emee && V().emee.visits ? null : '#f7c646', label: L('Эмээ', 'Grandma'), lift: 2.2 });
+          if (np.kind === 'npc') out.push({ x: np.x + 0.5, y: np.y + 0.9, c: null, label: L('Засуул', 'Herald'), lift: 2.4 });
+        }
+        for (const o of live.others.values()) out.push({ x: o.px + 0.5, y: o.py + 0.82, c: null, label: o.name, lift: o.look.ride ? 3.2 : 2.3 });
+        const bt = live.battle; if (bt) for (const e of bt.enemies) out.push({ x: e.x, y: e.y, c: null, label: e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), lift: 3.3 });
+        if (TG.history && TG.history.ready()) { const o = WD.objects.find((q) => q.kind === 'historian'); if (o) out.push({ x: o.x + 0.5, y: o.y + 0.9, c: '#7fe07a', label: L('Түүхч', 'Historian'), lift: 2.4 }); }
+        return out;
+      },
+      mini: { img: live.miniBase, w: WD.W * 3, h: WD.H * 3, dots: () => [...[...live.others.values()].map((o) => ({ x: o.px + 0.5, y: o.py + 0.8, c: '#ffffff' })), ...WD.objects.filter((o) => o.kind === 'npcq' && npcMark(o.id)).map((o) => ({ x: o.x + 0.5, y: o.y + 0.5, c: '#f7c646' }))] },
+      info: [h('b', null, '👁 ', L('Нутгаа өөрийн нүдээр!', 'Nutag in first person!')), h('p', null, L('WASD алхах, хулганаар харах, Space үсрэх, Shift гүйх, E харилцах. Морины уяанаас морь унаж давхиж болно!', 'WASD walk, mouse to look, Space jump, Shift sprint, E interact. Take a horse from the hitching line and ride!'))],
+      onClose: () => { if (live) { live.keys.clear(); live.fpOpen = false; updateCtx(); } },
+    });
+    if (sc) { live.fpOpen = true; TG._village.fpScene = sc; }
   }
 
   // ---------------------------------------------------------------- minimap
@@ -589,7 +867,7 @@
     if (!live) return;
     const dt = Math.min(0.05, (ts - live.last) / 1000); live.last = ts;
     update(dt);
-    if (!(TG.scene && TG.scene.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
+    if (!(TG.scene && TG.scene.active()) && !(TG.fp && TG.fp.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
     live.raf = requestAnimationFrame(frame);
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
@@ -633,6 +911,7 @@
       live.eT = (live.eT || 0) + dt; if (live.eT > 1) { live.eT = 0; hudEnergy(); live.eS = (live.eS || 0) + 1; if (live.eS >= 5) { live.eS = 0; S.save(); } }
     }
     if (live.race) raceTick(dt);
+    if (live.battle) battleTick(dt);
     if (m.path.length) { m.stuck = Math.hypot(m.px - ox, m.py - oy) < 0.002 ? m.stuck + dt : 0; if (m.stuck > 0.5) { m.path = []; live.pending = null; } }
     const tx = Math.floor(m.px + 0.5), ty = Math.floor(m.py + 0.82);
     if (tx !== m.x || ty !== m.y) { m.x = tx; m.y = ty; updateCtx(); }
@@ -699,14 +978,6 @@
       const X = x * T - c.x + 3 + Math.floor(WD.hash(y, x) * 9), Y = y * T - c.y + 4 + Math.floor(WD.hash(x + 1, y) * 9);
       PX.R(b, X, Y, ph < 0.6 ? 3 : 2, 1, ph < 0.6 ? PX.K.foam : PX.K.waterL);
     }
-    const gd = garden();
-    for (let i = 0; i < R.PLOTS; i++) {
-      const p = R.normalize(gd[i], nowMs); if (!p) continue;
-      const { x, y } = WD.plots[i], X = x * T - c.x, Y = y * T - c.y;
-      if (X < -16 || Y < -16 || X > bw + 1 || Y > bh + 1) continue;
-      PX.crop(b, X, Y, p.c, p.s, !!p.w, R.mature(p) && ((t * 1.6 + i * 0.37) % 2) < 0.35);
-      if (R.needsWater(p)) PX.drop(b, X + 11, Y - 5 + (Math.floor(t * 3 + i) % 2));
-    }
     seasonFx(b, bw, bh, t, c);
     // 2) …then upscale it, shifted by the camera's fractional part in real screen pixels (smooth scrolling)
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
@@ -742,6 +1013,11 @@
     const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
     ents.push({ y: dg.y + 0.05, f: () => { shadow(dg.x * T, dg.y * T + 1); sprite(PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.flip); } });
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
+    // the dairy yard's animals: cows and goats shift about, mares stand by their foals on the зэл
+    for (const o of WD.objects) {
+      if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); ents.push({ y: o.y + 0.2, f: () => { shadow(o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite(img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, turn); } }); }
+      if (o.kind === 'zel') { [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, k], i) => { const img = PX.beast(k, Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = k === 'mare' ? 0.75 : 0; ents.push({ y: o.y + my + 0.1, f: () => sprite(img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, i % 2 === 1) }); }); }
+    }
     const zs = WD.objects.find((q) => q.kind === 'npc');
     if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
     const tps = WD.objects.filter((q) => q.kind === 'npcq');
@@ -753,6 +1029,9 @@
       const RC = live.race.path.P, fl = Math.floor(t * 4) % 2;
       for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
     }
+    battleDraw(ents, drawRider, t);
+    const gn = WD.objects.find((q) => q.kind === 'general'), hs0 = WD.objects.find((q) => q.kind === 'historian');
+    for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
     // 4) evening: dark tint + stepped lantern glow
     const hr = new Date().getHours();
@@ -767,6 +1046,9 @@
     const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
     if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
+    if (gn) { const [sx, sy] = S(gn.x * T + 8, gn.y * T - 16); pixelText(ctx, L('Жанжин', 'General'), sx, sy, textSize() * 0.8, '#f7c646'); }
+    if (hs0) { const [sx, sy] = S(hs0.x * T + 8, hs0.y * T - 16); pixelText(ctx, L('Түүхч', 'Historian'), sx, sy, textSize() * 0.8, '#f7c646'); if (TG.history && TG.history.ready()) pixelText(ctx, '!', sx, sy - 9 * live.view.k, textSize() * 1.8, '#7fe07a'); }
+    battleOverlay(ctx, S, live.view.k);
     for (const np of tps) { const d = NPCS[np.id]; if (!d) continue; const [sx, sy] = S(np.x * T + 8, np.y * T - 16); pixelText(ctx, tx(d.name).split(' ').pop(), sx, sy, textSize() * 0.8, '#ffffff'); const mk = npcMark(np.id); if (mk) pixelText(ctx, mk, sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180 + np.x) * 2) * live.view.k / 2, textSize() * 1.8, mk === '?' ? '#7fe07a' : '#f7c646'); }
     if (em) { const [sx, sy] = S(em.x * T + 8, em.y * T - 16); pixelText(ctx, L('Эмээ', 'Grandma'), sx, sy, textSize(), '#f7c646'); if (!(V().emee && V().emee.visits)) pixelText(ctx, '!', sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2, textSize() * 1.8, '#f7c646'); }
     for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
@@ -832,41 +1114,24 @@
       h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, fact)),
       h('button', { class: 'btn primary block', style: { marginTop: '14px' }, onclick: () => close() }, L('Гайхалтай!', 'Cool!'))));
   }
-  function seedPicker(i) {
-    const v = V(), owned = Object.entries(R.CROPS).filter(([k]) => v.seeds[k] > 0);
-    const close = TG.modal(h('div', null,
-      h('h2', null, L('Юу тарих вэ?', 'What to plant?')),
-      h('p', { class: 'muted' }, L('Тарьсан ургамлаа 3 удаа услах хэрэгтэй. Найзууд чинь ч усалж туслах боломжтой!', 'Plants need water 3 times. Your friends can help water too!')),
-      owned.length ? h('div', { class: 'v-grid' }, owned.map(([k, c]) => h('button', { class: 'v-card', onclick: () => { close(); act('plant', i, k); } },
-        h('span', { class: 'v-card-e' }, pic('crop:' + k, 40)), h('b', null, tx(c.name)), h('small', null, `×${v.seeds[k]} · ${c.stage * 3}${L('с', 's')}`))))
-        : h('div', { class: 'empty-memory' }, h('p', null, L('Танд үр алга. Дэлгүүрээс аваарай!', "You don't have seeds. Get some at the shop!")),
-          h('button', { class: 'btn primary', onclick: () => { close(); shopModal('seeds'); } }, '🛒 ', L('Дэлгүүр', 'Shop')))));
-  }
-
   function shopModal(start) {
-    const v = V(); let cur = start || 'seeds';
+    const v = V(); let cur = start || 'wear';
     const body = h('div', { class: 'v-shop' });
-    const TABS = [['seeds', 'ui:seed', L('Үр', 'Seeds')], ['wear', 'deel:red', L('Хувцас', 'Clothes')], ['pet', 'pet:lamb', L('Тэжээвэр', 'Pets')], ['tool', 'tool:can-2', L('Багаж', 'Tools')], ['sell', 'ui:coin', L('Зарах', 'Sell')]];
-    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Хичээл үзэж, Басарын асуултад хариулж, ургац зарж цуглуулаарай!', 'Not enough coins. Learn, answer Basar’s quizzes or sell crops to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
-    const ownedItem = (it) => (it.cat === 'tool' ? (it.slot === 'can' ? v.can >= it.val : v.rod >= it.val) : v.owned.includes(it.id));
+    const TABS = [['wear', 'deel:red', L('Хувцас', 'Clothes')], ['pet', 'pet:lamb', L('Тэжээвэр', 'Pets')], ['tool', 'tool:rod-2', L('Багаж', 'Tools')], ['sell', 'ui:coin', L('Зарах', 'Sell')]];
+    const pay = (price) => { if (v.coins < price) { TG.sfx.bad(); TG.toast(L('Зоос хүрэлцэхгүй байна. Хичээл үзэж, Басарын асуултад хариулж, цагаан идээ зарж цуглуулаарай!', 'Not enough coins. Learn, answer Basar’s quizzes or sell dairy foods to earn more!')); return false; } v.coins -= price; TG.sfx.chime(); return true; };
+    const ownedItem = (it) => (it.cat === 'tool' ? v.rod >= it.val : v.owned.includes(it.id));
     const draw = () => {
       const level = lvl();
       let list;
-      if (cur === 'seeds') list = Object.entries(R.CROPS).map(([k, c]) => {
-        const locked = level < c.lvl;
-        return h('div', { class: 'v-row' + (locked ? ' locked' : '') }, icon('crop:' + k), h('div', { class: 'v-row-b' }, h('b', null, tx(c.name)), h('small', null, `${L('Зарах үнэ', 'Sells for')} ${c.sell} · ${L('Танд', 'You have')} ${v.seeds[k] || 0}`)),
-          locked ? h('span', { class: 'v-lock' }, '🔒 ', L('Түвшин', 'Lv'), ' ', c.lvl) : h('div', { class: 'v-buy' },
-            h('button', { class: 'btn sm', onclick: () => { if (pay(c.cost)) { v.seeds[k] = (v.seeds[k] || 0) + 1; save(); } } }, `+1 · ${c.cost}`, pic('ui:coin', 14)),
-            h('button', { class: 'btn sm primary', onclick: () => { if (pay(c.cost * 5)) { v.seeds[k] = (v.seeds[k] || 0) + 5; save(); } } }, `+5 · ${c.cost * 5}`, pic('ui:coin', 14))));
-      });
+      if (false) list = [];
       else if (cur === 'sell') {
-        const goods = [...Object.entries(v.produce).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'produce', e: 'crop:' + k, name: R.CROPS[k].name, price: R.CROPS[k].sell })),
+        const goods = [...Object.entries(v.produce).filter(([k, n]) => n > 0 && R.DAIRY[k]).map(([k, n]) => ({ k, n, kind: 'produce', e: 'dairy:' + k, name: R.DAIRY[k].name, price: R.DAIRY[k].sell })),
           ...Object.entries(v.fish).filter(([, n]) => n > 0).map(([k, n]) => ({ k, n, kind: 'fish', e: 'fish:' + k, name: R.FISH[k].name, price: R.FISH[k].sell }))];
         const sell = (g, n) => { v[g.kind][g.k] -= n; v.coins += g.price * n; quest('sell', n); TG.sfx.chime(); save(); };
         list = goods.length ? [h('button', { class: 'btn primary block', onclick: () => goods.forEach((g) => sell(g, g.n)) }, `${L('Бүгдийг зарах', 'Sell everything')} · +${goods.reduce((s, g) => s + g.n * g.price, 0)}`, pic('ui:coin', 16)),
           ...goods.map((g) => h('div', { class: 'v-row' }, icon(g.e), h('div', { class: 'v-row-b' }, h('b', null, `${tx(g.name)} ×${g.n}`), h('small', null, `${g.price} ${L('зоос, ширхэг бүр', 'coins each')}`)),
             h('button', { class: 'btn sm', onclick: () => sell(g, 1) }, `${L('Зарах', 'Sell')} 1`)))]
-          : [h('div', { class: 'empty-memory' }, h('p', null, L('Зарах зүйл алга. Ургац хурааж, загас бариарай!', 'Nothing to sell yet. Harvest crops or catch fish!')))];
+          : [h('div', { class: 'empty-memory' }, h('p', null, L('Зарах зүйл алга. Мал саагаад цагаан идээ хийж, загас бариарай!', 'Nothing to sell yet. Milk the animals, make dairy foods or catch fish!')))];
       } else list = R.ITEMS.filter((it) => it.cat === cur).map((it) => {
         const owned = ownedItem(it), locked = level < it.lvl, worn = it.cat !== 'tool' && v.look[it.slot] === it.val;
         return h('div', { class: 'v-row' + (locked && !owned ? ' locked' : '') }, icon(itemKey(it)), h('div', { class: 'v-row-b' }, h('b', null, tx(it.name)), h('small', null, owned ? (worn ? L('Өмссөн', 'Wearing') : L('Танд байгаа', 'Owned')) : `${it.price} ${L('зоос', 'coins')}`)),
@@ -874,7 +1139,7 @@
             : locked ? h('span', { class: 'v-lock' }, '🔒 ', L('Түвшин', 'Lv'), ' ', it.lvl)
               : h('button', { class: 'btn sm primary', onclick: () => {
                 if (!pay(it.price)) return;
-                if (it.cat === 'tool') { if (it.slot === 'can') { v.can = it.val; v.water = it.val; } else v.rod = it.val; }
+                if (it.cat === 'tool') v.rod = it.val;
                 else { v.owned.push(it.id); v.look[it.slot] = it.val; sendLook(); }
                 TG.toast(`${tx(it.name)}: ${L('худалдаж авлаа!', 'purchased!')}`); save();
               } }, `${it.price}`, pic('ui:coin', 14)));
@@ -922,11 +1187,11 @@
 
   function bag() {
     const v = V();
-    const sec = (title, obj, src) => { const items = Object.entries(obj).filter(([k, n]) => n > 0 && src[k]); return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, title), items.length ? h('div', { class: 'v-chips' }, items.map(([k, n]) => h('span', { class: 'v-chip wide' }, pic((src === R.FISH ? 'fish:' : 'crop:') + k, 24), ` ${tx(src[k].name)} ×${n}`))) : h('p', { class: 'muted' }, '—')); };
+    const sec = (title, obj, src) => { const items = Object.entries(obj).filter(([k, n]) => n > 0 && src[k]); return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, title), items.length ? h('div', { class: 'v-chips' }, items.map(([k, n]) => h('span', { class: 'v-chip wide' }, pic((src === R.FISH ? 'fish:' : 'dairy:') + k, 24), ` ${tx(src[k].name)} ×${n}`))) : h('p', { class: 'muted' }, '—')); };
     const L1 = R.level(v.xp);
     const close = TG.modal(h('div', null, h('h2', null, L('Цүнх', 'Bag')),
       h('div', { class: 'stat-cards' }, h('div', { class: 'stat' }, h('small', null, L('Түвшин', 'Level')), h('b', null, L1.l)), h('div', { class: 'stat' }, h('small', null, 'XP'), h('b', null, `${L1.cur}/${L1.need}`)), h('div', { class: 'stat' }, h('small', null, L('Зоос', 'Coins')), h('b', null, v.coins))),
-      sec(L('Үр', 'Seeds'), v.seeds, R.CROPS), sec(L('Ургац', 'Harvest'), v.produce, R.CROPS), sec(L('Загас', 'Fish'), v.fish, R.FISH),
+      sec(L('Цагаан идээ', 'Dairy'), v.produce, R.DAIRY), sec(L('Загас', 'Fish'), v.fish, R.FISH),
       h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, '👗 ', L('Хувцас', 'Wardrobe')), h('button', { class: 'btn primary', onclick: () => { close(); shopModal('sell'); } }, '💰 ', L('Зарах', 'Sell')))), { cls: 'v-modal' });
   }
 
@@ -936,8 +1201,8 @@
       h('p', { class: 'muted' }, L('Даалгавар өдөр бүр шинэчлэгдэнэ.', 'Quests refresh every day.')),
       h('div', { class: 'v-list' }, quests().map((q) => {
         const d = QUESTS[q.k], ready = q.p >= d.n && !q.done;
-        return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? 'ui:star' : q.k === 'help' ? 'ui:heart' : 'ui:scroll'),
-          h('div', { class: 'v-row-b' }, h('b', null, q.season ? `${TG.seasons.byId(q.season).icon} ` : '', tx(d.t), q.k === 'help' ? h('small', null, ` (${L('онлайн', 'online')})`) : null, q.season ? h('small', { class: 'v-season-tag' }, ` ${tx(TG.seasons.byId(q.season).name)} ×1.5`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
+        return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? 'ui:star' : 'ui:scroll'),
+          h('div', { class: 'v-row-b' }, h('b', null, q.season ? `${TG.seasons.byId(q.season).icon} ` : '', tx(d.t), q.season ? h('small', { class: 'v-season-tag' }, ` ${tx(TG.seasons.byId(q.season).name)} ×1.5`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
           ready ? h('button', { class: 'btn sm primary', onclick: () => { q.done = true; if (q.season) { v.seasonDone = v.seasonDone || {}; v.seasonDone[q.season] = Date.now(); } reward(Math.round(d.c * (q.season ? 1.5 : 1)), Math.round(d.x * (q.season ? 1.5 : 1))); TG.confetti(40); draw(); } }, L('Авах', 'Claim')) : q.done ? h('span', { class: 'v-owned' }, '✓') : null);
       })),
       h('button', { class: 'btn block', onclick: () => { close(); TG.go('learn'); } }, '📚 ', L('Өв соёлын сургууль', 'Heritage school')));
@@ -1293,16 +1558,16 @@
   const NPCS = {
     herder: { name: Tx('Малчин Батбаяр', 'Herder Batbayar'), look: { deel: 'brown', skin: '#D9A06E', hat: 'mongol', neck: null, face: null, pet: null },
       hello: Tx('Сайн уу, хүү/охин минь! Мал маллах амаргүй ч сайхан ажил шүү.', 'Hello, child! Herding is hard work, but wonderful.'),
-      chain: [NQ('pet', 3, 'Хониддоо дасгая: тэднийг 3 удаа илбээрэй.', 'Help the sheep get to know you: pet them 3 times.', 20, 25), NQ('harvest', 2, 'Малын тэжээлд 2 ургац хураагаад ирээрэй.', 'Harvest 2 crops for the animals.', 25, 30), NQ('etiquette', 1, 'Эмээгийн гэрт ёсоор зочлоод ир. Малчин хүн ёсоо мэддэг байх ёстой!', 'Visit Grandma’s ger with good manners. A herder knows the customs!', 35, 40)],
+      chain: [NQ('pet', 3, 'Хониддоо дасгая: тэднийг 3 удаа илбээрэй.', 'Help the sheep get to know you: pet them 3 times.', 20, 25), NQ('milk', 2, 'Хот айлд 2 удаа мал саагаад ирээрэй.', 'Milk the animals in the dairy yard twice.', 25, 30), NQ('etiquette', 1, 'Эмээгийн гэрт ёсоор зочлоод ир. Малчин хүн ёсоо мэддэг байх ёстой!', 'Visit Grandma’s ger with good manners. A herder knows the customs!', 35, 40)],
       done: Tx('Чи жинхэнэ малчин болох нь! Малчид хонь бүрээ таньдаг, гэр бүл шиг хайрладаг.', 'You’ll make a real herder! Herders know every sheep and love them like family.') },
     fisher: { name: Tx('Загасчин Дорж өвөө', 'Grandpa Dorj the fisher'), look: { deel: 'teal', skin: '#B97A4A', hat: 'cap', neck: null, face: null, pet: null },
       hello: Tx('Нуур тайван байна. Загасчлахад тэвчээр хэрэгтэй.', 'The lake is calm today. Fishing takes patience.'),
       chain: [NQ('fish', 1, 'Нэг загас барьж үзээрэй. Гүүрэн дээрээс загасчилна.', 'Catch your first fish from the dock.', 15, 20), NQ('fish', 3, 'Одоо 3 загас бариарай. Хадран барьвал буцааж тавиарай!', 'Now catch 3 fish. If you catch a taimen, let it go!', 30, 35), NQ('basar', 2, 'Басараас Монголын гол мөрөн, нууруудын тухай 2 асуулт асуу.', 'Ask Basar 2 questions about Mongolia’s rivers and lakes.', 25, 30)],
       done: Tx('Сайн загасчин байгалиа хайрладаг. Хөвсгөл нуур бол Монголын хамгийн гүн нуур шүү!', 'A good fisher loves nature. Lake Khövsgöl is Mongolia’s deepest lake!') },
-    farmer: { name: Tx('Тариачин Сарнай эгч', 'Farmer Sarnai'), look: { deel: 'green', skin: '#EDBB93', hat: 'flower', neck: null, face: null, pet: null },
-      hello: Tx('Цэцэрлэгт ажиллах сайхан шүү! Надад туслах уу?', 'Gardening is lovely! Will you help me?'),
-      chain: [NQ('plant', 4, '4 үр тариарай.', 'Plant 4 seeds.', 20, 25), NQ('water', 5, 'Ургамлуудаа 5 удаа услаарай.', 'Water the plants 5 times.', 20, 25), NQ('harvest', 3, '3 ургац хураагаарай.', 'Harvest 3 crops.', 30, 35)],
-      done: Tx('Баярлалаа! Сэлэнгэ аймаг Монголын талх, үр тарианы өлгий шүү.', 'Thank you! Selenge province is the cradle of Mongolia’s bread and grain.') },
+    farmer: { name: Tx('Саальчин Сарнай эгч', 'Sarnai the milkmaid'), look: { deel: 'green', skin: '#EDBB93', hat: 'flower', neck: null, face: null, pet: null },
+      hello: Tx('Хот айлд ажил их байна! Мал саахад туслах уу?', 'There’s lots to do in the dairy yard! Will you help me milk?'),
+      chain: [NQ('milk', 3, 'Үнээ, ямаа, гүүгээ 3 удаа саагаарай.', 'Milk the cows, goats and mares 3 times.', 20, 25), NQ('dairy', 2, 'Ааруул, өрөм, тараг эсвэл айраг 2 удаа хийгээрэй.', 'Make aaruul, öröm, tarag or airag twice.', 25, 30), NQ('sell', 3, 'Цагаан идээгээ дэлгүүрт 3 удаа зараарай.', 'Sell your dairy foods at the shop 3 times.', 30, 35)],
+      done: Tx('Баярлалаа! Монголчууд зун цагаан идээ, өвөл улаан идээ (мах) голлон иддэг.', 'Thank you! Mongolians eat mostly white foods (dairy) in summer and red foods (meat) in winter.') },
     teacher: { name: Tx('Багш Оюун', 'Teacher Oyun'), look: { deel: 'blue', skin: '#F6D3B3', hat: null, neck: 'scarf', face: 'glasses', pet: null },
       hello: Tx('Сурах бичиг уншихаас гадна тоглож сурах нь бас гоё!', 'Besides books, learning by playing is great fun!'),
       chain: [NQ('lesson', 1, 'Сургуулийн гэрт нэг хичээл дуусгаарай.', 'Finish one lesson in the school ger.', 30, 40), NQ('quiz', 3, 'Басарын 3 асуултад зөв хариулаарай.', 'Answer 3 of Basar’s questions correctly.', 25, 35), NQ('stamp', 1, 'Аймгийн паспортоороо нэг аймагт аялж тамга аваарай.', 'Travel to a province with your passport and earn a stamp.', 35, 45)],
@@ -1393,7 +1658,7 @@
     else things.push(spot('tulga', cx, 158, 'Голомт', 'The hearth', () => sayIt(L('Гал голомт бол гэрийн зүрх. Тулга авбал энд цай чанаж болно.', 'The hearth is the heart of the ger. Get a stove and you can make tea here.'))));
     if (has('or')) for (const [bx, side] of [[48, 'w'], [272, 'e']]) things.push(spot('or' + side, bx, 140, 'Унтаж амрах', 'Sleep and rest', () => {
       fx.zzz = performance.now(); fx.zx = bx; TG.sfx.chime && TG.sfx.chime();
-      if (own && v.rest !== today) { v.rest = today; v.water = v.can; S.save(); reward(5, 10); sayIt(L('😴 Сайхан амарлаа! Усны сав дүүрч, +10 XP.', '😴 A good rest! Water refilled, +10 XP.')); hud(); }
+      if (own && v.rest !== today) { v.rest = today; v.energy = 100; S.save(); reward(5, 10); sayIt(L('😴 Сайхан амарлаа! Хүч бүрэн дүүрч, +10 XP.', '😴 A good rest! Energy full again, +10 XP.')); hud(); }
       else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
     }));
     if (has('avdar')) things.push(spot('avdar', 206, 106, 'Авдраа нээх', 'Open the chest', () => chestModal()));
@@ -1486,7 +1751,7 @@
       h('p', { class: 'privacy' }, L('Найзууд чинь яг ижил Wi-Fi-д холбогдсон байх ёстой. Сургууль, зочны Wi-Fi төхөөрөмжүүдийг хооронд нь холбохгүй байж болно. Тэгвэл утасны hotspot ашиглаарай.', 'Friends must be on the same Wi-Fi. Some school or guest Wi-Fi blocks devices from seeing each other; if so, use a phone hotspot.'))) : null;
     body.append(h('h2', null, L('Хамт тоглох өрөө', 'Play-together room')), invite,
       live.status === 'online'
-        ? h('div', null, h('p', { class: 'muted' }, L(`"${live.room}" өрөөнд ${others.length + 1} хүн байна. Ижил кодтой хүмүүс нэг нутагт тоглож, нэг цэцэрлэгт тарина.`, `${others.length + 1} people in room "${live.room}". Everyone with the same code shares one village and garden.`)),
+        ? h('div', null, h('p', { class: 'muted' }, L(`"${live.room}" өрөөнд ${others.length + 1} хүн байна. Ижил кодтой хүмүүс нэг нутагт хамт тоглоно.`, `${others.length + 1} people in room "${live.room}". Everyone with the same code shares one village.`)),
           h('div', { class: 'v-chips' }, h('span', { class: 'v-chip wide active' }, portrait(V().look, 22), ' ', live.name, ` (${L('та', 'you')})`), others.map((o) => h('span', { class: 'v-chip wide' }, portrait(o.look, 22), ' ', o.name, ` · ${o.lvl}`))))
         : h('div', { class: 'hint' }, live.status === 'solo'
           ? L('Одоо ганцаараа горимд байна. Найзуудтайгаа хамт тоглохын тулд багш эсвэл эцэг эх компьютер дээр "node server.js" ажиллуулж, бүгд нэг Wi-Fi-аас тэр хаягаар нэвтэрнэ.', 'You are in solo mode. To play with friends, a teacher or parent runs "node server.js" on a computer and everyone on the same Wi-Fi opens its address.')
@@ -1586,7 +1851,7 @@
     }
     const buy = () => {
       if (lvl() < R.GER_LEVEL) return TG.toast(L(`${R.GER_LEVEL}-р түвшинд хүрээрэй.`, `Reach level ${R.GER_LEVEL} first.`));
-      if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, ургац зарж цуглуулаарай!', 'Not enough coins. Play games or sell crops to earn more!'));
+      if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, цагаан идээ зарж цуглуулаарай!', 'Not enough coins. Play games or sell dairy foods to earn more!'));
       close();
       if (live.online) net.send({ t: 'ger-buy', i, roof, door });
       else { const lot = { by: v.id, n: live.name, roof, door, furn: [] }; onLot({ act: 'buy', i, lot, by: v.id }); }
@@ -1624,7 +1889,7 @@
       rc(body, h('h2', null, L('Гэрээ тохижуулах', 'Decorate my ger')), cv,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, L('Хувцас', 'Wardrobe')),
-          h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.rest = today; v.water = v.can; S.save(); reward(5, 10); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: +10 XP, усны сав дүүрлээ.', 'You rested at home: +10 XP, water refilled.')); draw(); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),
+          h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.rest = today; v.energy = 100; S.save(); reward(5, 10); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: +10 XP, хүч дүүрлээ.', 'You rested at home: +10 XP, energy full.')); draw(); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),
         h('div', { class: 'label', style: { marginTop: '12px' } }, L('Тавилга', 'Furniture')),
         h('div', { class: 'v-list' }, R.FURNITURE.map((f) => {
           const owned = (l.furn || []).includes(f.id), locked = lvl() < f.lvl;
@@ -1685,7 +1950,7 @@
         : next.id === 'avarga' ? L('Наадамд дахин түрүүлбэл Аварга цол хүртэнэ!', 'Win the Naadam once more to become an Avarga!')
           : L(`Наадамд ${next.need} давбал «${tx(next.name)}» цол хүртэнэ.`, `Win ${next.need} rounds at the Naadam to earn the "${tx(next.name)}" title.`)),
       h('button', { class: 'btn primary big block', onclick: () => { close(); tournament(1); } }, L('Наадамд барилдах (9 даваа)', 'Wrestle in the Naadam (9 rounds)')),
-      h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L('Мэхний ном (7 мэх)', 'Technique book (7 moves)')),
+      h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L(`Мэхний ном (${R.MOVES.length} мэх)`, `Technique book (${R.MOVES.length} moves)`)),
       live.online ? h('div', { style: { marginTop: '12px' } }, h('div', { class: 'label' }, L('Найзтайгаа барилдах', 'Wrestle a friend')),
         others.length ? h('div', { class: 'v-list' }, others.map((o) => h('div', { class: 'v-row' }, portrait(o.look, 28), h('div', { class: 'v-row-b' }, h('b', null, o.name), h('small', null, `${L('Түвшин', 'Level')} ${o.lvl}`)),
           h('button', { class: 'btn sm primary', onclick: () => { net.send({ t: 'wr-invite', to: o.id }); TG.toast(L('Урилга илгээлээ…', 'Invitation sent…')); close(); } }, L('Урих', 'Invite')))))
@@ -1695,9 +1960,9 @@
   function techBook() {
     const used = (V().wr.techs) || {};
     TG.modal(h('div', null, h('h2', null, L('Бөхийн мэхний ном', 'Wrestling technique book')),
-      h('p', { class: 'muted' }, L('Мэх бүр дараагийн 3 мэхийг давж, өмнөх 3-д дийлддэг. Нэг мэхийг давтвал өрсөлдөгч таньж, хүч чинь сулардаг. Даваа ахих тусам өрсөлдөгч чинь ухаалаг, хурдан болно!', 'Each move beats the next 3 and loses to the 3 before it. Repeat a move and your opponent reads it, so your power drops. Each round, opponents get smarter and faster!')),
+      h('p', { class: 'muted' }, L(`Мэх бүр дараагийн ${R.MOVES.length >> 1} мэхийг давж, өмнөхөд нь дийлддэг. Мэх бүрийг өөр ур чадвараар хийнэ: ⏱ цаг тааруулах, ⇄ хөлийн хөдөлгөөн (сумнууд), 💪 хүч (хурдан дарах), ✋ барьцаа (дарж байгаад тавих), ⚖ тэнцвэр. Нэг мэхийг давтвал өрсөлдөгч таньдаг. Даваа ахих тусам хэцүү болно!`, `Each move beats the next ${R.MOVES.length >> 1} and loses to the ones before it. Each is done with its own skill: ⏱ timing, ⇄ footwork (arrows), 💪 power (fast taps), ✋ grip (hold and release), ⚖ balance. Repeat a move and your opponent reads it. Each round gets harder!`)),
       h('div', { class: 'v-list' }, R.MOVES.map((m) => h('div', { class: 'v-row' }, h('span', { class: 'v-tech-n' }, used[m.id] || 0),
-        h('div', { class: 'v-row-b' }, h('b', null, tx(m.name)), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
+        h('div', { class: 'v-row-b' }, h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
   }
   function tournament(round) {
     const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.15 + round * 0.085, skin: TG.pick(R.SKINS) };
@@ -1712,7 +1977,13 @@
     });
   }
   // what touches the ground after each move (a fall counts when an elbow, knee, back or shoulder touches)
-  const WR_PART = { push: Tx('нуруу', 'back'), pull: Tx('өвдөг', 'knee'), hook: Tx('нуруу', 'back'), inhook: Tx('нуруу', 'back'), hip: Tx('мөр', 'shoulder'), leg: Tx('тохой', 'elbow'), lift: Tx('нуруу', 'back') };
+  const WR_PART = { push: Tx('нуруу', 'back'), pull: Tx('өвдөг', 'knee'), hook: Tx('нуруу', 'back'), inhook: Tx('нуруу', 'back'), hip: Tx('мөр', 'shoulder'), leg: Tx('тохой', 'elbow'), lift: Tx('нуруу', 'back'),
+    havirah: Tx('ташаа', 'hip'), humruh: Tx('нуруу', 'back'), toigdoh: Tx('мөр', 'shoulder'), hongodoh: Tx('нуруу', 'back'), suga: Tx('мөр', 'shoulder'), tahim: Tx('өвдөг', 'knee') };
+  // each technique is performed with its own skill, so bouts don't feel the same: footwork combos for hooks and sweeps,
+  // rapid power for lifts, hold-and-release for grip throws, keeping your balance for тойгдох and хонгодох, timing for the rest
+  const SKILL = { push: 'timing', hip: 'timing', tahim: 'timing', pull: 'hold', leg: 'hold', suga: 'hold', hook: 'combo', inhook: 'combo', havirah: 'combo', lift: 'mash', humruh: 'mash', toigdoh: 'balance', hongodoh: 'balance' };
+  const SKILL_ICON = { timing: '⏱', hold: '✋', combo: '⇄', mash: '💪', balance: '⚖' };
+  const ARROWS = ['←', '→', '↑', '↓'], ARROW_KEY = { ArrowLeft: 0, KeyA: 0, ArrowRight: 1, KeyD: 1, ArrowUp: 2, KeyW: 2, ArrowDown: 3, KeyS: 3 };
   const OPP_TITLE = ['', '', '', '', 'nachin', 'khartsaga', 'zaan', 'garid', 'arslan', 'arslan'];
   const DEVEE_BEAT = 700, DEVEE_TAPS = 4;
   function wrestleMatch(cfg, onEnd) {
@@ -1727,6 +1998,9 @@
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
     const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone', style: { width: Math.round(36 / sharp) + '%', left: (50 - 18 / sharp) + '%' } }), marker), goBtn);
+    const skillBox = h('div', { class: 'v-wr-skill hidden' });
+    st.view = v.wrView === 'fp' ? 'fp' : 'side';
+    const viewBtn = h('button', { class: 'btn sm v-wr-view', onclick: () => { st.view = st.view === 'fp' ? 'side' : 'fp'; v.wrView = st.view; S.save(); viewBtn.textContent = st.view === 'fp' ? L('🗺️ Хажуугаас', '🗺️ Side view') : L('👁 Өөрийн нүдээр', '👁 First person'); viewBtn.blur(); } }, st.view === 'fp' ? L('🗺️ Хажуугаас', '🗺️ Side view') : L('👁 Өөрийн нүдээр', '👁 First person'));
     const tail = h('div');
     // the zasuul calls out both wrestlers by their titles before the bout
     const myT = titleObj(R.titleFor(v.wr)), opT = cfg.ai ? titleObj(OPP_TITLE[cfg.round]) : null, named = (t, n) => (t ? tx(t.name) + ' ' : '') + n;
@@ -1737,14 +2011,14 @@
     const deveeBtn = h('button', { class: 'btn primary big', onclick: () => deveeTap() }, '🦅 ', L('Дэвэх (Space)', 'Flap (Space)'));
     const deveeBox = h('div', { class: 'v-wr-devee hidden' }, h('div', { class: 'v-wr-feathers' }, ...feathers), deveeBtn);
     const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
-      h('h2', null, `${live.name} · ${cfg.opp.name}`), cv, herald, score, msg, deveeBox, moves, timing, tail);
+      h('div', { class: 'v-wr-title' }, h('h2', null, `${live.name} · ${cfg.opp.name}`), viewBtn), cv, herald, score, msg, deveeBox, moves, timing, skillBox, tail);
     const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(Math.max(0, need - st.a))), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(Math.max(0, need - st.b)), ' ', cfg.opp.name));
     const moveLabel = (id) => tx(R.MOVES.find((m) => m.id === id).name);
     const setPhase = (p) => {
       st.phase = p;
-      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee');
-      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; st.t0 = performance.now(); setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); } },
-        h('b', null, tx(m.name)), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
+      moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee'); skillBox.classList.toggle('hidden', p !== 'skill');
+      if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; startSkill(m.id); } },
+        h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
     };
     let raf = 0, lastT = performance.now();
     const loop = (ts) => {
@@ -1752,6 +2026,8 @@
       st.off += (st.target - st.off) * Math.min(1, dt * 8);
       if (st.phase === 'devee') deveeBtn.classList.toggle('beat', deveeOnBeat(ts));
       if (st.phase === 'timing') { st.marker = (Math.sin(((ts - st.t0) / 1000) * barSpeed) + 1) / 2; marker.style.left = st.marker * 100 + '%'; if (ts - st.t0 > 5000) lock(); }
+      skillTick(dt, ts);
+      if (st.view === 'fp') { drawFP(ts); raf = requestAnimationFrame(loop); return; }
       // pixel scene: crowd stands, flags, sand ring, the zasuul watching
       const Wc = 192, Hc = 108, ground = 100;
       cx.imageSmoothingEnabled = false; cx.fillStyle = '#e8c994'; cx.fillRect(0, 0, Wc, Hc);
@@ -1783,7 +2059,90 @@
       }
       raf = requestAnimationFrame(loop);
     };
+    function startSkill(id) {
+      const type = SKILL[id] || 'timing'; st.t0 = performance.now();
+      if (type === 'timing') { setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); return; }
+      const sk = st.skill = { type, t0: performance.now(), el: {} };
+      if (type === 'combo') { sk.seq = Array.from({ length: 3 + Math.min(3, Math.floor(rnd / 3)) }, () => Math.floor(Math.random() * 4)); sk.i = 0; sk.err = 0; sk.limit = Math.max(2600, 4800 - rnd * 200); }
+      if (type === 'mash') { sk.n = 0; sk.need = 9 + rnd; sk.limit = 2400; }
+      if (type === 'hold') { sk.held = false; sk.v = 0; sk.zc = 0.8; sk.zw = 0.2 / sharp; }
+      if (type === 'balance') { sk.x = 0; sk.vx = 0; sk.push = 0; sk.dir = 0; sk.good = 0; sk.limit = 2800; }
+      setPhase('skill'); renderSkill();
+      msg.textContent = { combo: L('Хөлийн хөдөлгөөн! Сумнуудыг дарааллаар нь хурдан дар.', 'Footwork! Press the arrows in order, quickly.'), mash: L('Бүх хүчээ гарга! Хурдан, олон дар!', 'All your strength! Tap as fast as you can!'),
+        hold: L('Барьцаа ав: дарж байгаад шар хэсэгт хүрэхэд тавь.', 'Take the grip: hold, and let go in the yellow zone.'), balance: L('Тэнцвэрээ хадгал! Зүү голдоо байлгах гэж ← → дар.', 'Keep your balance! Use ← → to keep the needle in the middle.') }[type];
+    }
+    function renderSkill() {
+      const sk = st.skill; if (!sk) return;
+      const meter = (cls) => { const fill = h('i'); sk.el.fill = fill; return h('div', { class: 'v-wr-bar ' + (cls || '') }, fill); };
+      if (sk.type === 'combo') rc(skillBox, h('div', { class: 'v-wr-combo' }, sk.seq.map((a, i) => h('span', { class: 'v-wr-arrow' + (i < sk.i ? ' ok' : i === sk.i ? ' next' : '') }, ARROWS[a]))), meter('time'),
+        h('div', { class: 'v-wr-pad' }, ARROWS.map((a, i) => h('button', { class: 'btn', onclick: () => comboInput(i) }, a))));
+      else if (sk.type === 'mash') { const b = h('button', { class: 'btn primary big block', onclick: () => mashTap() }, L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`)); sk.el.btn = b; rc(skillBox, meter('power'), b); }
+      else if (sk.type === 'hold') { const b = h('button', { class: 'btn primary big block', onpointerdown: (e) => { e.preventDefault(); holdDown(); }, onpointerup: () => holdUp(), onpointerleave: () => sk.held && holdUp() }, L('Барих: дарж байгаад тавих (Space)', 'Grip: hold, then let go (Space)'));
+        rc(skillBox, h('div', { class: 'v-wr-bar hold' }, h('i', { class: 'v-wr-zone', style: { left: (sk.zc - sk.zw / 2) * 100 + '%', width: sk.zw * 100 + '%' } }), (sk.el.fill = h('i', { class: 'v-wr-fill' }))), b); }
+      else if (sk.type === 'balance') { const needle = h('i', { class: 'v-wr-needle' }); sk.el.needle = needle; const btn = (d, t) => h('button', { class: 'btn big', onpointerdown: (e) => { e.preventDefault(); sk.dir = d; }, onpointerup: () => { sk.dir = 0; }, onpointerleave: () => { if (sk.dir === d) sk.dir = 0; } }, t);
+        rc(skillBox, h('div', { class: 'v-wr-bar balance' }, h('i', { class: 'v-wr-zone', style: { left: '37.5%', width: '25%' } }), needle), meter('time'), h('div', { class: 'v-wr-pad two' }, btn(-1, '◀'), btn(1, '▶'))); }
+    }
+    function comboInput(i) {
+      const sk = st.skill; if (!sk || sk.type !== 'combo' || st.phase !== 'skill') return;
+      if (sk.seq[sk.i] === i) { sk.i++; TG.sfx.tick ? TG.sfx.tick() : TG.sfx.tap(); if (sk.i >= sk.seq.length) { const q = (performance.now() - sk.t0) / sk.limit; return lock(clamp(0.45 + 0.55 * (1 - q) - 0.15 * sk.err, 0.05, 1)); } }
+      else { sk.err++; TG.sfx.bad(); }
+      renderSkill();
+    }
+    function mashTap() { const sk = st.skill; if (!sk || sk.type !== 'mash' || st.phase !== 'skill') return; sk.n++; TG.sfx.tap(); if (sk.el.btn) sk.el.btn.textContent = L(`Хүч! ${sk.n}/${sk.need}`, `Power! ${sk.n}/${sk.need}`); }
+    function holdDown() { const sk = st.skill; if (!sk || sk.type !== 'hold' || st.phase !== 'skill' || sk.held) return; sk.held = true; sk.v = 0; }
+    function holdUp() { const sk = st.skill; if (!sk || sk.type !== 'hold' || !sk.held) return; sk.held = false; lock(clamp(1 - Math.abs(sk.v - sk.zc) * 3.2 * sharp, 0, 1)); }
+    function skillTick(dt, ts) {
+      const sk = st.skill; if (!sk || st.phase !== 'skill') return;
+      const el = ts - sk.t0;
+      if (sk.type === 'combo') { if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%'; if (el > sk.limit) lock((sk.i / sk.seq.length) * 0.5); }
+      else if (sk.type === 'mash') { if (sk.el.fill) sk.el.fill.style.width = Math.min(100, (sk.n / sk.need) * 100) + '%'; if (el > sk.limit) lock(Math.min(1, sk.n / sk.need)); }
+      else if (sk.type === 'hold') { if (sk.held) { sk.v += dt / 1.5; if (sk.v > 1) { sk.v = 0; msg.textContent = L('Хэт удаан барилаа! Дахиад.', 'Held too long! Again.'); } } if (sk.el.fill) sk.el.fill.style.width = sk.v * 100 + '%'; if (el > 6000) lock(0.1); }
+      else if (sk.type === 'balance') {
+        sk.push += (Math.random() - 0.5) * dt * (6 + rnd); sk.push = clamp(sk.push, -1.6, 1.6);   // your opponent shoves you this way and that
+        sk.vx += (sk.push * (1 + rnd * 0.12) + sk.dir * 4.2) * dt; sk.vx *= 0.92; sk.x = clamp(sk.x + sk.vx * dt, -1, 1);
+        if (Math.abs(sk.x) < 0.25) sk.good += dt * 1000;
+        if (sk.el.needle) sk.el.needle.style.left = (50 + sk.x * 48) + '%'; if (sk.el.fill) sk.el.fill.style.width = Math.max(0, 100 - (el / sk.limit) * 100) + '%';
+        if (el > sk.limit) lock(clamp((sk.good / sk.limit) * 1.15, 0, 1));
+      }
+    }
     function deveeOnBeat(ts) { const q = ((ts - st.devee.t0) % DEVEE_BEAT) / DEVEE_BEAT; return q < 0.2 || q > 0.84; }
+    // first person: you face your opponent up close, your red sleeves gripping his zodog, the crowd all round the ring
+    let fallAnim = 0, lastScore = 0;
+    function drawFP(ts) {
+      const Wc = 192, Hc = 108, f = Math.floor(ts / 260) % 2, sway = Math.sin(ts / 420) * 3 + st.off * 0.4;
+      const iFell = st.over && st.pose[0] === 'fall', heFell = st.over && st.pose[1] === 'fall';
+      if (st.a + st.b !== lastScore) { lastScore = st.a + st.b; fallAnim = ts; }
+      const hit = ts - fallAnim < 450 ? 1 - (ts - fallAnim) / 450 : 0, scored = st.flash && st.flash.good;
+      cx.save(); cx.imageSmoothingEnabled = false;
+      if (iFell) { const q = clamp((ts - st.end) / 700, 0, 1); cx.translate(Wc / 2, Hc / 2); cx.rotate(q * 0.5); cx.translate(-Wc / 2, -Hc / 2 + q * 30); }
+      else if (hit && !scored) cx.translate(Math.round(Math.sin(ts / 30) * 3 * hit), Math.round(hit * 2));   // you were thrown off balance
+      cx.fillStyle = '#9fd8f7'; cx.fillRect(-20, -40, Wc + 40, 70); cx.fillStyle = '#c4e6fb'; cx.fillRect(-20, 6, Wc + 40, 8);
+      cx.fillStyle = '#5a361c'; cx.fillRect(-20, 14, Wc + 40, 22);
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 40; i++) { const px0 = -8 + i * 5 + (row % 2) * 2, py0 = 15 + row * 7, bob = Math.floor(ts / 300 + i * 1.7 + row) % 4 === 0 ? -1 : 0; cx.fillStyle = ['#d8342b', '#2b5bd8', '#f7c646', '#2ea35f', '#ffffff', '#9466e0'][(i * 3 + row) % 6]; cx.fillRect(px0, py0 + 3 + bob, 4, 3); cx.fillStyle = (i + row) % 3 ? '#edbb93' : '#c98a5a'; cx.fillRect(px0 + 1, py0 + bob, 2, 3); }
+      [[6, '#2b5bd8'], [70, '#d8342b'], [120, '#f7c646'], [182, '#2b5bd8']].forEach(([fx, fc]) => { cx.fillStyle = '#4a2a14'; cx.fillRect(fx, 22, 1, 18); cx.fillStyle = fc; for (let r = 0; r < 5; r++) cx.fillRect(fx + 1, 22 + r, 6 - Math.abs(r - 2), 1); });
+      cx.fillStyle = '#e8c994'; cx.fillRect(-20, 36, Wc + 40, 90); cx.fillStyle = '#d4ae72'; for (let i = -6; i <= 6; i++) { cx.beginPath(); cx.moveTo(96 + i * 6, 36); cx.lineTo(96 + i * 40, Hc + 10); cx.lineTo(97 + i * 40, Hc + 10); cx.lineTo(97 + i * 6, 36); cx.fill(); }
+      const zs = PX.char(ZASUUL, 0, 0); cx.drawImage(zs, 150, 18, 12, 21);                                               // the zasuul watching from the side
+      // your opponent
+      const opp = PX.wrestlerFront(BLUE, oppSkin, st.phase === 'devee' ? (st.devee && st.devee.f) || f : f), sc = 2;
+      cx.save(); cx.translate(Math.round(96 + sway), 16 + 112);
+      if (heFell) { const q = clamp((ts - st.end) / 650, 0, 1); cx.rotate(-q * 1.35); cx.translate(0, q * 40); }
+      else if (hit && scored) cx.rotate(-hit * 0.35);                                                                      // he staggers from your move
+      cx.drawImage(opp, -20 * sc, -56 * sc, 40 * sc, 56 * sc); cx.restore();
+      // your arms gripping his sleeves (raised and flapping during the eagle dance, up in victory)
+      const dance = st.phase === 'devee' || (st.over && !iFell), up = dance ? (st.devee && st.devee.f) || f : 0;
+      const arm = (side) => { const bx = side < 0 ? 18 : 174, tx = dance ? (side < 0 ? 30 : 162) : 96 + sway + side * 26, ty = dance ? (up ? 20 : 34) : 64;
+        cx.fillStyle = '#2b1e2e'; cx.beginPath(); cx.moveTo(bx - 14, Hc + 4); cx.lineTo(tx - 7, ty - 1); cx.lineTo(tx + 7, ty - 1); cx.lineTo(bx + 14, Hc + 4); cx.fill();
+        cx.fillStyle = RED; cx.beginPath(); cx.moveTo(bx - 12, Hc + 4); cx.lineTo(tx - 5, ty + 1); cx.lineTo(tx + 5, ty + 1); cx.lineTo(bx + 12, Hc + 4); cx.fill();
+        cx.fillStyle = '#f7c646'; cx.fillRect(Math.round(tx - 6), Math.round(ty + 2), 12, 2);
+        cx.fillStyle = mySkin; cx.fillRect(Math.round(tx - 5), Math.round(ty - 6), 10, 7); cx.fillStyle = '#2b1e2e'; cx.fillRect(Math.round(tx - 5), Math.round(ty - 7), 10, 1); };
+      arm(-1); arm(1);
+      if (st.flash && ts - st.flash.t0 < 1300) {
+        const q = (ts - st.flash.t0) / 1300, fy = 50 - q * 10;
+        cx.font = '700 13px Rubik, sans-serif'; cx.textAlign = 'center'; cx.globalAlpha = q > 0.75 ? (1 - q) * 4 : 1;
+        cx.fillStyle = '#2b1e2e'; cx.fillText(st.flash.text, 97, fy + 1); cx.fillStyle = st.flash.good ? '#f7c646' : '#ffffff'; cx.fillText(st.flash.text, 96, fy); cx.globalAlpha = 1;
+      }
+      cx.restore();
+    }
     function deveeTap() {
       const d = st.devee; if (st.phase !== 'devee' || d.n >= DEVEE_TAPS) return;
       const good = deveeOnBeat(performance.now());
@@ -1795,10 +2154,10 @@
         : d.good ? L(`Дэвээ дууслаа. Эхний мэх +${Math.round(st.bonus * 100)}% хүчтэй.`, `Dance done. First move +${Math.round(st.bonus * 100)}% power.`) : L('Дэвээ хэмнэлээсээ алдлаа. Одоо барилдъя!', 'The dance was off the beat. Now wrestle!');
       setTimeout(() => { if (st.over) return; st.pose = ['grip', 'grip']; herald.remove(); setPhase('choose'); }, 900);
     }
-    function lock() {
-      if (st.phase !== 'timing') return;
-      herald.remove();
-      let power = Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
+    function lock(given) {
+      if (st.phase !== 'timing' && st.phase !== 'skill') return;
+      herald.remove(); st.skill = null;
+      let power = typeof given === 'number' ? given : Math.max(0, 1 - Math.abs(st.marker - 0.5) * 2 * sharp);
       if (st.bonus) { power = Math.min(1, power + st.bonus); st.bonus = 0; } // the eagle dance's power
       const repeated = st.move === st.lastPlayer;
       if (repeated) power *= 0.8; // the same move twice in a row is easier to read
@@ -1849,7 +2208,17 @@
             : h('button', { class: 'btn primary', onclick: () => { close(); tournament(1); } }, L('Шинэ Наадам', 'New Naadam'))) : null));
       if (cfg.remote && live) live.match = null;
     }
-    const key = (e) => { if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (e.type === 'keydown' && !e.repeat) { if (st.phase === 'devee') deveeTap(); else lock(); } } };
+    const key = (e) => {
+      if (document.querySelectorAll('.modal-back').length > 1) return;
+      const down = e.type === 'keydown', sk = st.phase === 'skill' && st.skill;
+      if (sk && sk.type === 'combo' && ARROW_KEY[e.code] !== undefined) { e.preventDefault(); e.stopPropagation(); if (down && !e.repeat) comboInput(ARROW_KEY[e.code]); return; }
+      if (sk && sk.type === 'balance' && ['ArrowLeft', 'KeyA', 'ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); const d = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : 1; if (down) sk.dir = d; else if (sk.dir === d) sk.dir = 0; return; }
+      if (e.code !== 'Space' && e.code !== 'KeyE') return;
+      e.preventDefault(); e.stopPropagation();
+      if (sk && sk.type === 'hold') { if (down && !e.repeat) holdDown(); else if (!down) holdUp(); return; }
+      if (!down || e.repeat) return;
+      if (st.phase === 'devee') deveeTap(); else if (sk && sk.type === 'mash') mashTap(); else if (st.phase === 'timing') lock();
+    };
     window.addEventListener('keydown', key, true); window.addEventListener('keyup', key, true);
     goBtn.addEventListener('click', lock);
     if (cfg.remote) cfg.remote.ui = (m) => {
@@ -1887,11 +2256,11 @@
       h('p', null, L('Би Басар, монгол банхар нохой. Нутагт үргэлж хажууд чинь явна. Намайг дарж эсвэл B товчоор юу ч асуугаарай!', 'I’m Basar, a Mongolian Bankhar dog. I’ll walk beside you everywhere in Nutag. Tap me or press B to ask me anything!')),
       h('div', { class: 'v-list' }, [
         ['ui:star', L('Газар дээр дарж алх. Компьютер дээр сум эсвэл WASD товч.', 'Tap the ground to walk. On a computer use arrows or WASD.')],
-        ['crop:carrot', L('Цэцэрлэгт үр тарьж, 3 удаа усалж, ургацаа хураа. Худгаас ус аваарай.', 'Plant seeds in the garden, water 3 times, then harvest. Refill water at the well.')],
+        ['beast:cow', L('Хот айлд үнээ, ямаа, гүүгээ саагаад ааруул, өрөм, тараг, айраг хий.', 'In the dairy yard milk the cows, goats and mares, then make aaruul, öröm, tarag and airag.')],
         ['ui:book', L('Сургуулийн гэрт гэр барих, цагаан идээ хийх, Нууц товчоог сур. Сурснаа гэр бүлтэйгээ хий!', 'In the school ger learn to build a ger, make dairy foods and hear the Secret History. Then do it with your family!')],
         ['ui:ger', L('Гэр барих хичээлээ дуусгаад Нутагт өөрийн гэрээ бариарай.', 'Finish the ger lesson, then build your own ger in Nutag.')],
         ['ui:horse', L('Морины уяанаас морь унаж давхих, эсвэл уралдаанд оролцоорой!', 'Take a horse from the horse line to ride freely or race!')],
-        ['ui:heart', L('Нэг өрөөний найзууд нэг цэцэрлэгт хамт тарьж, бие биеийнхээ ургамлыг усална.', 'Friends in the same room share one garden and can water each other\'s plants.')],
+        ['ui:heart', L('Нэг өрөөний найзууд нэг нутагт хамт тоглож, барилдаж, морь уралдана.', 'Friends in the same room play in one village, wrestle and race together.')],
       ].map(([e, t]) => h('div', { class: 'v-row' }, icon(e), h('div', { class: 'v-row-b' }, t)))),
       h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => close() }, L('Эхлэх', "Let's go"))), { cls: 'v-modal', onClose: () => { const v = V(); if (v) { v.tips = true; S.save(); } } });
   }

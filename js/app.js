@@ -164,8 +164,13 @@
           card.replaceChildren(prog, basar(L('Вуф! Би Басар. Чиний нэрийг хэн гэдэг вэ?', 'Woof! I’m Basar. What’s your name?')), name, err, h('button', { class: 'btn primary big block', onclick: go }, L('Цааш →', 'Next →')));
           setTimeout(() => name.focus(), 200);
         } else if (step === 1) {
-          const grid = h('div', { class: 'age-grid' }, Array.from({ length: 16 }, (_, k) => k + 3).map((a) => h('button', { class: 'age-btn' + (a === d.age ? ' active' : ''), onclick: () => { d.age = a; TG.sfx.tap(); draw(); } }, a)));
-          card.replaceChildren(prog, basar(L(`Сайн уу, ${d.name}! Хэдэн настай вэ?`, `Hi ${d.name}! How old are you?`)), grid,
+          const pickAge = (a) => { d.age = a; TG.sfx.tap(); draw(); };
+          const grid = h('div', { class: 'age-grid' }, Array.from({ length: 16 }, (_, k) => k + 3).map((a) => h('button', { class: 'age-btn' + (a === d.age ? ' active' : ''), onclick: () => pickAge(a) }, a)));
+          const grown = h('div', { class: 'age-grid age-grown' }, [20, 25, 30, 40, 50, 60, 70, 80].map((a) => h('button', { class: 'age-btn' + (a === d.age ? ' active' : ''), onclick: () => pickAge(a) }, a)));
+          const other = h('input', { class: 'input age-other', type: 'number', inputmode: 'numeric', min: 1, step: 1, placeholder: L('Өөр нас', 'Other age'), 'aria-label': L('Өөр нас', 'Other age'), value: d.age > 18 && ![20, 25, 30, 40, 50, 60, 70, 80].includes(d.age) ? d.age : '',
+            oninput: (e) => { const n = Math.floor(Number(e.target.value)); if (n >= 1) { d.age = n; grid.querySelectorAll('.active').forEach((b) => b.classList.remove('active')); grown.querySelectorAll('.active').forEach((b) => b.classList.remove('active')); } } });
+          card.replaceChildren(prog, basar(L(`Сайн уу, ${d.name}! Хэдэн настай вэ? Том хүмүүс ч тоглож болно!`, `Hi ${d.name}! How old are you? Grown-ups can play too!`)), grid,
+            h('div', { class: 'age-label' }, L('Том хүн', 'Grown-ups')), grown, other,
             h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', onclick: () => { step = 0; draw(); } }, '←'), h('button', { class: 'btn primary', onclick: () => { step = 2; draw(); } }, L('Цааш →', 'Next →'))));
         } else if (step === 2) {
           const m = TG.MASCOTS.find((x) => x.e === d.avatar);

@@ -4,14 +4,21 @@
 (function (TG) {
   const { h, L, tx } = TG;
   const S = TG.store;
-  const TS = 16, MW = 28, MH = 18;
+  const TS = 16, MW = 36, MH = 24, RY = 19, RX = 18;    // map size in tiles; the main road (row RY) and the road north (column RX)
   const BLOCK = 'wtmrbLGzO';
-  // landmark footprints (4×3 tiles) and the tile you stand on to visit each one
-  const SLOTS = [{ x: 3, y: 7, fx: 5, fy: 10, to: 'down' }, { x: 19, y: 9, fx: 21, fy: 12, to: 'down' }, { x: 8, y: 2, fx: 10, fy: 5, to: 'right' }];
-  const CAMP = [{ x: 7, y: 11 }, { x: 10, y: 11 }];
-  const FAM = { x: 24, y: 10, fx: 25, fy: 13 };          // the herder family's ger (3×3) and where the herder stands
-  const OVOO = { x: 16, y: 2, fx: 16, fy: 4 };           // a 2×2 ovoo on the hill
-  const SIGN = { x: 2, y: 13 };                          // welcome board by the bus stop
+  // landmark lots (LW×LH tiles) and the tile you stand on to visit each one. Lot B sits on the south shore of a province's big lake.
+  const LW = 6, LH = 4;
+  const SLOTS = [{ x: 3, y: 10, fx: 6, fy: 14, to: 'down' }, { x: 24, y: 13, fx: 27, fy: 17, to: 'down' }, { x: 8, y: 3, fx: 11, fy: 7, to: 'right' }];
+  const CAMP = [{ x: 8, y: 15 }, { x: 11, y: 15 }];
+  const FAM = { x: 31, y: 14, fx: 32, fy: 18 };          // the herder family's ger (3×3) and where the herder stands
+  const OVOO = { x: 14, y: 2, fx: 14, fy: 4 };           // a 2×2 ovoo on the hill
+  const SIGN = { x: 2, y: 18 };                          // welcome board by the bus stop
+  // the big lakes, sized by their real area (Uvs 3,350 km², Khövsgöl 2,760, Khar Us 1,578, Buir 615, Orog 140, Terkhiin Tsagaan 61):
+  // they fill the north-east of their province's map; small lakes like Ganga or Khökh stay inside their landmark lot
+  const LAKES = {
+    uvs: { cx: 27, cy: 6, rx: 8.6, ry: 4.9, salt: true }, khuvsgul: { cx: 27, cy: 6, rx: 8.4, ry: 4.8 }, khovd: { cx: 27, cy: 6.5, rx: 6.6, ry: 3.9, reeds: true },
+    dornod: { cx: 27.5, cy: 6.5, rx: 5.6, ry: 3.3 }, bayankhongor: { cx: 28, cy: 7, rx: 3.6, ry: 2.1, salt: true }, arkhangai: { cx: 28, cy: 7, rx: 4.3, ry: 2.6, island: true },
+  };
   // Researched details for each province: real area (km²), the animals you meet, trees, birds, a local fact the herder
   // family tells, and the food or drink they offer (an id from the Нутаг food list).
   const T = (mn, en) => ({ mn, en });
@@ -54,56 +61,60 @@
 
   /** Build the province's map: ground, blocking features, the arrival point, three landmarks, a ger camp and the guide. */
   function build(id) {
-    const j = TG.passport.J[id], has = (k) => j.land.includes(k), rnd = rng(id);
+    const j = TG.passport.J[id], has = (k) => j.land.includes(k), rnd = rng(id), det = DETAIL[id] || {}, lake = LAKES[id];
     const desert = has('desert') || has('dunes'), snow = has('snow'), city = has('city');
-    const g = Array.from({ length: MH }, () => Array(MW).fill('g'));   // g ground · w water · t tree · m mountain · r rock · b building · p path · s sand mound · f field · L landmark · G ger
+    const g = Array.from({ length: MH }, () => Array(MW).fill('g'));   // g ground · w water · t tree · m mountain · r rock · b building · p path · s sand mound · f field · L landmark · G ger · O ovoo · z saxaul
     const set = (x, y, c) => { if (x >= 0 && y >= 0 && x < MW && y < MH) g[y][x] = c; };
     const inner = (x, y) => x > 0 && y > 0 && x < MW - 1 && y < MH - 1;
-    for (let x = 0; x < MW; x++) { set(x, 0, has('forest') ? 't' : 'm'); set(x, 1, has('mountains') || snow ? 'm' : has('forest') ? 't' : g[1][x]); set(x, MH - 1, has('forest') ? 't' : 'm'); }
-    for (let y = 0; y < MH; y++) { set(0, y, has('forest') ? 't' : 'm'); set(MW - 1, y, has('forest') ? 't' : 'm'); }
-    for (let x = 1; x < MW - 1; x++) set(x, 14, 'p');                    // the road in from the bus stop
-    for (let y = 3; y < 15; y++) set(14, y, 'p');
-    if (has('lake')) for (let y = 3; y < 10; y++) for (let x = 17; x < 26; x++) if (((x - 21.5) / 4.6) ** 2 + ((y - 6.5) / 3.2) ** 2 <= 1) set(x, y, 'w');
-    if (has('river')) for (let x = 1; x < MW - 1; x++) { const y = 10 + Math.round(Math.sin(x / 4)); set(x, y, x === 14 || x === 15 ? 'p' : 'w'); }
-    if (city) for (let by = 3; by < 12; by += 4) for (let bx = 2; bx < 26; bx += 5) if (bx !== 12 && bx !== 13 && !(by < 9 && bx > 15 && has('lake'))) { set(bx, by, 'b'); set(bx + 1, by, 'b'); set(bx, by + 1, 'b'); set(bx + 1, by + 1, 'b'); }
-    if (has('fields')) for (let y = 3; y < 9; y++) for (let x = 2; x < 12; x++) if (y % 2 && g[y][x] === 'g') set(x, y, 'f');
+    const edge = has('forest') ? 't' : 'm';
+    for (let x = 0; x < MW; x++) { set(x, 0, edge); set(x, 1, has('mountains') || snow ? 'm' : has('forest') ? 't' : 'g'); set(x, MH - 1, edge); }
+    for (let y = 0; y < MH; y++) { set(0, y, edge); set(MW - 1, y, edge); }
+    if (lake) for (let y = 1; y < MH - 1; y++) for (let x = 1; x < MW - 1; x++) if (((x + 0.5 - lake.cx) / lake.rx) ** 2 + ((y + 0.5 - lake.cy) / lake.ry) ** 2 <= 1) set(x, y, 'w');
+    if (lake && lake.island) { set(Math.round(lake.cx), Math.round(lake.cy) - 1, 'g'); set(Math.round(lake.cx) + 1, Math.round(lake.cy) - 1, 't'); }   // Terkhiin Tsagaan’s little volcanic island
+    if (has('river')) for (let x = 1; x < MW - 1; x++) { const y = 9 + Math.round(Math.sin(x / 4)); set(x, y, x === RX || x === RX + 1 ? 'p' : 'w'); }
+    for (let x = 1; x < MW - 1; x++) set(x, RY, 'p');                   // the road in from the bus stop
+    for (let y = 3; y <= RY; y++) if (g[y][RX] !== 'w') set(RX, y, 'p');
+    if (city) for (let by = 3; by < 13; by += 4) for (let bx = 2; bx < MW - 3; bx += 5) if (Math.abs(bx - RX) > 2) { set(bx, by, 'b'); set(bx + 1, by, 'b'); set(bx, by + 1, 'b'); set(bx + 1, by + 1, 'b'); }
+    if (has('fields')) for (let y = 3; y < 9; y++) for (let x = 2; x < 16; x++) if (y % 2 && g[y][x] === 'g') set(x, y, 'f');
     const free = (x, y) => g[y] && g[y][x] === 'g';
-    const scatter = (c, n) => { for (let i = 0; i < n; i++) { const x = 2 + Math.floor(rnd() * (MW - 4)), y = 2 + Math.floor(rnd() * (MH - 5)); if (free(x, y) && Math.abs(x - 14) > 1 && y !== 14 && y !== 13) set(x, y, c); } };
-    if (has('forest') || has('valley')) scatter('t', 40);
-    if (has('mountains') && !has('forest')) scatter('r', 10);
-    if (desert || has('rocks') || has('volcano')) scatter('r', 14);
-    if (has('dunes')) scatter('s', 24);
-    const det = DETAIL[id] || {};
-    if (det.saxaul) scatter('z', 16);                                   // saxaul shrubs of the Gobi
-    if (has('steppe') || has('hills')) scatter('r', 5);
-    // the three landmarks: clear the ground round each, stand them up, and lay a path from the road to each one
-    const carve = (sl) => { if (sl.to === 'right') for (let x = sl.fx; x <= 14; x++) set(x, sl.fy, 'p'); else for (let y = sl.fy; y <= 14; y++) set(sl.fx, y, 'p'); };
-    const marks = SLOTS.map((s, i) => {
-      for (let y = s.y - 1; y <= s.y + 3; y++) for (let x = s.x - 1; x <= s.x + 4; x++) if (inner(x, y) && g[y][x] !== 'p') set(x, y, 'g');
-      for (let y = s.y; y < s.y + 3; y++) for (let x = s.x; x < s.x + 4; x++) set(x, y, 'L');
+    const scatter = (c, n) => { for (let i = 0; i < n; i++) { const x = 2 + Math.floor(rnd() * (MW - 4)), y = 2 + Math.floor(rnd() * (MH - 5)); if (free(x, y) && Math.abs(x - RX) > 1 && y !== RY && y !== RY - 1) set(x, y, c); } };
+    if (has('forest') || has('valley')) scatter('t', 70);
+    if (has('mountains') && !has('forest')) scatter('r', 14);
+    if (desert || has('rocks') || has('volcano')) scatter('r', 20);
+    if (has('dunes')) scatter('s', 40);
+    if (det.saxaul) scatter('z', 26);                                   // saxaul shrubs of the Gobi
+    if (has('steppe') || has('hills')) scatter('r', 8);
+    // the three landmarks: the lake attraction goes on the lake shore (lot B); clear the ground, stand them up, lay a path to each
+    const kinds = (TG.landmarks.KIND[id] || []).slice(0, 3), order = [0, 1, 2], si = kinds.indexOf('shore');
+    if (si >= 0 && si !== 1) { order[si] = 1; order[1] = si; }   // swap so the lake attraction gets lot B, on the shore
+    const carve = (sl) => { if (sl.to === 'right') for (let x = sl.fx; x <= RX; x++) set(x, sl.fy, 'p'); else for (let y = sl.fy; y <= RY; y++) set(sl.fx, y, 'p'); };
+    const marks = [0, 1, 2].map((i) => {
+      const s = SLOTS[order[i]];
+      for (let y = s.y - 1; y <= s.y + LH; y++) for (let x = s.x - 1; x <= s.x + LW; x++) if (inner(x, y) && g[y][x] !== 'p' && !(lake && g[y][x] === 'w' && y < s.y)) set(x, y, 'g');
+      for (let y = s.y; y < s.y + LH; y++) for (let x = s.x; x < s.x + LW; x++) set(x, y, 'L');
       carve(s);
-      return { x: s.fx, y: s.fy, sx: s.x, sy: s.y, i, m: j.marks[i], kind: (TG.landmarks.KIND[id] || [])[i] || 'sacredmtn' };
+      if (kinds[i] === 'shore') for (let x = s.x - 1; x <= s.x + LW; x++) for (let y = s.y - 1; y > 0 && g[y][x] !== 'w'; y--) set(x, y, 'g');   // an open beach down to the water
+      return { x: s.fx, y: s.fy, sx: s.x, sy: s.y, i, m: j.marks[i], kind: kinds[i] || 'sacredmtn' };
     });
-    // a small tourist ger camp near the bus stop
+    // a tourist ger camp near the bus stop, the herder family, the ovoo, the welcome board
     for (const c of CAMP) for (let y = c.y; y < c.y + 3; y++) for (let x = c.x; x < c.x + 3; x++) if (g[y][x] !== 'p') set(x, y, 'G');
-    for (let y = FAM.y - 1; y <= FAM.y + 3; y++) for (let x = FAM.x - 1; x <= FAM.x + 3; x++) if (inner(x, y) && g[y][x] !== 'p') set(x, y, 'g');   // the herder family's ger with its fence
+    for (let y = FAM.y - 1; y <= FAM.y + 3; y++) for (let x = FAM.x - 1; x <= FAM.x + 3; x++) if (inner(x, y) && g[y][x] !== 'p' && g[y][x] !== 'L') set(x, y, 'g');
     for (let y = FAM.y; y < FAM.y + 3; y++) for (let x = FAM.x; x < FAM.x + 3; x++) set(x, y, 'G');
-    set(FAM.fx, FAM.fy, 'p');
-    for (let y = OVOO.y - 1; y <= OVOO.y + 2; y++) for (let x = OVOO.x - 1; x <= OVOO.x + 2; x++) if (inner(x, y) && g[y][x] !== 'p') set(x, y, 'g');   // the ovoo
+    for (let y = FAM.fy; y <= RY; y++) set(FAM.fx, y, 'p');
+    for (let y = OVOO.y - 1; y <= OVOO.y + 2; y++) for (let x = OVOO.x - 1; x <= OVOO.x + 2; x++) if (inner(x, y) && g[y][x] !== 'p' && g[y][x] !== 'L') set(x, y, 'g');
     for (let y = OVOO.y; y < OVOO.y + 2; y++) for (let x = OVOO.x; x < OVOO.x + 2; x++) set(x, y, 'O');
-    for (let x = OVOO.fx; x >= 14; x--) set(x, OVOO.fy, 'p');
+    for (let x = OVOO.fx; x <= RX; x++) set(x, OVOO.fy, 'p');
     set(SIGN.x, SIGN.y, 'p');
-    const district = [];                                                // ger districts round the cities
-    if (city) for (const [gx, gy] of [[2, 2], [5, 2], [22, 2], [25, 3], [2, 5], [25, 6]]) if (g[gy] && g[gy][gx] === 'g' && g[gy + 1] && g[gy + 1][gx] === 'g') { set(gx, gy, 'G'); district.push({ x: gx, y: gy }); }
-    for (let y = 3; y < 14; y++) if (g[y][14] !== 'p') set(14, y, 'p');
+    const district = [];                                                // ger districts on the hills round the cities
+    if (city) for (const [gx, gy] of [[2, 2], [5, 2], [24, 2], [28, 3], [32, 2], [2, 6], [33, 7]]) if (g[gy] && g[gy][gx] === 'g' && g[gy + 1] && g[gy + 1][gx] === 'g') { set(gx, gy, 'G'); district.push({ x: gx, y: gy }); }
+    for (let y = 3; y < RY; y++) if (g[y][RX] !== 'p' && g[y][RX] !== 'w') set(RX, y, 'p');
     const near = (x, y) => { for (let r = 0; r < 6; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (free(x + dx, y + dy) || (g[y + dy] && g[y + dy][x + dx] === 'p')) return { x: x + dx, y: y + dy }; return { x, y }; };
-    const guide = near(16, 13), start = { x: 3, y: 14 };
+    const guide = near(21, RY - 1), start = { x: 3, y: RY };
     // herds: a few of each local animal grazing on open ground away from the road
     const ar = rng(id + ':herd'), herd = [];
-    (det.animals || []).forEach((kind, k) => { for (let n = 0; n < (k ? 2 : 3); n++) for (let tries = 0; tries < 40; tries++) { const x = 2 + Math.floor(ar() * (MW - 4)), y = 2 + Math.floor(ar() * (MH - 4)); if (g[y][x] === 'g' && y !== 13 && y !== 14) { herd.push({ kind, x: x * TS + 8, y: y * TS + 12 }); break; } } });
-    return { id, j, g, desert, snow, city, has, marks, guide, start, det, herd, district };
+    (det.animals || []).forEach((kind, k) => { for (let n = 0; n < (k ? 3 : 4); n++) for (let tries = 0; tries < 60; tries++) { const x = 2 + Math.floor(ar() * (MW - 4)), y = 2 + Math.floor(ar() * (MH - 4)); if (g[y][x] === 'g' && Math.abs(y - RY) > 1) { herd.push({ kind, x: x * TS + 8, y: y * TS + 12 }); break; } } });
+    return { id, j, g, desert, snow, city, has, marks, guide, start, det, herd, district, lake };
   }
-
   /** Trees by region: larch (the northern taiga), birch (the forest steppe), poplar (river valleys), or pine. */
   function tree(x, px, py, kind, snow, hsh) {
     const P = TG.pixel, { R, ell } = P, autumn = TG.seasons && TG.seasons.current().id === 'autumn';
@@ -124,7 +135,7 @@
       for (let i = 0; i < 3; i++) P.P(x, px + Math.floor(P.hash(X * 3 + i, y) * 15), py + Math.floor(P.hash(y * 5 + i, X) * 15), ground[1]); // natural speckles, no checkerboard
       if (!map.snow && !map.desert && P.hash(X, y) < 0.12 && t === 'g') { P.P(x, px + 5, py + 7, ['#ffd34e', '#ff8fb1', '#ffffff'][Math.floor(P.hash(y, X) * 3)]); P.P(x, px + 5, py + 8, '#5c9a36'); }
       if (t === 'p') { R(x, px, py, TS, TS, map.city ? '#b8b0a0' : '#d8ab6c'); P.P(x, px + 4, py + 9, map.city ? '#a09888' : '#b78a4f'); P.P(x, px + 11, py + 3, map.city ? '#a09888' : '#b78a4f'); }
-      else if (t === 'w') { R(x, px, py, TS, TS, '#4aa6e2'); if ((X + y) % 3 === 0) R(x, px + 4, py + 6, 4, 1, '#93d4f6'); }
+      else if (t === 'w') { const salt = map.lake && map.lake.salt, deep = map.lake && map.id === 'khuvsgul'; R(x, px, py, TS, TS, salt ? '#5fbcc4' : deep ? '#2b62b8' : '#4aa6e2'); if ((X + y) % 3 === 0) R(x, px + 4, py + 6, 4, 1, salt ? '#a6e0e4' : '#93d4f6'); }
       else if (t === 'f') { R(x, px, py, TS, TS, '#c9b34a'); for (let i = 0; i < 4; i++) R(x, px + 1 + i * 4, py + 3, 1, 10, '#e8d36a'); }
       else if (t === 'm') { const top = map.snow ? '#ffffff' : '#9fb4c8'; for (let r = 0; r < 14; r++) R(x, px + 7 - r / 2, py + 1 + r, r + 2, 1, r < 4 ? top : map.desert ? '#b9875a' : '#6f97b8'); }
       else if (t === 't') tree(x, px, py, map.det.trees, map.snow, P.hash(X, y));
@@ -143,11 +154,12 @@
       }
       if (t === 'w') {
         const land = (dx, dy) => { const c = map.g[y + dy] && map.g[y + dy][X + dx]; return c && c !== 'w'; };
-        if (land(0, -1)) { R(x, px, py, TS, 2, '#e8c994'); R(x, px, py + 2, TS, 1, '#93d4f6'); }
-        if (land(0, 1)) R(x, px, py + 14, TS, 2, '#e8c994');
-        if (land(-1, 0)) R(x, px, py, 2, TS, '#e8c994');
-        if (land(1, 0)) R(x, px + 14, py, 2, TS, '#e8c994');
-        if ((land(0, -1) || land(-1, 0)) && hsh < 0.5) for (let i = 0; i < 3; i++) { R(x, px + 2 + i * 3, py + 1, 1, 5, '#357a28'); P.P(x, px + 2 + i * 3, py, '#8a5a33'); } // reeds
+        const rim = map.lake && map.lake.salt ? '#f4f2ea' : '#e8c994';   // salt lakes leave a white crust on their shores
+        if (land(0, -1)) { R(x, px, py, TS, 2, rim); R(x, px, py + 2, TS, 1, '#93d4f6'); }
+        if (land(0, 1)) R(x, px, py + 14, TS, 2, rim);
+        if (land(-1, 0)) R(x, px, py, 2, TS, rim);
+        if (land(1, 0)) R(x, px + 14, py, 2, TS, rim);
+        if ((land(0, -1) || land(-1, 0)) && (hsh < 0.5 || (map.lake && map.lake.reeds))) for (let i = 0; i < 3; i++) { R(x, px + 2 + i * 3, py + 1, 1, 5, '#357a28'); P.P(x, px + 2 + i * 3, py, '#8a5a33'); } // reeds
       }
     }
     // the herder family's ger with its wooden fence (khashaa), the ovoo, the welcome board, and the city's ger districts
@@ -168,7 +180,7 @@
       R(x, sx - 1, sy - 4, 2, 10, '#6b4220'); R(x, sx - 9, sy - 14, 18, 11, '#2b1e2e'); R(x, sx - 8, sy - 13, 16, 9, '#c99257'); R(x, sx - 6, sy - 11, 12, 1, '#5a2d10'); R(x, sx - 6, sy - 8, 9, 1, '#5a2d10'); }
     for (const d of map.district) x.drawImage(P.gerSprite('#e8dfc8', '#e14b3d'), 0, 0, 48, 50, d.x * TS - 2, d.y * TS - 4, 20, 21);
     // the landmarks, a tourist ger camp and the bus stop
-    for (const m of map.marks) TG.landmarks.draw(x, m.kind, m.sx * TS, m.sy * TS);
+    for (const m of map.marks) TG.landmarks.draw(x, m.kind, m.sx * TS, m.sy * TS, map.id);
     CAMP.forEach((cp, i) => x.drawImage(P.gerSprite(i ? '#e14b3d' : '#3f76db', i ? '#e9a91f' : '#e8892b'), cp.x * TS, cp.y * TS - 2));
     const bx = map.start.x * TS, by = map.start.y * TS;
     R(x, bx - 4, by - 18, 2, 18, '#4a4a55'); R(x, bx - 10, by - 22, 14, 6, '#3f76db'); R(x, bx - 9, by - 21, 12, 1, '#ffffff');
@@ -199,6 +211,11 @@
       { kind: 'sign', ...at(SIGN.x, SIGN.y), label: () => L('📋 Самбар унших', '📋 Read the sign'), run: () => run('sign') },
       ...herds.map((hd) => Object.assign(hd, { kind: 'animal', penalty: 8, label: () => `🐾 ${tx(ANAME[hd.sp])}`, run: () => run('animal', hd) })),
     ];
+    // the historian's task: an item to find, sparkling beside one of the sights
+    const hq = TG.history && TG.history.target(id);
+    if (hq) { const mk = map.marks.find((q) => q.i === hq.near) || map.marks[0]; let ax = mk.x + 2, ay = mk.y; for (const [dx, dy] of [[2, 0], [-2, 0], [2, 1], [-2, 1], [1, 1], [-1, 1]]) { const c = map.g[mk.y + dy] && map.g[mk.y + dy][mk.x + dx]; if (c === 'g' || c === 'p') { ax = mk.x + dx; ay = mk.y + dy; break; } }
+      const art = { kind: 'artifact', ...at(ax, ay), label: () => `${hq.e} ${tx(hq.item)}`, run: () => { const q = TG.history.found(id); if (!q) return; things.splice(things.indexOf(art), 1); sc.say(h('b', null, `${q.e} `, L('Олдлоо!', 'Found it!')), h('p', null, tx(q.item), '. ', L('Нутагтаа буцаад Түүхчид өгөөрэй.', 'Take it back to the historian in Nutag.'))); } };
+      things.push(art); }
     const byKind = (k) => things.find((q) => q.kind === k), guideT = byKind('guide'), busT = byKind('bus'), famT = byKind('family');
     function run(kind, m) {
       if (kind === 'mark') {
@@ -253,6 +270,7 @@
         ...things.filter((q) => q.kind === 'mark').map((q) => ({ x: q.x, y: q.y, c: seen.includes(q.i) ? '#5c9a36' : '#f7c646', label: tx(q.m.name), lift: 2.6 })),
         ...(stamped() ? [] : [{ x: guideT.x, y: guideT.y, c: seen.length === 3 ? '#7fe07a' : '#f7c646', label: L('Хөтөч', 'Guide') }]),
         ...(famDone() ? [] : [{ x: famT.x, y: famT.y - 6, c: '#f7c646', label: L('Малчин айл', 'Herder family') }]),
+        ...things.filter((q) => q.kind === 'artifact').map((q) => ({ x: q.x, y: q.y, c: '#7fe07a', label: `${hq.e} ${tx(hq.item)}`, lift: 1.4 })),
       ],
     };
     const cfg = {
@@ -268,6 +286,7 @@
         }
       },
       ents: (t) => [
+        ...things.filter((q) => q.kind === 'artifact').map((q) => ({ y: q.y, f: (b) => { const tw = Math.floor(t * 6) % 4; b.fillStyle = '#fff6c8'; b.fillRect(Math.round(q.x) - 1, Math.round(q.y) - 6, 3, 3); b.fillStyle = '#f7c646'; if (tw < 2) { b.fillRect(Math.round(q.x) - 4, Math.round(q.y) - 5, 9, 1); b.fillRect(Math.round(q.x), Math.round(q.y) - 9, 1, 9); } } })),
         ...herds.map((hd) => ({ y: hd.y, f: (b) => { const img = TG.landmarks.critter(hd.sp, hd.moving ? Math.floor(t * 6) % 2 : 0), X = Math.round(hd.x - 10), Y = Math.round(hd.y - 14); b.fillStyle = 'rgba(30,20,10,.22)'; b.fillRect(X + 4, Y + 14, 12, 2); if (hd.flip) { b.save(); b.translate(X + 20, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); } else b.drawImage(img, X, Y); } })),
         { y: famT.y - 2, f: (b) => { const f0 = famT; b.drawImage(TG.pixel.char(herderLook, Math.floor(t / 3) % 4 === 3 ? 2 : 0, 0), Math.round(f0.x - 8), Math.round(f0.y - 28)); if (!famDone()) { b.fillStyle = '#f7c646'; const bob = Math.round(Math.sin(t * 5) * 1.5); b.fillRect(Math.round(f0.x - 1), Math.round(f0.y - 38) + bob, 2, 5); b.fillRect(Math.round(f0.x - 1), Math.round(f0.y - 32) + bob, 2, 2); } } },
         ...things.filter((q) => q.kind === 'mark').map((q) => ({ y: q.y, f: (b) => { const done = seen.includes(q.i), X = Math.round(q.x), Y = Math.round(q.y); TG.pixel.R(b, X - 1, Y - 18, 2, 18, '#6b4220'); TG.pixel.R(b, X + 1, Y - 18, 8, 6, '#2b1e2e'); TG.pixel.R(b, X + 1, Y - 17, 7, 4, done ? '#5c9a36' : '#f7c646'); if (!done && Math.floor(t * 3) % 2) TG.pixel.R(b, X + 4, Y - 24, 2, 3, '#ffffff'); } })),
@@ -295,5 +314,5 @@
     TG.sfx.whoosh && TG.sfx.whoosh();
     TG.travel._cur = { me: sc.me, things, run: (t) => t.run(), seen, close: () => sc.close(), view: fpWanted && sc.P ? 'fp' : '2d', sc }; // used by automated tests
   }
-  TG.travel = { open, build, CAMP, FAM, OVOO, SIGN, TS, DETAIL };
+  TG.travel = { open, build, CAMP, FAM, OVOO, SIGN, TS, DETAIL, LW, LH, LAKES };
 })(window.TG);
