@@ -67,6 +67,9 @@
   t.darkStone = T('darkStone', noise(['#5a4a4a', '#4a3e3e', '#6a5a5a'], 44, 0.5));
   t.white = T('white', noise(['#ffffff', '#f2f2f6', '#e8e8ee'], 45, 0.15));
   t.cloud = T('cloud', (x, X, Y) => fill(x, X, Y, '#ffffff'));
+  t.saltwater = T('saltwater', (x, X, Y) => { fill(x, X, Y, '#4fb8c4'); for (let j = 0; j < 16; j += 4) for (let i = 0; i < 16; i++) if (hash(i, j, 51) < 0.4) px(x, X, Y, i, j + (i % 2), '#86d0d6'); });
+  t.saltcrust = T('saltcrust', noise(['#f4f2ea', '#e8e4d8', '#ffffff'], 52, 0.3));
+  t.deepwater = T('deepwater', (x, X, Y) => { fill(x, X, Y, '#2b5aa8'); for (let j = 0; j < 16; j += 4) for (let i = 0; i < 16; i++) if (hash(i, j, 53) < 0.4) px(x, X, Y, i, j + (i % 2), '#4a7ac8'); });
   t.pine = T('pine', leaves(['#2c6a44', '#3f8a57', '#235a38'], 46));
   t.carving = T('carving', (x, X, Y) => { noise(['#8a6a5a', '#7a5a4a', '#9a7a6a'], 47, 0.4)(x, X, Y); x.fillStyle = '#e8d8c0'; x.fillRect(X + 3, Y + 6, 7, 2); x.fillRect(X + 3, Y + 8, 1, 4); x.fillRect(X + 9, Y + 8, 1, 4); x.fillRect(X + 9, Y + 3, 1, 3); x.fillRect(X + 10, Y + 2, 2, 1); });
   t.deerStone = T('deerStone', (x, X, Y) => { noise(['#a5a5b0', '#8a8a94'], 48, 0.4)(x, X, Y); x.strokeStyle = '#5a5a66'; for (let k = 0; k < 3; k++) { x.beginPath(); x.moveTo(X + 2, Y + 5 + k * 4); x.lineTo(X + 13, Y + 2 + k * 4); x.stroke(); } });
@@ -92,6 +95,7 @@
   def('khadag', t.khadag); def('steel', t.iron, t.iron, t.iron); def('bronze', t.bronze); def('planks', t.planks); def('hide', t.hide); def('rail', t.rail, t.gravel, t.gravel); def('train', t.iron, t.train, t.iron);
   def('yellow', t.yellow); def('clay', t.clay); def('cobble', t.cobble); def('reed', t.reed, t.reed, t.reed, { solid: false, cut: true }); def('carpet', t.carpet, t.red, t.red);
   def('egg', t.egg); def('darkStone', t.darkStone); def('white', t.white); def('cloud', t.cloud); def('carving', t.carving); def('deerStone', t.deerStone);
+  def('saltwater', t.saltwater, t.saltwater, t.saltwater, { solid: false, water: true }); def('deepwater', t.deepwater, t.deepwater, t.deepwater, { solid: false, water: true }); def('saltcrust', t.saltcrust, t.saltcrust, t.dirt);
   def('shrine', t.orange, t.shrine, t.orange); def('toono', t.toono, t.orange, t.toono); def('lattice', t.feltRoof, t.lattice, t.feltRoof);
 
   let atlasCache = null;
@@ -134,14 +138,15 @@
       }
       let h = G, tb = groundTop, under = desert ? B.sand : B.dirt;
       if (tl === 'p') { tb = map.city ? B.gravel : desert ? B.path : B.path; }
-      else if (tl === 'w') { h = G - 3; tb = B.sand; under = B.sand; }
+      else if (tl === 'w') { h = G - 4; tb = B.sand; under = B.sand; }
+      else if (map.lake && map.lake.salt && near(x, z, 1, 'w')) tb = B.saltcrust;   // the white salt crust round a salt lake
       else if (tl === 'f') tb = B.farmland;
       else if (tl === 's') h = G + Math.round(smooth(x, z, 3) * 2.4);
       else if (tl === 'g' && !near(x, z, 2, 'pLGOwb')) h = G + (smooth(x, z, 6) > 0.62 ? 1 : 0) + (smooth(x, z, 11) > 0.8 ? 1 : 0);   // gentle grassy rises
       column(x, z, h, tb, under);
-      if (tl === 'w') { set(x, G - 3, z, B.water); set(x, G - 2, z, B.water); }   // water: two blocks deep, its surface one block below the banks
+      if (tl === 'w') { const wb = map.lake && map.lake.salt ? B.saltwater : map.id === 'khuvsgul' ? B.deepwater : B.water; for (let y = G - 4; y < G; y++) set(x, y, z, wb); }   // water: four blocks deep, its surface level with the shore so you see it from afar
       if (tl === 'f') set(x, G, z, B.wheat);
-      top[z * X + x] = tl === 'w' ? G - 1 : h;
+      top[z * X + x] = tl === 'w' ? G - 4 : h;
     }
     const groundAt = (x, z) => top[Math.round(z) * X + Math.round(x)] || G;
     // reeds on the lake shores
@@ -198,9 +203,9 @@
 
     // 4) the landmarks, each as a 3D model in its 16×12 block lot
     for (const mk of map.marks) {
-      const x0 = M + mk.sx * TILE, z0 = M + mk.sy * TILE, cx = x0 + 8, cz = z0 + 6;
+      const LWb = (TG.travel.LW || 4) * TILE, LHb = (TG.travel.LH || 3) * TILE, x0 = M + mk.sx * TILE, z0 = M + mk.sy * TILE, cx = x0 + (LWb >> 1), cz = z0 + (LHb >> 1);
       const L = LAND[mk.kind] || LAND.sacredmtn;
-      L({ x0, z0, cx, cz, x1: x0 + 15, z1: z0 + 11, G, B, set, get, box, ellipsoid, cyl, cone, tree: (x, z, k) => tree(x, G, z, k || map.det.trees), hash, ger, add: (kind, x, z) => sprites.push({ kind, x, z }) });
+      L({ id: map.id, x0, z0, cx, cz, x1: x0 + LWb - 1, z1: z0 + LHb - 1, G, B, set, get, box, ellipsoid, cyl, cone, tree: (x, z, k) => tree(x, G, z, k || map.det.trees), hash, ger, add: (kind, x, z) => sprites.push({ kind, x, z }) });
     }
     return { X, Z, YS, vox, idx, get, set, groundAt, sprites, M, TILE, G, BLOCKS, B };
   }
@@ -299,6 +304,109 @@
     rockart(W) { const { cx, cz, G, B } = W; W.ellipsoid(cx, G + 1, cz - 1, 7, 3.5, 3, B.graniteDark); W.box(cx - 5, G + 1, cz + 2, cx + 5, G + 3, cz + 2, B.carving); },
     eagle(W) { const { cx, cz, G, B } = W; W.box(cx + 2, G, cz, cx + 2, G + 2, cz, B.log); W.box(cx + 1, G + 2, cz, cx + 3, G + 2, cz, B.log); W.add('eagle', cx + 2, cz); W.add('hunter', cx - 2, cz + 1); W.add('horse', cx - 5, cz - 1); },
   };
+  // ---- the bigger lots (24×16 blocks) and each province's own attractions in 3D
+  const peak3 = (W, cx, cz, r, hgt, rock, snowFrom) => W.cone(cx, cz, r, W.G - 1, hgt, (x, y, z, k) => (snowFrom !== undefined && k >= snowFrom ? W.B.snow : k < 2 && rock === W.B.stone ? W.B.grass : rock));
+  Object.assign(LAND, {
+    statue(W) { // Tsonjin Boldog: the 40 m Chinggis Khaan statue (about 22 blocks) on its round visitor centre, facing east
+      const { cx, cz, G, B } = W;
+      W.cyl(cx, cz, 8, G, G + 4, (x, y) => (y === G + 2 && W.hash(x, 0, 1) < 0.7 ? B.window : B.plaster)); W.cyl(cx, cz, 8.5, G + 5, G + 5, B.gravel); W.cyl(cx, cz, 3, G + 6, G + 7, B.plaster);
+      for (let k = 0; k < 4; k++) W.box(cx - 2, G + k - 3, W.z1 - k, cx + 2, G - 1 + k - 3 + 3, W.z1 - k, B.stone);   // steps up from the south
+      const S = B.silver, D = B.steel;
+      W.box(cx - 5, G + 12, cz - 2, cx + 4, G + 15, cz + 2, S);                       // the horse’s body
+      for (const [lx, lz] of [[-5, -2], [-5, 1], [3, -2], [3, 1]]) W.box(cx + lx, G + 8, cz + lz, cx + lx + 1, G + 11, cz + lz + 1, (lx + lz) % 2 ? S : D);
+      W.box(cx + 4, G + 15, cz - 1, cx + 6, G + 19, cz + 1, S); W.box(cx + 6, G + 18, cz - 1, cx + 9, G + 20, cz + 1, S); W.box(cx + 4, G + 19, cz, cx + 5, G + 21, cz, D); W.box(cx - 6, G + 10, cz, cx - 6, G + 14, cz, D);
+      W.box(cx - 1, G + 16, cz - 1, cx + 1, G + 21, cz + 1, S); W.box(cx - 1, G + 16, cz - 3, cx, G + 17, cz + 3, D); W.box(cx - 1, G + 22, cz - 1, cx + 1, G + 23, cz + 1, S); W.box(cx - 1, G + 24, cz, cx + 1, G + 24, cz, D);
+      W.box(cx + 2, G + 20, cz + 2, cx + 4, G + 20, cz + 2, S); W.box(cx + 5, G + 19, cz + 2, cx + 5, G + 22, cz + 2, B.gold);   // arm and golden whip
+      for (const fx of [W.x0 + 1, W.x1 - 1]) { W.box(fx, G, W.z1 - 1, fx, G + 5, W.z1 - 1, B.log); W.set(fx + 1, G + 5, W.z1 - 1, B.red); W.set(fx + 1, G + 4, W.z1 - 1, B.khadag); W.set(fx + 1, G + 3, W.z1 - 1, B.red); }
+    },
+    turtle(W) { // Turtle Rock, about 24 m of granite, and the Ariyabal temple on the slope behind
+      const { cx, cz, G, B } = W, gr = (x, y, z) => (W.hash(x >> 1, y + (z >> 1), 3) < 0.25 ? B.graniteDark : B.granite);
+      W.ellipsoid(cx, G + 4, cz, 8, 8, 6, gr); W.ellipsoid(cx - 9, G + 3, cz + 1, 3.2, 2.8, 2.6, B.granite); W.set(cx - 12, G + 4, cz, B.graniteDark); W.set(cx - 12, G + 4, cz + 2, B.graniteDark);
+      for (const [dx, dz] of [[-5, 5], [5, 5], [-5, -5], [5, -5]]) W.ellipsoid(cx + dx, G, cz + dz, 2, 1.5, 1.7, B.graniteDark);
+      hill(W, W.x1 - 3, W.z0 + 2, 6, 5, 4); W.box(W.x1 - 6, G + 4, W.z0, W.x1 - 2, G + 6, W.z0 + 3, B.plaster); W.box(W.x1 - 7, G + 7, W.z0 - 1, W.x1 - 1, G + 7, W.z0 + 4, B.red); W.set(W.x1 - 4, G + 8, W.z0 + 1, B.gold);
+      for (const [tx, tz] of [[W.x0 + 1, W.z0 + 1], [W.x0 + 3, W.z1 - 1], [W.x1 - 1, W.z1 - 2], [W.x0 + 6, W.z0]]) W.tree(tx, tz, 'larch');
+    },
+    gandan(W) { // Gandan: the tall white Migjid Janraisig temple with layered green-and-gold roofs, white stupas either side
+      const { cx, cz, G, B } = W;
+      W.box(W.x0, G - 1, W.z0, W.x1, G - 1, W.z1, B.cobble);
+      W.box(cx - 6, G, cz - 5, cx + 6, G + 10, cz + 3, B.plaster); W.box(cx - 6, G + 10, cz - 5, cx + 6, G + 10, cz + 3, B.red);
+      for (let y = G + 2; y < G + 10; y += 3) for (let x = cx - 5; x <= cx + 5; x += 2) W.set(x, y, cz + 3, B.window);
+      W.box(cx - 1, G, cz + 3, cx + 1, G + 2, cz + 3, B.door);
+      for (let k = 0; k < 4; k++) W.box(cx - 8 + k * 2, G + 11 + k, cz - 7 + k, cx + 8 - k * 2, G + 11 + k, cz + 5 - k, k === 3 ? B.gold : B.greenTile);
+      W.box(cx - 1, G + 15, cz - 2, cx + 1, G + 16, cz, B.gold); W.box(cx, G + 17, cz - 1, cx, G + 19, cz - 1, B.gold);
+      for (const sx of [W.x0 + 2, W.x0 + 5, W.x1 - 5, W.x1 - 2]) stupa(W, sx, W.z1 - 3, 1);
+    },
+    burkhan(W) { // Burkhan Khaldun: a sacred mountain clad in larch forest, ovoos on its top
+      const { cx, cz, G, B } = W;
+      W.cone(cx, cz - 2, 12, G - 1, 18, (x, y, z, k) => (k > 15 ? B.stone : W.get(x, y + 1, z) ? B.dirt : B.grass));
+      for (let i = 0; i < 26; i++) { const a = i * 2.39, r = 3 + (i % 9); const x = Math.round(cx + Math.cos(a) * r), z = Math.round(cz - 2 + Math.sin(a) * r * 0.9); let y = G + 18; while (y > G && !W.get(x, y - 1, z)) y--; if (y < G + 14) { W.box(x, y, z, x, y + 3, z, B.log); W.cone(x, z, 1.8, y + 2, 4, B.larch); } }
+      W.cone(cx, cz - 2, 1.8, G + 17, 3, B.cobble); W.box(cx, G + 20, cz - 2, cx, G + 23, cz - 2, B.log); W.set(cx + 1, G + 22, cz - 2, B.khadag); W.set(cx - 1, G + 21, cz - 2, B.khadag);
+    },
+    khokh(W) { // Khökh Lake: a small deep-blue lake in the forest, with the memorial where Temüjin was proclaimed khan
+      const { cx, cz, G, B } = W;
+      for (let z = W.z0; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { const d = ((x - cx + 2) / 8) ** 2 + ((z - cz) / 5) ** 2; if (d <= 1) { W.box(x, G - 3, z, x, G + 3, z, 0); W.set(x, G - 4, z, B.sand); W.set(x, G - 3, z, B.water); W.set(x, G - 2, z, B.water); } else if (d < 2.2 && W.hash(x, z, 6) < 0.18) W.tree(x, z, 'larch'); }
+      W.box(W.x1 - 3, G, cz, W.x1 - 2, G + 7, cz, B.white); W.box(W.x1 - 4, G, cz - 1, W.x1 - 1, G, cz + 1, B.stone); W.set(W.x1 - 2, G + 4, cz + 1, B.khadag);
+    },
+    shore(W) { // a big lake’s south shore: beach, jetty, boats (the lake itself is real terrain beyond the lot)
+      const { G, B } = W, s = (TG.landmarks.SHORE || {})[W.id] || {};
+      for (let z = W.z0; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { W.box(x, G, z, x, G + 3, z, 0); W.set(x, G - 1, z, s.salt ? B.saltcrust : B.sand); }
+      for (let z = W.z0 - 6; z <= W.z0 + 4; z++) W.set(W.cx, G - 1, z, B.planks);                 // the jetty out over the water
+      if (s.boat === 'ship') { W.box(W.cx + 3, G - 2, W.z0 - 9, W.cx + 12, G - 1, W.z0 - 6, B.white); W.box(W.cx + 3, G - 2, W.z0 - 9, W.cx + 12, G - 2, W.z0 - 6, B.red); W.box(W.cx + 5, G, W.z0 - 8, W.cx + 9, G + 1, W.z0 - 7, B.white); W.box(W.cx + 7, G + 2, W.z0 - 8, W.cx + 7, G + 3, W.z0 - 8, B.iron); }
+      if (s.boat === 'fish') for (const bx of [W.cx - 6, W.cx + 5]) { W.box(bx, G - 2, W.z0 - 5, bx + 3, G - 2, W.z0 - 4, B.planks); W.box(bx + 1, G - 1, W.z0 - 5, bx + 1, G + 1, W.z0 - 5, B.log); W.set(bx + 2, G, W.z0 - 5, B.white); }
+      if (s.reeds) for (let x = W.x0; x <= W.x1; x += 2) W.set(x, G - 1 + 1, W.z0, B.reed);
+      W.box(W.x0 + 1, G, W.z1 - 2, W.x0 + 2, G + 1, W.z1 - 2, B.planks); W.add(s.birds === 'pelican' ? 'swan' : 'gull', W.cx - 4, W.z0 - 3);
+    },
+    memorial(W) { // the Khalkhin Gol victory memorial
+      const { cx, cz, G, B } = W;
+      for (let z = W.z1 - 3; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { W.box(x, G - 3, z, x, G + 2, z, 0); W.set(x, G - 4, z, B.sand); W.set(x, G - 3, z, B.water); W.set(x, G - 2, z, B.water); }
+      for (let k = 0; k < 3; k++) W.box(cx - 5 + k, G + k, cz - 4 + k, cx + 5 - k, G + k, cz + 2 - k, k % 2 ? B.stone : B.plaster);
+      W.box(cx - 1, G + 3, cz - 2, cx, G + 18, cz - 1, B.white); W.set(cx, G + 19, cz - 1, B.gold);
+      for (const fx of [cx - 7, cx + 7]) { W.box(fx, G, cz, fx, G + 6, cz, B.log); W.set(fx + 1, G + 6, cz, B.red); W.set(fx + 1, G + 5, cz, B.khadag); W.set(fx + 1, G + 4, cz, B.red); }
+    },
+    shiliin(W) { const { cx, cz, G, B } = W; W.cone(cx, cz - 2, 11, G - 1, 14, (x, y, z, k) => (k > 11 ? B.darkStone : B.grass)); W.cyl(cx, cz - 2, 2, G + 11, G + 13, 0); for (const dx of [-3, 0, 3]) { W.cone(cx + dx, cz - 4, 1.2, G + 11, 2, B.cobble); } W.box(cx, G + 13, cz - 4, cx, G + 16, cz - 4, B.log); W.set(cx + 1, G + 15, cz - 4, B.khadag); },
+    ganga(W) { const { cx, cz, G, B } = W; for (let z = W.z0; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { const d = ((x - cx) / 7) ** 2 + ((z - cz - 2) / 4) ** 2; if (d <= 1) { W.set(x, G - 2, z, B.water); W.set(x, G - 1, z, 0); W.set(x, G - 3, z, B.sand); } } for (let x = W.x0; x <= W.x1; x++) for (let z = W.z0; z < W.z0 + 4; z++) { const hh = 2 + Math.round(Math.abs(Math.sin(x / 3)) * 3); W.box(x, G, z, x, G + hh - (z - W.z0 > 2 ? 1 : 0), z, B.sand); } for (const [dx, dz] of [[-2, 2], [1, 3], [3, 1]]) W.add('swan', cx + dx, cz + dz); },
+    altanovoo(W) { const { cx, cz, G } = W; hill(W, cx, cz, 10, 6, 7); const W2 = { ...W, G: G + 5 }; stupa(W2, cx, cz, 1); for (const sx of [W.x0 + 2, W.x0 + 5, W.x1 - 3]) { W.box(sx, G, W.z1 - 1, sx, G + 2, W.z1 - 1, W.B.stone); W.set(sx, G + 3, W.z1 - 1, W.B.cobble); } },
+    khamar(W) { LAND.temple(W); for (let x = W.x0; x <= W.x1; x += 2) { W.set(x, W.G, W.z1, W.B.white); W.set(x, W.G + 1, W.z1, W.B.white); W.set(x, W.G + 2, W.z1, W.B.gold); } },
+    granitemtn(W) { const { cx, cz, G, B } = W; for (const [dx, dz, r] of [[-7, -2, 4.5], [0, -3, 6.5], [7, -1, 5], [-3, 3, 3.2], [4, 3, 3.6], [10, 4, 2.6]]) W.ellipsoid(cx + dx, G + r * 0.5, cz + dz, r, r * 0.95, r * 0.8, (x, y, z) => (W.hash(x, y, z) < 0.3 ? B.graniteDark : B.granite)); },
+    ejkhairkhan(W) { LAND.granitemtn(W); for (let x = W.cx - 2; x <= W.cx + 2; x++) for (let z = W.z1 - 3; z <= W.z1 - 1; z++) { W.set(x, W.G - 1, z, W.B.water); W.set(x, W.G, z, 0); } },
+    bagagazar(W) { LAND.granitemtn(W); for (const [dx, hh] of [[-10, 3], [-8, 4], [10, 3]]) W.box(W.cx + dx, W.G, W.z1 - 1, W.cx + dx + 1, W.G + hh, W.z1 - 1, W.B.clay); },
+    khongor(W) { // the towering dunes of Khongoryn Els, with the green Khongor stream at their foot
+      const { G, B } = W;
+      for (let z = W.z0; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { const back = W.z1 - z, hh = Math.round(Math.max(0, (back - 4) * 1.4) + Math.abs(Math.sin(x / 4)) * 5 + Math.sin(x / 2 + z / 3)); if (back < 4) { W.set(x, G - 1, z, back === 1 ? B.water : B.grass); continue; } W.box(x, G, z, x, G + hh, z, B.sand); }
+      W.add('camel', W.cx - 4, W.z1 - 2); W.add('camel', W.cx, W.z1 - 3);
+    },
+    ikhbogd(W) { peak3(W, W.cx - 4, W.cz - 2, 10, 20, W.B.stone, 12); peak3(W, W.cx + 7, W.cz - 3, 7, 14, W.B.stone, 9); },
+    otgon(W) { LAND.ikhbogd(W); const { cx, cz, G, B } = W; W.set(cx - 4, G + 19, cz - 2, B.khadag); W.set(cx - 3, G + 18, cz - 2, B.white); },
+    kharkhiraa(W) { peak3(W, W.cx - 6, W.cz - 2, 9, 19, W.B.stone, 11); peak3(W, W.cx + 5, W.cz - 3, 9, 21, W.B.stone, 12); },
+    tavanbogd(W) { LAND.kharkhiraa(W); const { cx, G, B } = W; for (let z = W.cz; z <= W.z1; z++) for (let x = cx - 3 - (z - W.cz); x <= cx + 3 + (z - W.cz); x++) { W.set(x, G - 1, z, B.ice); W.set(x, G, z, (x + z) % 3 ? 0 : B.ice); } },   // the Potanin glacier flowing down
+    whitecave(W) { const { cx, cz, G, B } = W; W.cone(cx, cz - 2, 11, G - 1, 12, (x, y, z) => (W.hash(x, y, z) < 0.3 ? B.whiteRock : B.white)); W.ellipsoid(cx, G + 1, cz + 2, 2.6, 2.8, 7, 0); },
+    khogno(W) { const { cx, cz, G, B } = W; peak3(W, cx - 6, cz - 2, 8, 14, B.graniteDark); for (let z = W.z0; z <= W.z1; z++) for (let x = cx + 3; x <= W.x1; x++) { const hh = 1 + Math.round(Math.abs(Math.sin(x / 3 + z / 5)) * 3); W.box(x, G, z, x, G + hh - 1, z, B.sand); } for (const [tx, tz] of [[W.x0 + 1, W.z1 - 1], [W.x0 + 4, W.z1]]) W.tree(tx, tz, 'birch'); },
+    amar(W) { // Amarbayasgalant: a walled, symmetrical monastery with green-and-gold roofs
+      const { x0, z0, x1, z1, cx, G, B } = W;
+      for (let x = x0; x <= x1; x++) { W.box(x, G, z0, x, G + 2, z0, B.clay); W.box(x, G, z1, x, G + 2, z1, B.clay); } for (let z = z0; z <= z1; z++) { W.box(x0, G, z, x0, G + 2, z, B.clay); W.box(x1, G, z, x1, G + 2, z, B.clay); }
+      W.box(cx - 2, G, z1, cx + 2, G + 2, z1, 0); W.box(cx - 3, G + 3, z1, cx + 3, G + 3, z1, B.greenTile);
+      for (const [hx, hw, hz, hh] of [[cx - 4, 4, z0 + 3, 6], [x0 + 3, 3, z0 + 6, 4], [x1 - 3, 3, z0 + 6, 4]]) { W.box(hx - hw, G, hz - 2, hx + hw, G + hh, hz + 2, B.plaster); W.box(hx - hw, G + hh, hz - 2, hx + hw, G + hh, hz + 2, B.red); for (let k = 0; k < 3; k++) W.box(hx - hw - 1 + k, G + hh + 1 + k, hz - 3 + k, hx + hw + 1 - k, G + hh + 1 + k, hz + 3 - k, k === 2 ? B.gold : B.greenTile); }
+      W.box(cx - 4, G, z0 + 5, cx - 4, G + 2, z0 + 5, 0); W.box(cx + 4, G, z0 + 5, cx + 4, G + 2, z0 + 5, B.door);
+    },
+    altanbulag(W) { const { x0, z0, cx, cz, G, B } = W; W.box(x0 + 1, G, z0 + 2, x0 + 9, G + 4, z0 + 8, B.planks); W.box(x0, G + 5, z0 + 1, x0 + 10, G + 5, z0 + 9, B.red); for (let x = x0 + 2; x <= x0 + 8; x += 2) W.set(x, G + 2, z0 + 8, B.window); W.box(cx + 4, G, cz, cx + 8, G, cz + 3, B.stone); W.box(cx + 6, G + 1, cz + 1, cx + 6, G + 14, cz + 1, B.white); W.set(cx + 6, G + 15, cz + 1, B.red); },
+    pavilion(W) { const { cx, cz, G, B } = W; hill(W, cx, cz, 11, 7, 7); const y = G + 6; for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) W.box(cx + dx, y, cz + dz, cx + dx, y + 3, cz + dz, B.red); W.box(cx - 3, y + 4, cz - 3, cx + 3, y + 4, cz + 3, B.greenTile); W.box(cx - 2, y + 5, cz - 2, cx + 2, y + 5, cz + 2, B.greenTile); W.set(cx, y + 6, cz, B.gold); },
+    mazaalai(W) { const { cx, cz, G, B } = W; W.box(W.x0, G - 1, W.z0, W.x1, G - 1, W.z1, B.sand); for (let x = cx - 4; x <= cx; x++) for (let z = cz + 1; z <= cz + 3; z++) { W.set(x, G - 1, z, B.water); } for (const [dx, dz] of [[-6, 1], [-6, 4], [2, 4]]) W.set(cx + dx, G, cz + dz, B.saxaul); peak3(W, W.x1 - 4, W.z0 + 2, 6, 7, B.redRock); W.add('bear', cx + 3, cz + 1); W.add('camel', W.x1 - 6, cz + 3); W.add('camel', W.x1 - 3, cz + 4); },
+    eaglefest(W) { const { cx, cz, G, B } = W; for (let x = W.x0; x <= W.x1; x += 3) { W.set(x, G, W.z0, B.planks); W.set(x, G, W.z1, B.planks); } W.add('hunter', cx - 6, cz); W.add('horse', cx - 6, cz + 2); W.add('hunter', cx + 2, cz - 2); W.add('horse', cx + 2, cz); W.add('eagle', cx - 2, cz - 1); W.add('eagle', cx + 6, cz + 1); W.ger(W.x1 - 4, W.z0 + 4, 3); },
+    swans(W) { const { cx, cz, G, B } = W; for (let z = W.z0; z <= W.z1; z++) for (let x = W.x0; x <= W.x1; x++) { const d = ((x - cx) / 11) ** 2 + ((z - cz) / 7) ** 2; if (d <= 1) { W.box(x, G - 3, z, x, G + 3, z, 0); W.set(x, G - 4, z, B.sand); W.set(x, G - 3, z, B.saltwater); W.set(x, G - 2, z, B.saltwater); } else if (d < 1.35) { W.set(x, G - 1, z, B.saltcrust); } } for (const [dx, dz] of [[-4, 0], [-1, 2], [3, -1], [5, 2]]) W.add('swan', cx + dx, cz + dz); },
+    waterfall(W) { // the 20 m Orkhon waterfall into its basalt canyon
+      const { x0, z0, x1, cx, G, B } = W;
+      W.box(x0, G, z0, x1, G + 10, z0 + 6, B.basalt); W.box(x0, G + 10, z0, x1, G + 10, z0 + 6, B.grass);
+      for (let y = G - 4; y <= G + 10; y++) for (let x = cx - 1; x <= cx + 1; x++) W.set(x, y, z0 + 6, B.water);
+      W.box(cx - 1, G + 10, z0, cx + 1, G + 10, z0 + 5, B.water);
+      for (let z = z0 + 7; z <= W.z1; z++) for (let x = x0; x <= x1; x++) { const pool = Math.hypot((x - cx) / 6, (z - z0 - 9) / 3) <= 1; W.box(x, G - 5, z, x, G + 1, z, 0); W.set(x, G - 6, z, B.basalt); if (pool || Math.abs(x - cx - Math.sin(z) * 2) < 3) { W.set(x, G - 5, z, B.water); W.set(x, G - 4, z, B.water); } else W.box(x, G - 5, z, x, G - 4, z, B.basalt); }
+      for (const tx of [x0 + 1, x0 + 4, x1 - 2]) W.tree(tx, z0 + 3);
+    },
+    stupawall(W) { const { x0, z0, x1, z1, G, B } = W; for (let x = x0; x <= x1; x++) { W.box(x, G, z0, x, G + 2, z0, B.white); W.box(x, G, z1, x, G + 2, z1, B.white); } for (let z = z0; z <= z1; z++) { W.box(x0, G, z, x0, G + 2, z, B.white); W.box(x1, G, z, x1, G + 2, z, B.white); }
+      for (let x = x0 + 1; x < x1; x += 3) for (const z of [z0, z1]) { W.box(x - 1, G + 3, z, x + 1, G + 3, z, B.white); W.set(x, G + 4, z, B.white); W.set(x, G + 5, z, B.gold); }
+      W.box(W.cx - 1, G, z1, W.cx + 1, G + 2, z1, 0);
+      for (const [hx, hw] of [[W.cx - 5, 3], [W.cx + 4, 4]]) { W.box(hx - hw, G, z0 + 3, hx + hw, G + 4, z0 + 8, B.plaster); for (let k = 0; k < 3; k++) W.box(hx - hw - 1 + k, G + 5 + k, z0 + 2 + k, hx + hw + 1 - k, G + 5 + k, z0 + 9 - k, k === 2 ? B.gold : B.greenTile); }
+    },
+  });
   function cliff(W, layers) { const { G } = W; for (let z = W.z0; z <= W.z0 + 6; z++) for (let x = W.x0; x <= W.x1; x++) { const hh = 6 + Math.round(Math.abs(Math.sin(x / 2.5)) * 4 + W.hash(x, z, 2) * 2) - Math.max(0, z - W.z0 - 3) * 2; for (let y = 0; y < hh; y++) W.set(x, G + y, z, layers[Math.floor(y / 2) % layers.length]); } }
 
   TG.fpworld = { create, atlas, BLOCKS, B, TILE, M, G, YS, hash, tex: t };

@@ -708,6 +708,10 @@
     R(x, 12, 3, 2, 4, '#d8a868'); blob(x, 14, 2, 2, 1, '#d8a868', K.out); eye(x, 14, 1); P(x, 13, 0, '#3a2516'); P(x, 12, 0, '#3a2516'); } };
   BEAST.puppy = { w: 13, h: 11, draw: (x, f) => { hooves(x, f, [3, 4, 8, 9], 7, 4, '#2d2629', '#1a1618', '#3a3235'); blob(x, 6, 5, 4, 2, '#2d2629', K.out); ell(x, 6, 4, 2, 0, '#4a4044'); blob(x, 10, 3, 2, 2, '#2d2629', K.out); P(x, 11, 2, '#c98a4a'); P(x, 9, 2, '#c98a4a'); P(x, 12, 4, '#c98a4a'); eye(x, 11, 3); P(x, 9, 0, '#2d2629'); P(x, 1, 3, '#2d2629'); P(x, 1, 2, '#2d2629'); } };
   BEAST.kitten = { w: 12, h: 10, draw: (x, f) => { hooves(x, f, [3, 4, 7, 8], 6, 4, '#f39b2c', '#c46d12', '#e08a20'); blob(x, 5, 4, 3, 2, '#f39b2c', K.out); P(x, 4, 3, '#c46d12'); P(x, 6, 3, '#c46d12'); blob(x, 9, 3, 2, 2, '#f39b2c', K.out); P(x, 8, 0, '#f39b2c'); P(x, 10, 0, '#f39b2c'); eye(x, 10, 3); P(x, 1, 2, '#f39b2c'); P(x, 1, 1, '#c46d12'); } };
+  BEAST.swan = { w: 14, h: 12, draw: (x, f) => { blob(x, 6, 8, 5, 3, '#ffffff', '#8a8a94'); ell(x, 5, 7, 3, 1, '#f2f2f6'); R(x, 10, 2, 1, 6, '#ffffff'); P(x, 9, 2, '#8a8a94'); R(x, 10, 1, 3, 2, '#ffffff'); P(x, 13, 2, '#f39b2c'); P(x, 11, 1, K.eye); if (f) P(x, 2, 6, '#ffffff'); } };
+  BEAST.gull = { w: 12, h: 9, draw: (x, f) => { blob(x, 6, 5, 4, 2, '#f2f2f6', '#77778a'); R(x, 2 - (f ? 1 : 0), 3, 4, 1, '#a5a5b0'); R(x, 9, 3, 2, 2, '#f2f2f6'); P(x, 11, 4, '#f7c646'); P(x, 10, 3, K.eye); R(x, 5, 7, 1, 2, '#f39b2c'); R(x, 7, 7, 1, 2, '#f39b2c'); } };
+  BEAST.bear = { w: 22, h: 16, draw: (x, f) => { // the Gobi bear (mazaalai), one of the rarest bears on Earth
+    hooves(x, f, [5, 8, 14, 17], 11, 5, '#6b4a2a', '#2b1e14', '#5a3a22'); blob(x, 11, 8, 8, 4, '#8a6a4a', K.out); ell(x, 10, 6, 6, 1, '#a88a62'); blob(x, 18, 6, 3, 3, '#8a6a4a', K.out); P(x, 17, 3, '#6b4a2a'); P(x, 20, 3, '#6b4a2a'); R(x, 20, 7, 2, 2, '#c9a87a'); P(x, 21, 7, K.out); eye(x, 19, 5); } };
   /** Any animal sprite, cached. */
   function beast(kind, frame = 0) {
     const key = 'b:' + kind + frame; if (cache.has(key)) return cache.get(key);

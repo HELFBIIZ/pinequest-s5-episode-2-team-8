@@ -270,7 +270,7 @@
     function sprites(t) {
       const out = [];
       for (const a of cfg.actors ? cfg.actors(t) : []) { const [x, z] = toB(a.x, a.y); out.push({ img: a.img, x, z, y: world.groundAt(x, z), h: a.h, w: a.h * (a.img.width / a.img.height), flip: a.flip }); }
-      for (const s of extra) { const img = s.img || eagleImg, hh = s.kind === 'hunter' ? 1.8 : s.kind === 'eagle' ? 0.8 : s.kind === 'camel' ? 2.1 : s.kind === 'horse' ? 1.5 : 1.2; out.push({ img, x: s.x + 0.5, z: s.z + 0.5, y: s.kind === 'eagle' ? world.G + 3 : world.groundAt(s.x, s.z), h: hh, w: hh * img.width / img.height }); }
+      for (const s of extra) { const img = s.img || eagleImg, hh = { hunter: 1.8, eagle: 0.8, camel: 2.1, horse: 1.6, bear: 1.3, swan: 0.65, gull: 0.45, reindeer: 1.45, gazelle: 1.15 }[s.kind] || 1.2; out.push({ img, x: s.x + 0.5, z: s.z + 0.5, y: s.kind === 'eagle' ? world.G + 3 : world.groundAt(s.x, s.z), h: hh, w: hh * img.width / img.height }); }
       out.push({ img: TG.pixel.bankhar(Math.hypot(P.vx, P.vz) > 0.5 ? 1 + Math.floor(t * 8) % 2 : 3), x: dog.x, z: dog.z, y: world.groundAt(dog.x, dog.z), h: 0.95, w: 0.95 * 22 / 16 });
       // farthest first so see-through edges look right
       for (const s of out) s.d = (s.x - P.x) ** 2 + (s.z - P.z) ** 2;
