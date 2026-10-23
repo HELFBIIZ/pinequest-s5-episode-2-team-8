@@ -446,6 +446,7 @@ try {
   await page.evaluate(() => TG._village.fpScene.close()); await sleep(400);
   // the historian: find an arrowhead in Khentii, hand it in
   step = 'historian';
+  await page.evaluate(() => { TG.store.active().aimagPass = { at: Date.now(), local: true }; TG.store.save(); }); // the first quest goes to Khentii, past the free aimags
   await page.evaluate(() => TG.history.open()); await sleep(250);
   await check('historian', '.modal .btn.primary');
   await page.evaluate(() => document.querySelector('.modal .btn.primary').click()); await sleep(1200);

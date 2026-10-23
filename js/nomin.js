@@ -1,97 +1,124 @@
 /* Guide Nomin in full (pixel art, animated in code) and the Aimag Travel Pass.
-   The first four provinces on the passport route are free. Going further needs the Aimag Travel Pass (9,900₮, paid once
-   by a grown-up): when a child tries, Nomin jumps in front of the road barrier, wags her finger and says "no no!". */
+   The first two provinces on the passport route are free. Going further needs the Aimag Travel Pass (9,900₮, paid once
+   by a grown-up): when a child tries, Nomin steps in front of the road barrier and kindly explains the pass. */
 (function (TG) {
   const { h, L, tx } = TG;
   const S = TG.store;
   const T = (mn, en) => ({ mn, en });
-  const FREE = 4, PRICE = 9900;
+  const FREE = 2, PRICE = 9900;
   const OUT = '#2b1e2e';
 
-  // ------------------------------------------------------------ full-body Nomin (72×124, drawn every frame)
-  const W = 72, H = 124;
-  /** pose: 'no' (finger wag, head shake), 'yay' (hop, hands up), 'bye' (wave). talking: mouth moves. */
-  function drawNomin(x, t, pose, talking) {
-    const GP = TG.guidePalette, face = TG.guideFace; if (!GP || !face) return;
-    x.clearRect(0, 0, W, H);
+  // ------------------------------------------------------------ full-body Nomin (76×168 pixel art in three layers)
+  // back: hair, deel, boots, the arm at her side · head: her portrait, tilted smoothly by CSS · front: the khadag and the gesturing arm.
+  // Breathing, the hop and the head tilt are CSS transforms, so they glide between pixels instead of jumping a whole one.
+  const W = 76, H = 168, HX = 14, HY = 2, CX = 38, HEAD_H = 40;
+  const ease = (q) => q * q * (3 - 2 * q);
+  function painter(x) {
     const px = (X, Y, col) => { x.fillStyle = col; x.fillRect(Math.round(X), Math.round(Y), 1, 1); };
     const disc = (cx, cy, r, col) => { for (let Y = Math.floor(cy - r); Y <= Math.ceil(cy + r); Y++) for (let X = Math.floor(cx - r); X <= Math.ceil(cx + r); X++) if ((X + 0.5 - cx) ** 2 + (Y + 0.5 - cy) ** 2 <= r * r) px(X, Y, col); };
-    const limb = (ax, ay, bx, by, r, col, outline = true) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay)); for (const pass of outline ? [OUT, col] : [col]) for (let i = 0; i <= n; i++) { const q = i / (n || 1); disc(ax + (bx - ax) * q, ay + (by - ay) * q, pass === OUT ? r + 1 : r, pass); } };
-
-    // timing: a playful rhythm, the head shakes in bursts
-    const hop = pose === 'yay' ? -Math.round(Math.abs(Math.sin(t * 6)) * 7) : 0;
-    const bob = Math.round(Math.sin(t * 3) * 0.8) + hop;
-    const burst = (t % 1.6) < 0.9;
-    const shake = pose === 'no' && burst ? Math.round(Math.sin(t * 22) * 1.6) : 0;
-    const blink = (t % 3.3) > 3.15;
-    const expr = pose === 'yay' ? 'laugh' : pose === 'bye' ? 'happy' : (Math.floor(t / 2.2) % 3 === 2 ? 'wink' : 'tease');
-    const open = talking && Math.floor(t * 9) % 2 === 0;
-    const hx = 12 + shake, hy = 2 + bob, cx = 36;
-
-    // 1) long hair falling down her back
-    for (let Y = hy + 30; Y < hy + 66; Y++) { const q = (Y - hy - 30) / 36, hw = 15.5 + Math.sin(q * Math.PI) * 1.5 - q * 3; const l = Math.round(cx - hw + shake), r = Math.round(cx + hw + shake);
-      for (let X = l; X <= r; X++) px(X, Y, (X - l) % 3 === 0 ? GP.hair[0] : X < cx ? GP.hair[2] : GP.hair[1]); px(l - 1, Y, OUT); px(r + 1, Y, OUT); }
-    for (let X = Math.round(cx - 12 + shake); X <= Math.round(cx + 12 + shake); X++) px(X, hy + 66 + ((X * 7) % 3 === 0 ? 1 : 0), OUT);    // wavy ends
-    // 2) the deel: torso narrowing to the sash, then an A-line skirt
-    const top = hy + 46, waist = hy + 70, hem = hy + 106;
-    const half = (Y) => (Y < waist ? 23 - (Y - top) * (6 / (waist - top)) : 17 + (Y - waist) * (6 / (hem - waist)));
+    const limb = (ax, ay, bx, by, r, col) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay)); for (const pass of [OUT, col]) for (let i = 0; i <= n; i++) { const q = i / (n || 1); disc(ax + (bx - ax) * q, ay + (by - ay) * q, pass === OUT ? r + 1 : r, pass); } };
+    return { px, disc, limb };
+  }
+  /** Where her arms are for a pose at time t (shared by the back and front layers). */
+  function arms(pose, t) {
+    if (pose === 'yay') { const up = Math.sin(t * 5) * 0.12; return { left: { el: [7, HY + 44], hand: [6 + up * 10, HY + 27], open: true }, right: { el: [69, HY + 44], hand: [70 - up * 10, HY + 27], open: true } }; }
+    const left = { el: [9, HY + 72], hand: [14, HY + 90], open: false };                                // relaxed at her side
+    if (pose === 'bye') { const a = Math.sin(t * 4.2) * 0.42; return { left, right: { el: [64, HY + 72], hand: [64 + Math.sin(a) * 18, HY + 72 - Math.cos(a) * 18], open: true } }; }
+    const a = Math.sin(t * 3.6) * 0.16;                                                                   // 'wait': a gentle "just a moment" finger
+    return { left, right: { el: [64, HY + 72], hand: [64 + Math.sin(a) * 18, HY + 72 - Math.cos(a) * 18], open: false, finger: true, ang: a } };
+  }
+  function drawBack(x, t, pose) {
+    const GP = TG.guidePalette, face = TG.guideFace; if (!GP || !face) return;
+    x.clearRect(0, 0, W, H);
+    const { px, disc, limb } = painter(x);
+    const top = HY + 46, waist = HY + 88, hem = HY + 144;
+    // a soft shadow on the ground
+    x.fillStyle = 'rgba(43,30,46,.22)'; for (let i = -20; i <= 20; i++) { const w = Math.sqrt(1 - (i / 21) ** 2) * 2.5; x.fillRect(CX + i, hem + 14 - w, 1, w * 2); }
+    // long hair down her back, gently swaying
+    for (let Y = HY + 30; Y < HY + 84; Y++) {
+      const q = (Y - HY - 30) / 54, sway = Math.sin(t * 1.8 - q * 2) * q * 1.2, hw = 15.5 + Math.sin(q * Math.PI) * 1.2 - q * 4.5;
+      const l = Math.round(CX - hw + sway), r = Math.round(CX + hw + sway);
+      for (let X = l; X <= r; X++) px(X, Y, (X - l) % 3 === 0 ? GP.hair[0] : (X - l) % 7 === 4 ? GP.hair[3] : X < CX ? GP.hair[2] : GP.hair[1]);
+      px(l - 1, Y, OUT); px(r + 1, Y, OUT);
+    }
+    // the deel: shoulders, a slimmer waist, then a long A-line skirt with soft folds
+    const half = (Y) => (Y < waist ? 23 - ease((Y - top) / (waist - top)) * 8 : 15 + ((Y - waist) / (hem - waist)) * 9);
     for (let Y = top; Y <= hem + 1; Y++) {
-      const hw = half(Math.min(Y, hem));
-      for (let X = Math.round(cx - hw) - 1; X <= Math.round(cx + hw) + 1; X++) {
-        const edge = X <= Math.round(cx - hw) - 1 || X >= Math.round(cx + hw) + 1 || Y === hem + 1;
-        const rel = (X - (cx - hw)) / (2 * hw);
-        px(X, Y, edge ? OUT : rel < 0.22 ? GP.deel[3] : rel < 0.62 ? GP.deel[2] : GP.deel[1]);
+      const hw = half(Math.min(Y, hem)), l = Math.round(CX - hw), r = Math.round(CX + hw);
+      for (let X = l - 1; X <= r + 1; X++) {
+        const edge = X === l - 1 || X === r + 1 || Y === hem + 1, rel = (X - l) / Math.max(1, r - l);
+        const fold = Y > waist + 6 && [0.3, 0.55, 0.78].some((f) => Math.abs(rel - f - Math.sin(t * 1.4 + f * 9) * 0.012) < 0.02);
+        px(X, Y, edge ? OUT : fold ? GP.deel[1] : rel < 0.18 ? GP.deel[3] : rel < 0.6 ? GP.deel[2] : GP.deel[1]);
       }
-      if (Y > waist + 4 && Y < hem - 2 && (Y - waist) % 9 === 0) for (let X = Math.round(cx - hw) + 3; X < Math.round(cx + hw) - 3; X += 7) px(X, Y, GP.deel[1]); // soft folds
     }
-    for (let X = Math.round(cx - half(hem)); X <= Math.round(cx + half(hem)); X++) { px(X, hem - 1, GP.gold[1]); px(X, hem, GP.gold[2]); }   // gold hem
-    // the overlap of the deel: a gold-trimmed edge from the collar across to the right, then straight down
-    for (let i = 0; i < 16; i++) { px(cx + 2 + i * 0.55, top + i, GP.gold[2]); px(cx + 3 + i * 0.55, top + i, GP.gold[1]); }
-    for (let Y = top + 16; Y < hem - 1; Y++) { px(cx + 11 + (Y - top - 16) * 0.12, Y, GP.gold[1]); }
-    px(cx + 9, top + 10, GP.gold[2]); px(cx + 9, top + 11, GP.gold[0]);                                                  // a button
-    // the sash (бүс), knotted on the side with its ends hanging down
-    for (let Y = waist - 2; Y <= waist + 2; Y++) { const hw = half(Y); for (let X = Math.round(cx - hw); X <= Math.round(cx + hw); X++) px(X, Y, Y === waist - 2 ? GP.gold[2] : Y === waist + 2 ? GP.gold[0] : '#e9a91f'); }
-    for (let i = 0; i < 12; i++) { const sw = Math.round(Math.sin(t * 3 + i * 0.3) * (i / 12) * 1.5); px(cx - 12 + sw, waist + 3 + i, '#e9a91f'); px(cx - 11 + sw, waist + 3 + i, GP.gold[0]); px(cx - 9 + sw, waist + 3 + i, '#e9a91f'); px(cx - 8 + sw, waist + 3 + i, GP.gold[0]); }
-    // 3) Mongol boots (гутал) with upturned toes
-    for (const bxx of [cx - 9, cx + 3]) {
-      for (let Y = hem + 2; Y < hem + 13; Y++) for (let X = bxx; X < bxx + 7; X++) px(X, Y, Y === hem + 12 || X === bxx || X === bxx + 6 ? OUT : (X + Y) % 5 === 0 ? '#c0432c' : '#8e2b1d');
-      for (let X = bxx + 1; X < bxx + 6; X++) px(X, hem + 5, GP.gold[2]);
-      px(bxx - 1, hem + 10, OUT); px(bxx - 2, hem + 9, OUT); px(bxx - 1, hem + 11, '#8e2b1d');                         // the curled toe
+    for (let X = Math.round(CX - half(hem)); X <= Math.round(CX + half(hem)); X++) { px(X, hem - 3, GP.gold[1]); px(X, hem - 1, GP.gold[1]); px(X, hem, GP.gold[2]); } // a double gold hem
+    for (let i = 0; i < 18; i++) { px(CX + 2 + i * 0.5, top + i, GP.gold[2]); px(CX + 3 + i * 0.5, top + i, GP.gold[1]); }   // the overlap of the deel
+    for (let Y = top + 18; Y < hem - 3; Y++) px(CX + 11 + (Y - top - 18) * 0.1, Y, GP.gold[1]);
+    for (const by of [top + 9, top + 14]) { px(CX + 7, by, GP.gold[2]); px(CX + 7, by + 1, GP.gold[0]); }                    // two knot buttons
+    // the sash (бүс), with its ends hanging on the side
+    for (let Y = waist - 2; Y <= waist + 2; Y++) { const hw = half(Y); for (let X = Math.round(CX - hw); X <= Math.round(CX + hw); X++) px(X, Y, Y === waist - 2 ? GP.gold[2] : Y === waist + 2 ? GP.gold[0] : '#e9a91f'); }
+    for (let i = 0; i < 16; i++) { const sw = Math.sin(t * 2 + i * 0.25) * (i / 16) * 1.4; for (const [dx, c] of [[-13, '#e9a91f'], [-12, GP.gold[0]], [-10, '#e9a91f'], [-9, GP.gold[0]]]) px(CX + dx + sw, waist + 3 + i, c); }
+    // Mongol boots (гутал) with upturned toes, peeking out under the hem
+    for (const bx of [CX - 10, CX + 3]) {
+      for (let Y = hem + 2; Y < hem + 13; Y++) for (let X = bx; X < bx + 8; X++) px(X, Y, Y === hem + 12 || X === bx || X === bx + 7 ? OUT : X === bx + 1 ? '#b2412b' : '#8e2b1d');
+      for (let X = bx + 1; X < bx + 7; X++) px(X, hem + 5, GP.gold[2]);
+      px(bx - 1, hem + 10, OUT); px(bx - 2, hem + 9, OUT); px(bx - 1, hem + 11, '#8e2b1d');
     }
-    // 4) her left arm: hand on the hip (a cheeky pose)
-    const sL = [hx + 3, hy + 50];
-    limb(sL[0], sL[1], 6, hy + 70, 3.6, GP.deel[2]); limb(6, hy + 70, 15, hy + 73, 3.4, GP.deel[2]);
-    disc(15, hy + 73, 3.4, GP.gold[1]); disc(17, hy + 73, 2.6, OUT); disc(17, hy + 73, 1.8, GP.skin[3]);
-    // 5) the head (her portrait art), with a blue khadag around the neck
-    x.drawImage(face(expr, open, blink), hx, hy);
-    for (const sx of [hx + 15, hx + 30]) for (let i = 0; i < 22; i++) { // the khadag: a pale-blue silk scarf hanging down both sides, with a fringe
-      const wob = Math.round(Math.sin(t * 2.5 + i * 0.35 + sx) * 0.7), X = sx + wob, Y = hy + 41 + i;
-      px(X - 1, Y, OUT); px(X, Y, '#ffffff'); px(X + 1, Y, '#bfe6fb'); px(X + 2, Y, i % 5 === 2 ? '#7fb8e6' : '#93d4f6'); px(X + 3, Y, OUT);
-      if (i === 21) { px(X, Y + 1, '#bfe6fb'); px(X + 2, Y + 1, '#93d4f6'); px(X + 1, Y + 2, '#bfe6fb'); }
-    }
-    // 6) her right arm: the wagging finger (or a wave / a cheer)
-    const sR = [hx + 45, hy + 50], el = [62 + (pose === 'yay' ? 3 : 0), hy + 68 - (pose === 'yay' ? 16 : 0)];
-    const ang = pose === 'no' ? Math.sin(t * 11) * 0.42 : pose === 'bye' ? Math.sin(t * 6) * 0.5 : Math.sin(t * 8) * 0.15;
-    const len = 18, hand = [el[0] + Math.sin(ang) * len, el[1] - Math.cos(ang) * len];
-    limb(sR[0], sR[1], el[0], el[1], 3.6, GP.deel[1]); limb(el[0], el[1], hand[0], hand[1], 3.4, GP.deel[2]);
-    const cuff = [el[0] + Math.sin(ang) * (len - 3), el[1] - Math.cos(ang) * (len - 3)]; disc(cuff[0], cuff[1], 3.4, GP.gold[1]);
-    disc(hand[0], hand[1], 3.2, OUT); disc(hand[0], hand[1], 2.4, GP.skin[3]);
-    if (pose === 'no') { // index finger up, the others curled
-      for (let i = 1; i <= 7; i++) { const fx = hand[0] + Math.sin(ang) * (2 + i), fy = hand[1] - Math.cos(ang) * (2 + i); disc(fx, fy, 1.9, OUT); }
-      for (let i = 1; i <= 7; i++) { const fx = hand[0] + Math.sin(ang) * (2 + i), fy = hand[1] - Math.cos(ang) * (2 + i); disc(fx, fy, 0.9, GP.skin[4]); }
-    } else for (let f = -2; f <= 2; f++) { const a2 = ang + f * 0.28; for (let i = 1; i <= 4; i++) { const fx = hand[0] + Math.sin(a2) * (2 + i), fy = hand[1] - Math.cos(a2) * (2 + i); px(fx, fy, i === 4 ? OUT : GP.skin[4]); } }
-    // 7) a little sparkle of mischief
-    if (pose === 'no' && !burst) { const s0 = Math.floor(t * 4) % 2; px(hx + 50, hy + 8 - s0, '#f7c646'); px(hx + 49, hy + 9 - s0, '#f7c646'); px(hx + 51, hy + 9 - s0, '#f7c646'); px(hx + 50, hy + 10 - s0, '#f7c646'); }
+    // the shoulders and collar from her portrait, then the arm at her side
+    x.drawImage(face('happy', false, false), 0, HEAD_H, 48, 48 - HEAD_H, HX, HY + HEAD_H, 48, 48 - HEAD_H);
+    const A = arms(pose, t).left;
+    limb(HX + 4, HY + 50, A.el[0], A.el[1], 3.8, GP.deel[2]); limb(A.el[0], A.el[1], A.hand[0], A.hand[1], 3.4, GP.deel[3]);
+    disc(A.hand[0], A.hand[1], 3.6, GP.gold[1]);
+    const hy2 = A.hand[1] + (A.open ? -3 : 3); disc(A.hand[0], hy2, 3, OUT); disc(A.hand[0], hy2, 2.2, GP.skin[3]);
   }
-  /** A <canvas> with Nomin animating. Returns { el, set(pose), talk(on), stop() }. */
-  function nominCanvas(pose = 'no', scale = 3) {
-    const c = h('canvas', { class: 'nomin-full', width: W, height: H, style: { width: W * scale + 'px', height: H * scale + 'px' } }), x = c.getContext('2d');
-    x.imageSmoothingEnabled = false;
-    const st = { pose, talking: false, raf: 0, t0: performance.now() };
-    const loop = () => { if (!c.isConnected && performance.now() - st.t0 > 500) return; drawNomin(x, (performance.now() - st.t0) / 1000, st.pose, st.talking); st.raf = requestAnimationFrame(loop); };
+  function drawFront(x, t, pose) {
+    const GP = TG.guidePalette; if (!GP) return;
+    x.clearRect(0, 0, W, H);
+    const { px, disc, limb } = painter(x);
+    for (const sx of [HX + 15, HX + 30]) for (let i = 0; i < 26; i++) { // the khadag: pale-blue silk hanging from her neck, with a fringe
+      const wob = Math.sin(t * 2 + i * 0.3 + sx) * 0.6 * (i / 26), X = Math.round(sx + wob), Y = HY + 41 + i;
+      px(X - 1, Y, OUT); px(X, Y, '#ffffff'); px(X + 1, Y, '#bfe6fb'); px(X + 2, Y, i % 6 === 3 ? '#7fb8e6' : '#93d4f6'); px(X + 3, Y, OUT);
+      if (i === 25) { px(X, Y + 1, '#bfe6fb'); px(X + 2, Y + 1, '#93d4f6'); px(X + 1, Y + 2, '#bfe6fb'); }
+    }
+    const A = arms(pose, t).right;
+    limb(HX + 44, HY + 50, A.el[0], A.el[1], 3.8, GP.deel[1]); limb(A.el[0], A.el[1], A.hand[0], A.hand[1], 3.4, GP.deel[2]);
+    const dx = A.hand[0] - A.el[0], dy = A.hand[1] - A.el[1], n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n;
+    disc(A.hand[0] - ux * 3, A.hand[1] - uy * 3, 3.6, GP.gold[1]);                                        // the cuff
+    disc(A.hand[0], A.hand[1], 3.2, OUT); disc(A.hand[0], A.hand[1], 2.4, GP.skin[3]);
+    if (A.finger) { for (let i = 1; i <= 6; i++) disc(A.hand[0] + ux * (2 + i), A.hand[1] + uy * (2 + i), 1.8, OUT); for (let i = 1; i <= 6; i++) disc(A.hand[0] + ux * (2 + i), A.hand[1] + uy * (2 + i), 0.8, GP.skin[4]); }
+    else for (let f = -2; f <= 2; f++) { const c = Math.cos(f * 0.28), sn = Math.sin(f * 0.28), fx = ux * c - uy * sn, fy = ux * sn + uy * c; for (let i = 1; i <= 4; i++) px(A.hand[0] + fx * (2 + i), A.hand[1] + fy * (2 + i), i === 4 ? OUT : GP.skin[4]); }
+  }
+  /** Nomin, animating. Returns { el, set(pose), talk(on), stop() }. pose: 'wait' | 'bye' | 'yay'. */
+  function nominCanvas(pose = 'wait', scale = 2) {
+    const mk = (w, hh) => { const c = h('canvas', { width: w, height: hh }); c.getContext('2d').imageSmoothingEnabled = false; return c; };
+    const back = mk(W, H), head = mk(48, HEAD_H), front = mk(W, H);
+    Object.assign(head.style, { left: HX * scale + 'px', top: HY * scale + 'px', width: 48 * scale + 'px', height: HEAD_H * scale + 'px', transformOrigin: `${24 * scale}px ${37 * scale}px` });
+    for (const c of [back, front]) Object.assign(c.style, { left: 0, top: 0, width: W * scale + 'px', height: H * scale + 'px' });
+    const el = h('div', { class: 'nomin-full', style: { width: W * scale + 'px', height: H * scale + 'px' } }, back, head, front);
+    const st = { pose, talking: false, raf: 0, t0: performance.now(), face: '', blinkAt: 2.5 };
+    const loop = () => {
+      if (!el.isConnected && performance.now() - st.t0 > 500) return;
+      const t = (performance.now() - st.t0) / 1000;
+      drawBack(back.getContext('2d'), t, st.pose); drawFront(front.getContext('2d'), t, st.pose);
+      // a friendly face: smiling, a wink now and then, natural blinks, her mouth moving while she talks
+      if (t > st.blinkAt + 0.14) st.blinkAt = t + 2.6 + Math.random() * 2.4;
+      const blink = t > st.blinkAt, open = st.talking && Math.sin(t * 15) > -0.2;
+      const expr = st.pose === 'yay' ? 'laugh' : st.pose === 'bye' ? 'happy' : (t % 7 > 5.6 && !st.talking ? 'wink' : 'happy');
+      const key = expr + open + blink;
+      if (key !== st.face) { st.face = key; const hx = head.getContext('2d'); hx.clearRect(0, 0, 48, HEAD_H); hx.drawImage(TG.guideFace(expr, open, blink), 0, 0, 48, HEAD_H, 0, 0, 48, HEAD_H); }
+      // smooth motion between pixels: breathing, a head that tilts and nods while she talks, a happy hop
+      const breathe = Math.sin(t * 2.1) * 0.7, hop = st.pose === 'yay' ? -Math.abs(Math.sin(t * 4.6)) * 7 : 0;
+      const tilt = st.pose === 'yay' ? Math.sin(t * 4.6) * 5 : st.pose === 'bye' ? Math.sin(t * 2.4) * 4 : Math.sin(t * 1.5) * 4 + (st.talking ? Math.sin(t * 6) * 1.2 : 0);
+      const nod = st.talking ? Math.max(0, Math.sin(t * 6)) * 0.6 : 0;
+      el.style.transform = `translateY(${((breathe + hop) * scale).toFixed(2)}px)`;
+      head.style.transform = `translateY(${(nod * scale - breathe * 0.3 * scale).toFixed(2)}px) rotate(${tilt.toFixed(2)}deg)`;
+      st.raf = requestAnimationFrame(loop);
+    };
     loop();
-    return { el: c, set: (p) => { st.pose = p; }, talk: (on) => { st.talking = on; }, stop: () => cancelAnimationFrame(st.raf) };
+    return { el, set: (p) => { st.pose = p; }, talk: (on) => { st.talking = on; }, stop: () => cancelAnimationFrame(st.raf) };
   }
+  /** One still frame into a canvas (used by tests and the contact sheet). */
+  function drawNomin(x, t, pose) { const b = document.createElement('canvas'); b.width = W; b.height = H; const f = document.createElement('canvas'); f.width = W; f.height = H; drawBack(b.getContext('2d'), t, pose); drawFront(f.getContext('2d'), t, pose); x.clearRect(0, 0, W, H); x.drawImage(b, 0, 0); x.drawImage(TG.guideFace(pose === 'yay' ? 'laugh' : 'happy', false, false), 0, 0, 48, HEAD_H, HX, HY, 48, HEAD_H); x.drawImage(f, 0, 0); }
 
   // ------------------------------------------------------------ the road barrier she stands in front of
   function barrier(c, up) {
@@ -126,7 +153,7 @@
   /** The paywall: Nomin says no-no in front of the barrier, with the pass and its price. */
   function show(id, after) {
     const a = TG.aimags && TG.aimags.byId(id), p = S.active();
-    const nm = nominCanvas('no', 2), say = h('div', { class: 'nw-say', 'aria-live': 'polite' });
+    const nm = nominCanvas('wait', 2), say = h('div', { class: 'nw-say', 'aria-live': 'polite' });
     const talk = (text) => { nm.talk(true); say.textContent = ''; const done = TG.voice ? TG.voice.type(say, TG.tx(text), 'guide') : (say.textContent = TG.tx(text), { done: Promise.resolve() }); Promise.resolve(done && done.done).then(() => nm.talk(false)); };
     const land = TG.passport && TG.passport.landCanvas ? TG.passport.landCanvas(id, 'nw-land', 160, 80) : h('div', { class: 'nw-land' });
     const gate = barrier(), stage = h('div', { class: 'nw-stage' }, land, gate, h('div', { class: 'nw-girl' }, nm.el), say);
@@ -144,8 +171,8 @@
     const close = TG.modal(h('div', { class: 'nomin-wall' }, h('h2', null, a ? L(`${tx(a.name)} руу явах уу?`, `Off to ${tx(a.name)}?`) : L('Цааш аялах уу?', 'Travel further?')), stage, card),
       { cls: 'nw-modal', onClose: () => nm.stop() });
     TG.sfx.pop && TG.sfx.pop();
-    talk(T(`Үгүй ээ, үгүй, үгүй! Чи ${stamps} аймгаар аялчихлаа, гоё байна! Харин цааш явахын тулд Аймгийн аяллын эрх хэрэгтэй шүү.`, `Nuh-uh, no no no! You’ve travelled ${stamps} provinces, amazing! But to go further you need the Aimag Travel Pass.`));
-    later.addEventListener('click', () => { nm.set('bye'); talk(T('За за, дараа уулзъя! Би энд хүлээж байна.', 'Okay okay, see you later! I’ll wait right here.')); later.disabled = true; buy.disabled = true; setTimeout(close, 1500); });
+    talk(T(`Хөөе, ${p.name}! Чи аль хэдийн ${stamps} аймгаар аялчихлаа, ямар гоё вэ! Цааш хамт аялахын тулд Аймгийн аяллын эрх хэрэгтэй юм. Ээж, аавдаа үзүүлээд асуучих уу?`, `Hey ${p.name}! You’ve already explored ${stamps} provinces, how wonderful! To keep travelling together we need the Aimag Travel Pass. Shall we show a grown-up?`));
+    later.addEventListener('click', () => { nm.set('bye'); talk(T('Зүгээр ээ! Бэлэн болохоор хамт аялцгаая. Тэр хооронд Нутагтаа тоглоод байя.', 'That’s okay! We’ll travel together whenever you’re ready. Let’s play in Nutag for now.')); later.disabled = true; buy.disabled = true; setTimeout(close, 1500); });
     buy.addEventListener('click', () => TG.parentGate(() => confirm()));
     function confirm() {
       const pay = h('button', { class: 'btn primary big block' }, L(`${fmt(PRICE)} төлөх`, `Pay ${fmt(PRICE)}`));
@@ -165,7 +192,7 @@
     }
     function celebrate() {
       nm.set('yay'); barrier(gate, true); TG.confetti(80); TG.sfx.win && TG.sfx.win();
-      talk(T('Ура! Одоо бүх Монголоороо аялна! Явцгаая!', 'Hooray! Now you can travel all of Mongolia! Let’s go!'));
+      talk(T('Ура, баярлалаа! Одоо бүх Монголоор хамт аялна. Явцгаая!', 'Hooray, thank you! Now we can travel all of Mongolia together. Let’s go!'));
       card.replaceChildren(h('button', { class: 'btn primary big block', onclick: () => { close(); if (after) after(); else TG.go('aimag', { id }); } }, '🚌 ', a ? L(`${tx(a.name)} руу аялах`, `Travel to ${tx(a.name)}`) : L('Аялах', 'Travel')));
     }
   }
