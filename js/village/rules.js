@@ -5,7 +5,7 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else { root.TG = root.TG || {}; root.TG.vrules = api; }
 })(typeof self !== 'undefined' ? self : this, function () {
-  const W = 56, H = 40, LOTS = 8, GER_PRICE = 200, GER_LEVEL = 2;
+  const W = 56, H = 40, LOTS = 8, GER_PRICE = 50, GER_LEVEL = 1; // cheap and open from the start, so a new player can build a ger right away
   const VERSION = 3; // bump when the game and server must change together (moves, messages), so an old running server is noticed
   const T = (mn, en) => ({ mn, en });
 
