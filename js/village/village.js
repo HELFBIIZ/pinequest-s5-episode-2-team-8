@@ -91,7 +91,9 @@
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
   TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
-    tut: (st) => { if (live) live.tut = st; }, basar: () => openBasar(), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
+    tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
+    questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
+    npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
   TG.villageInfo = () => { const v = V(); return v ? { coins: v.coins, ...R.level(v.xp) } : null; };
 
   // ================================================================ pixel art helpers
@@ -911,6 +913,27 @@
     live.raf = requestAnimationFrame(frame);
   }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
+  // ---------------------------------------------------------------- Nomin pops in and out (tutorial.js decides when)
+  const POOF_MS = 420;
+  /** Somewhere open right beside you for her to appear. */
+  function besideMe() {
+    const m = live.me;
+    for (const [dx, dy] of [[-1.2, 0.15], [1.25, 0.15], [0, 1.1], [-1.1, -0.9], [1.1, -0.9], [-2.2, 0.2], [2.2, 0.2]]) {
+      const x = m.px + dx, y = m.py + dy;
+      if (!WD.blocked(Math.floor(x + 0.5), Math.floor(y + 0.82))) return { x, y };
+    }
+    return { x: m.px - 1.2, y: m.py + 0.15 };
+  }
+  function nomin(cmd) {
+    if (!live) return;
+    const tut = live.tut || (live.tut = { guide: null, target: null }), g = tut.guide, pn = performance.now();
+    if (cmd === 'in') {
+      if (g && !g.out && Math.hypot(g.x - live.me.px, g.y - live.me.py) < 4.5) return; // already here, close enough to talk
+      const at = besideMe(); tut.guide = { x: at.x, y: at.y, dir: 0, moving: false, in: pn, out: 0 };
+      if (g && !g.out) live.floaters.push({ x: g.x, y: g.y, poof: true, t0: pn }); // she was far away: a puff where she was
+      TG.sfx.pop && TG.sfx.pop();
+    } else if (cmd === 'out' && g && !g.out) { g.out = pn; TG.sfx.tick && TG.sfx.tick(); }
+  }
   function update(dt) {
     const m = live.me, k = live.keys, v0 = V();
     const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || !!live.stick || m.path.length > 0);
@@ -976,11 +999,9 @@
       if (dg.bubble && nowP - dg.bubble.t0 > 12000) dg.bubble = null;
     }
     const tg = live.tut && live.tut.guide;
-    if (tg) { // the tutorial guide walks along on your other side
-      const gx = m.px - 1.15, gy = m.py + 0.15, d0 = Math.hypot(gx - tg.x, gy - tg.y);
-      if (d0 > 6) { tg.x = gx; tg.y = gy; }
-      const q = d0 > 0.6 ? Math.min(1, dt * 2.6) : 0, ox = tg.x; tg.x += (gx - tg.x) * q; tg.y += (gy - tg.y) * q;
-      tg.moving = d0 > 0.6; if (Math.abs(tg.x - ox) > 0.003) tg.dir = tg.x < ox ? 1 : 2; else if (!tg.moving) tg.dir = 0;
+    if (tg) { // Nomin doesn't follow you: she pops in beside you when she has something to say, turns to face you, then pops out again
+      tg.moving = false; tg.dir = Math.abs(m.px - tg.x) < 0.3 ? 0 : m.px < tg.x ? 1 : 2;
+      if (tg.out && performance.now() - tg.out > POOF_MS) live.tut.guide = null;
     }
     for (const o of live.others.values()) {
       const dx = o.x - o.px, dy = o.y - o.py, d = Math.hypot(dx, dy);
@@ -1040,6 +1061,11 @@
       if (flip) { ctx.save(); ctx.translate(X + w, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, hh); ctx.restore(); } else ctx.drawImage(img, X, Y, w, hh);
     };
     const shadow = (wx, wy) => { const X = SX(wx), Y = SY(wy); ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(X + 4 * k, Y + 13 * k, 9 * k, k); ctx.fillRect(X + 3 * k, Y + 14 * k, 11 * k, k); ctx.fillRect(X + 4 * k, Y + 15 * k, 9 * k, k); };
+    /** A pixel puff of smoke at a tile spot, q from 0 to 1. */
+    const poof = (wx, wy, q) => { const cx = SX(wx * T + 8), cy = SY(wy * T + 6), r = (3 + q * 9) * k, a = 1 - q;
+      for (let i = 0; i < 8; i++) { const ang = (i / 8) * Math.PI * 2 + q, px0 = Math.round(cx + Math.cos(ang) * r), py0 = Math.round(cy + Math.sin(ang) * r * 0.7), sz = Math.round((4 - q * 2) * k);
+        ctx.fillStyle = `rgba(43,30,46,${0.5 * a})`; ctx.fillRect(px0 - sz / 2 - k, py0 - sz / 2 - k, sz + 2 * k, sz + 2 * k); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(px0 - sz / 2, py0 - sz / 2, sz, sz); }
+      if (q < 0.5) { ctx.fillStyle = `rgba(247,198,70,${1 - q * 2})`; for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) ctx.fillRect(Math.round(cx + dx * r * 0.5 - k), Math.round(cy + dy * r * 0.5 - k), 2 * k, 2 * k); } };
     const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * (o.running ? 13 : 8)) % 2) : 0);
     live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
     if (live.season === 'spring') live.sheep.forEach((q) => ents.push({ y: q.py + 0.3, f: () => sprite(PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.flip) })); // spring: the lambs are born
@@ -1081,7 +1107,11 @@
     }
     battleDraw(ents, drawRider, t);
     const tg = live.tut && live.tut.guide;
-    if (tg && TG.tutorial) ents.push({ y: tg.y, f: () => { shadow(tg.x * T, tg.y * T); sprite(PX.char(TG.tutorial.LOOK, tg.dir || 0, tg.moving ? 1 + (Math.floor(t * 8) % 2) : 0), tg.x * T, tg.y * T - 12); } });
+    if (tg && TG.tutorial) ents.push({ y: tg.y, f: () => { // Nomin: a hop and a puff when she pops in, a puff when she pops out
+      const qi = Math.min(1, (pn - tg.in) / POOF_MS), qo = tg.out ? (pn - tg.out) / POOF_MS : 0;
+      if (qi > 0.2 && qo < 0.35) { const hop = qi < 1 ? Math.round(Math.sin(qi * Math.PI) * 7) : 0; shadow(tg.x * T, tg.y * T); sprite(PX.char(TG.tutorial.LOOK, tg.dir || 0, 0), tg.x * T, tg.y * T - 12 - hop); }
+      if (qi < 1) poof(tg.x, tg.y, qi); if (tg.out) poof(tg.x, tg.y, Math.min(1, qo));
+    } });
     const gn = WD.objects.find((q) => q.kind === 'general'), hs0 = WD.objects.find((q) => q.kind === 'historian');
     for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
     ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
@@ -1109,7 +1139,7 @@
       const nx = live.race.path.P[Math.min(live.race.ci, live.race.path.P.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
       if (live.race.phase !== 'done') { const [ax, ay] = S(live.me.px * T + 8, live.me.py * T - 36), r = 7 * k; ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(r + k, 0); ctx.lineTo(-r * 0.6, -r * 0.75); ctx.lineTo(-r * 0.6, r * 0.75); ctx.fill(); ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(r - k, 0); ctx.lineTo(-r * 0.4, -r * 0.5); ctx.lineTo(-r * 0.4, r * 0.5); ctx.fill(); ctx.restore(); }
     }
-    if (tg) { const [sx, sy] = S(tg.x * T + 8, tg.y * T - 16); pixelText(ctx, L('Номин', 'Nomin'), sx, sy, textSize() * 0.8, '#f7c646'); }
+    if (tg && !tg.out && pn - tg.in > POOF_MS * 0.6) { const [sx, sy] = S(tg.x * T + 8, tg.y * T - 16); pixelText(ctx, L('Номин', 'Nomin'), sx, sy, textSize() * 0.8, '#f7c646'); }
     const tt = live.tut && live.tut.target;
     if (tt && !live.race) { // the tutorial points at where to go: a bouncing arrow over the spot, and a compass arrow over you when it is far away
       const bob = Math.round(Math.abs(Math.sin(pn / 220)) * 4) * k, [ax, ay] = S(tt.x * T + 8, tt.y * T - 26), r = 6 * k;
@@ -1129,6 +1159,7 @@
     live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
     for (const f of live.floaters) {
       const q = (pn - f.t0) / 1400, [sx, sy] = S(f.x * T + 8, f.y * T + 10);
+      if (f.poof) { const qp = (pn - f.t0) / POOF_MS; if (qp < 1) poof(f.x, f.y, qp); continue; }
       if (f.ring) { ctx.strokeStyle = `rgba(255,255,255,${1 - q})`; ctx.lineWidth = Math.max(2, k); ctx.strokeRect(Math.round(sx - (4 + q * 6) * k), Math.round(sy - (2 + q * 2) * k), Math.round((8 + q * 12) * k), Math.round((4 + q * 4) * k)); continue; }
       pixelText(ctx, f.text, sx, sy - (8 + q * 14) * k, textSize(), f.color, 1 - q);
     }
@@ -1263,6 +1294,7 @@
 
   function questModal() {
     const v = V(), body = h('div');
+    v.questsSeen = S.dkey(); S.save(); // Nomin stops reminding you about today's new quests
     const draw = () => rc(body, h('h2', null, L('Өнөөдрийн даалгавар', "Today's quests")),
       h('p', { class: 'muted' }, L('Даалгавар өдөр бүр шинэчлэгдэнэ.', 'Quests refresh every day.')),
       h('div', { class: 'v-list' }, quests().map((q) => {

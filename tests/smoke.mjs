@@ -68,7 +68,7 @@ try {
   await check('straight into Нутаг after creating the character', '.village canvas');
   const who = await page.evaluate(() => { const p = TG.store.active(); return { eth: p.eth, aimag: p.aimag, hat: p.village.look.hat }; });
   if (who.eth !== 'buriad' || !['dornod', 'khentii', 'selenge', 'bulgan', 'khuvsgul'].includes(who.aimag) || who.hat !== 'buriad') errors.push(`character creator: wrong result ${JSON.stringify(who)}`);
-  if (!(await page.evaluate(() => /📍/.test(document.querySelector('.v-loc').textContent)))) errors.push('village: the home province chip is missing');
+  if (!(await page.evaluate(() => !!document.querySelector('.v-loc img.emo[data-icon="pin"]')))) errors.push('village: the home province chip is missing');
   const prof = await page.evaluate(() => { const p = TG.store.active(); return p && { name: p.name, age: p.age, avatar: p.avatar, code: p.code }; });
   if (!prof || prof.name !== 'Тест' || prof.age !== 8 || !prof.code) errors.push(`register: profile not saved correctly: ${JSON.stringify(prof)}`);
 
@@ -233,7 +233,7 @@ try {
         for (let k = 1; k <= 6; k++) await page.mouse.move(x0 + dx * k * 17, y0 + dy * k * 17);
         await page.mouse.up();
       } else if (st === 'gauge') {
-        const hold = await page.evaluate(() => document.querySelector('.l-tap').textContent.includes('🔥'));
+        const hold = await page.evaluate(() => !!document.querySelector('.l-tap img.emo[data-icon="fire"]'));
         const box = await (await page.$('.l-tap')).boundingBox();
         const zone = await page.evaluate(() => { const b = document.querySelector('.l-gauge b'); return [parseFloat(b.style.left), parseFloat(b.style.left) + parseFloat(b.style.width)]; });
         if (hold) { await page.mouse.move(box.x + 20, box.y + 20); await page.mouse.down(); }
@@ -281,7 +281,7 @@ try {
   if (await page.evaluate((p0) => Math.hypot(TG._village.ger.me.x - p0.x, TG._village.ger.me.y - p0.y) < 8, p0)) errors.push('ger interior: tapping the floor did not walk there');
   await page.evaluate(() => { const m = TG._village.ger.me; m.x = m.tx = 160; m.y = m.ty = 160; }); await sleep(250);
   await page.keyboard.press('KeyE'); await sleep(300);
-  if (!(await page.evaluate(() => /🍵/.test(document.querySelector('.ger-scene .scene-info').textContent)))) errors.push('ger interior: pressing E at the stove did not make tea');
+  if (!(await page.evaluate(() => !!document.querySelector('.ger-scene .scene-info img.emo[data-icon="tea"]')))) errors.push('ger interior: pressing E at the stove did not make tea');
   await page.keyboard.down('Space'); await sleep(150); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => TG._village.ger.me.z > 0))) errors.push('ger interior: Space did not jump');
   await page.evaluate(() => { const m = TG._village.ger.me; m.x = m.tx = 244; m.y = m.ty = 178; }); await sleep(250);

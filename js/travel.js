@@ -190,6 +190,7 @@
   /** opts.view: 'fp' (first person, 3D) or '2d'. Without it, the view the child picked last time. */
   function open(id, opts = {}) {
     const a = TG.aimags.byId(id), p = S.active(); if (!a || !TG.passport.J[id]) return;
+    if (TG.aimagPass && TG.aimagPass.locked(p, id)) return TG.aimagPass.show(id, () => open(id, opts));
     const map = build(id), terrain = paint(map), v = p.village || {};
     p.travel = p.travel || {}; const seen = (p.travel[id] = p.travel[id] || []);
     const stamped = () => !!(p.passport && p.passport.stamps && p.passport.stamps[id]);

@@ -216,7 +216,7 @@
         h('div', { class: 'ach-grid' }, list.map((a) => {
           const on = !!got[a.id], pr = !on && AC.progress(a, p);
           return h('div', { class: 'ach' + (on ? ' on' : ''), title: tx(a.desc) },
-            h('span', { class: 'ach-i' }, on ? a.icon : '🔒'), h('b', null, tx(a.name)), h('small', null, tx(a.desc)),
+            h('span', { class: 'ach-i' }, AC.badge(a)), h('b', null, tx(a.name)), h('small', null, tx(a.desc)),
             on ? h('small', { class: 'ach-date' }, '✓ ', fmtDay(got[a.id])) : pr ? h('div', { class: 'meter' }, h('span', { style: { width: Math.min(100, (pr[0] / pr[1]) * 100) + '%' } })) : null);
         })));
     });
@@ -240,7 +240,7 @@
     const withTxt = (w) => !w ? '' : [w.family ? L(`гэр бүлтэйгээ ${w.family}`, `with family ${w.family}×`) : '', w.friends ? L(`найзуудтайгаа ${w.friends}`, `with friends ${w.friends}×`) : '', w.solo ? L(`ганцаараа ${w.solo}`, `alone ${w.solo}×`) : ''].filter(Boolean).join(', ');
     const logLine = (x) => {
       if (x.k === 'lesson') { const l = TG.learn.byId(x.id); return ['📚', L(`“${l ? tx(l.title) : x.id}” хичээлийг дуусгасан`, `Finished “${l ? tx(l.title) : x.id}”`)]; }
-      if (x.k === 'ach') { const a = TG.achievements.byId(x.id); return ['🏅', L('Амжилт: ', 'Badge: ') + (a ? `${a.icon} ${tx(a.name)}` : x.id)]; }
+      if (x.k === 'ach') { const a = TG.achievements.byId(x.id); return ['🏅', L('Амжилт: ', 'Badge: ') + (a ? tx(a.name) : x.id)]; }
       if (x.k === 'race') return ['🐎', L(`Морин уралдаанд ${x.id}-р байр`, `Horse race: place ${x.id}`)];
       if (x.k === 'together') { const [what, mode, who] = x.id.split('|'); const l = TG.learn.byId(what); return [mode === 'family' ? '👨‍👩‍👧' : '🤝', `${l ? tx(l.title) : L('Асуулт хариулт', 'Quiz')} · ${who}`]; }
       return ['•', x.k];
@@ -248,7 +248,7 @@
     return h('section', { class: 'card' },
       h('h3', null, '🏅 ', L('Амжилт ба сурсан зүйлс', 'Achievements & what they learned')),
       h('p', { class: 'muted' }, L(`${child.name} ${got.length}/${TG.achievements.LIST.length} амжилт авсан.`, `${child.name} has ${got.length}/${TG.achievements.LIST.length} badges.`)),
-      got.length ? h('div', { class: 'ach-earned' }, got.map(([id, ts]) => { const a = TG.achievements.byId(id); return a ? h('span', { class: 'ach-chip', title: tx(a.desc) }, a.icon, ' ', tx(a.name), h('small', null, fmtDay(ts))) : null; })) : h('p', { class: 'muted' }, L('Одоохондоо амжилт алга.', 'No badges yet.')),
+      got.length ? h('div', { class: 'ach-earned' }, got.map(([id, ts]) => { const a = TG.achievements.byId(id); return a ? h('span', { class: 'ach-chip', title: tx(a.desc) }, TG.achievements.badge(a, 'chip'), ' ', tx(a.name), h('small', null, fmtDay(ts))) : null; })) : h('p', { class: 'muted' }, L('Одоохондоо амжилт алга.', 'No badges yet.')),
       h('h4', null, L('Сурсан зүйлс', 'What they learned')),
       done.length ? done.map((l) => h('div', { class: 'learned' }, h('b', null, l.icon, ' ', tx(l.title)), withTxt(learn[l.id].with) ? h('small', null, ' · ', withTxt(learn[l.id].with)) : null,
         h('ul', null, (l.learned || []).map((t) => h('li', null, tx(t)))))) : h('p', { class: 'muted' }, L('Хичээл дуусгаагүй байна.', 'No lessons finished yet.')),

@@ -27,6 +27,7 @@
   function goal(r, text, done, progress) {
     check(r);
     TG.dialog.close();
+    TG._village.nomin('out'); // she leaves you to it instead of tagging along
     const label = h('span'), skip = h('button', { class: 'tut-skip' }, L('Алгасах', 'Skip'));
     const el = h('div', { class: 'tut-goal', role: 'status' }, h('b', null, '🎯'), label, skip);
     document.body.appendChild(el); run.goalEl = el;
@@ -49,8 +50,8 @@
     const name = (S.active() || {}).name || '';
     // when she points at a button in the lower half of the screen, her box moves to the top so you can see it
     const lowGlow = () => { const el = run && run.glowEl; return !!el && el.getBoundingClientRect().top > innerHeight * 0.5; };
-    const say = (face, mn, en, opts = {}) => { check(r); glow(opts.glow || null); return TG.dialog.say({ who: opts.who || 'guide', face, text: T(mn, en), top: lowGlow(), free: true }).then(() => check(r)); };
-    const ask = (face, mn, en, choices) => { check(r); glow(null); return TG.dialog.ask({ who: 'guide', face, text: T(mn, en), choices }).then((i) => { check(r); return i; }); };
+    const say = (face, mn, en, opts = {}) => { check(r); TG._village.nomin('in'); glow(opts.glow || null); return TG.dialog.say({ who: opts.who || 'guide', face, text: T(mn, en), top: lowGlow(), free: true }).then(() => check(r)); };
+    const ask = (face, mn, en, choices) => { check(r); TG._village.nomin('in'); glow(null); return TG.dialog.ask({ who: 'guide', face, text: T(mn, en), choices }).then((i) => { check(r); return i; }); };
 
     if (replay) {
       const pick = await ask('happy', `Дахиад уулзлаа, ${name}! Юу сонсмоор байна?`, `Hi again, ${name}! What would you like to hear about?`,
@@ -174,7 +175,7 @@
     const r = Math.random();
     run = { id: r, goalEl: null, glowEl: null, timer: 0 };
     lv.keys.clear(); lv.me.path = [];
-    TG._village.tut({ guide: { x: lv.me.px - 1.15, y: lv.me.py + 0.15, dir: 2, moving: false }, target: null });
+    TG._village.tut({ guide: null, target: null }); // she pops in with her first line
     lesson(r, !!replay).catch((e) => { if (!(e instanceof Stopped)) { console.warn('tutorial', e); stop(); } });
   }
   function stop() {
@@ -182,7 +183,67 @@
     const r = run; run = null;
     clearInterval(r.timer); if (r.goalEl) r.goalEl.remove(); if (r.glowEl) r.glowEl.classList.remove('tut-glow');
     TG.dialog && TG.dialog.close();
-    if (TG._village && TG._village.live()) TG._village.tut(null);
+    const lv = TG._village && TG._village.live();
+    if (lv) { TG._village.nomin('out'); if (lv.tut) lv.tut.target = null; }
+    drop.next = Date.now() + 25000; // no drop-in visit right after a lesson
   }
-  TG.tutorial = { start, stop, LOOK, active: () => !!run };
+
+  // ---------------------------------------------------------------- Nomin drops by: a quest to claim, new quests, someone with a task, now and then a tip
+  const TIPS = [
+    T('Ядарвал 🍖 дээр дарж хоол идээрэй. Хүч чинь буцаад дүүрнэ!', 'Tired? Tap 🍖 and eat something. Your energy fills right back up!'),
+    T('Эмээгийн гэрт ёсоор зочилбол тэр чамд ааруул өгнө шүү.', 'Visit Grandma’s ger with good manners and she’ll give you aaruul.'),
+    T('Морины уяанаас морь аваад Нутгаар давхиж үзээрэй!', 'Take a horse from the hitching line and gallop around Nutag!'),
+    T('Басараас юу ч асууж болно. Тэр маш их юм мэднэ.', 'You can ask Basar anything. He knows so much.'),
+    T('Нүдэн товч дарвал Нутгаа 3D-ээр өөрийн нүдээр харна!', 'Tap the eye button to see Nutag in 3D, through your own eyes!'),
+    T('Аймгийн паспортоор аялж, аймаг бүрээс тамга цуглуулаарай.', 'Travel with your aimag passport and collect a stamp from every province.'),
+    T('Загас барих гэж байвал усан онгоцны зогсоол руу оч.', 'Want to fish? Head to the dock by the lake.'),
+    T('Наадмын талбайд Засуултай уулзаад бөх барилдаарай!', 'Talk to the herald at the Naadam field and wrestle!'),
+  ];
+  const drop = { next: Date.now() + 20000, tipAt: 0, busy: false, said: {} };
+  const quiet = () => {
+    const lv = live(), v = V();
+    return lv && v && v.tutorial && !run && !drop.busy && !lv.race && !lv.battle && !lv.fpOpen && !lv.match && !(TG.fp && TG.fp.active()) && !(TG.scene && TG.scene.active())
+      && !(TG.dialog && TG.dialog.active()) && !document.querySelector('.modal-back') && document.visibilityState === 'visible';
+  };
+  async function dropBy(face, text, opts = {}) {
+    drop.busy = true;
+    const lit = opts.glow && document.querySelector(opts.glow);
+    try {
+      TG._village.nomin('in');
+      if (opts.target) TG._village.tut(Object.assign(live().tut || {}, { target: opts.target }));
+      if (lit) lit.classList.add('tut-glow');
+      await TG.dialog.say({ who: 'guide', face, text, free: true, auto: 5200 });
+    } catch (e) { /* the village closed */ }
+    TG.dialog.close();
+    if (lit) setTimeout(() => lit.classList.remove('tut-glow'), 4000);
+    if (TG._village.live()) TG._village.nomin('out');
+    if (opts.target) setTimeout(() => { const lv = live(); if (lv && lv.tut && lv.tut.target === opts.target) lv.tut.target = null; }, 20000);
+    drop.busy = false;
+  }
+  setInterval(() => {
+    if (!quiet()) return;
+    const now = Date.now(); if (now < drop.next) return;
+    if (!drop.tipAt) drop.tipAt = now + 4 * 60000;
+    const qs = TG._village.questsState(), name = (k) => TG.tx(qs.defs[k].t);
+    const ready = qs.list.find((q) => !q.done && q.p >= qs.defs[q.k].n && !drop.said['ready:' + qs.day + q.k]);
+    if (ready) {
+      drop.said['ready:' + qs.day + ready.k] = 1; drop.next = now + 40000;
+      return dropBy('laugh', T(`Ура! “${name(ready.k)}” биеллээ! Даалгаврын товчийг дараад шагналаа аваарай.`, `Yay! You did “${name(ready.k)}”! Tap the quests button to claim your reward.`), { glow: '.v-round[aria-label="quests"]' });
+    }
+    if (qs.seen !== qs.day && !drop.said['new:' + qs.day]) {
+      drop.said['new:' + qs.day] = 1; drop.next = now + 60000;
+      return dropBy('wink', T(`Өнөөдөр шинэ даалгаврууд гарлаа! Жишээ нь: “${name(qs.list[0].k)}”. Даалгаврын товчоор хараарай.`, `New quests today! Like “${name(qs.list[0].k)}”. Check them with the quests button.`), { glow: '.v-round[aria-label="quests"]' });
+    }
+    const npc = TG._village.npcs().find((n) => n.mark === '!' && !drop.said['npc:' + n.id]);
+    if (npc) {
+      drop.said['npc:' + npc.id] = 1; drop.next = now + 90000;
+      return dropBy('think', T(`${npc.name.mn} чамд даалгавартай байна. Шар сум замыг заана!`, `${npc.name.en} has a task for you. The yellow arrow shows the way!`), { target: { x: npc.x, y: npc.y, label: TG.tx(npc.name) } });
+    }
+    if (now > drop.tipAt) {
+      drop.tipAt = now + (6 + Math.random() * 4) * 60000; drop.next = now + 60000;
+      return dropBy(TG.pick(['happy', 'wink', 'tease', 'proud']), TG.pick(TIPS));
+    }
+  }, 3000);
+
+  TG.tutorial = { start, stop, LOOK, active: () => !!run, dropBy: (face, mn, en) => dropBy(face, T(mn, en)) };
 })(window.TG);
