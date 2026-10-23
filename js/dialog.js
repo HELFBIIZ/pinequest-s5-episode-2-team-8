@@ -274,7 +274,7 @@
     } else { row(32, 21, 26, GP.lipD); row(33, 22, 25, GP.lip); P(23, 33, GP.lipL); }
     fcache.set(key, c); return c;
   }
-  TG.guideFace = guideFace;
+  TG.guideFace = guideFace; TG.guidePalette = GP;
 
   // ---------------------------------------------------------------- the dialogue box
   // SPEAKERS: id → { name: {mn,en} | fn, voice, art: [w, h], portrait(expr, open, blink, t) → canvas, bob: bounce while talking }
@@ -346,7 +346,7 @@
   function swallowUp(e) { if (cur && !free() && !document.querySelector('.modal-back') && [...ADV, ...UP, ...DOWN].includes(e.code)) { e.preventDefault(); e.stopPropagation(); } }
 
   function speakerName(sp, line) { const n = line.name || sp.name; return typeof n === 'function' ? n() : TG.tx(n); }
-  /** Show one line. line: { who, face, text, choices?: [text…], name?, top?: show the box at the top }. Resolves on tap/key (or with the chosen index). */
+  /** Show one line. line: { who, face, text, choices?: [text…], name?, top?: show the box at the top, free?: keep walking, auto?: ms until it moves on by itself }. Resolves on tap/key (or with the chosen index). */
   function show(line) {
     const c = build(), sp = SPEAKERS[line.who] || SPEAKERS.guide;
     c.line = line; c.sp = sp; c.spId = line.who; c.lastDraw = '';
@@ -362,6 +362,7 @@
       c.typing.done.then(() => {
         if (!cur || cur.line !== line) return;
         cur.mouth = false; cur.root.classList.add('ready');
+        if (line.auto && !line.choices) setTimeout(() => { if (cur && cur.line === line && cur.waiting) press(); }, line.auto); // a passing remark goes away by itself
         if (!line.choices) return;
         cur.opts = line.choices.map((q) => TG.tx(q)); cur.sel = 0; cur.root.classList.add('asking');
         cur.choices.replaceChildren(...cur.opts.map((t, i) => h('button', { class: 'dlg-opt', role: 'option', onpointerdown: (e) => { e.stopPropagation(); }, onclick: (e) => { e.stopPropagation(); choose(i); }, onpointerenter: () => { if (cur) { cur.sel = i; highlight(); } } }, h('span', { class: 'dlg-heart', 'aria-hidden': 'true' }, '♥'), t)));

@@ -126,11 +126,12 @@
     return shell([
       h('section', { class: 'pp-hero px-card' }, h('div', { class: 'pp-cover' }, '🇲🇳', h('b', null, L('Аймгийн паспорт', 'Aimag Passport')), h('small', null, p.name)),
         h('div', null, h('h1', null, `${n} / ${ORDER.length}`), h('p', null, L('Улаанбаатараас эхлээд Монголын 21 аймгаар аялаарай. Аймаг бүрийн байгаль, алдартай газрууд, түүхтэй танилцаад тамга авбал дараагийн аймаг нээгдэнэ.', 'Start in Ulaanbaatar and travel through all 21 provinces. Discover each one’s nature, landmarks and history, earn its stamp and the next one opens.')),
-          nx ? h('button', { class: 'btn primary', onclick: () => TG.go('aimag', { id: nx }) }, '🧭 ', L('Дараагийн аялал: ', 'Next trip: '), tx(TG.aimags.byId(nx).name)) : h('p', null, '🏆 ', L('Та Монголоор бүрэн аялсан!', 'You have travelled all of Mongolia!')))),
+          nx ? h('button', { class: 'btn primary', onclick: () => TG.aimagPass.guard(nx, () => TG.go('aimag', { id: nx })) }, '🧭 ', L('Дараагийн аялал: ', 'Next trip: '), tx(TG.aimags.byId(nx).name)) : h('p', null, '🏆 ', L('Та Монголоор бүрэн аялсан!', 'You have travelled all of Mongolia!')))),
       h('div', { class: 'pp-grid' }, ORDER.map((id, i) => {
-        const a = TG.aimags.byId(id), got = ps.stamps[id], open = unlocked(p, id), home = p.aimag === id;
-        return h('button', { class: 'pp-slot' + (got ? ' got' : '') + (open && !got ? ' next' : '') + (open ? '' : ' locked'), disabled: !open, onclick: () => TG.go('aimag', { id }) },
-          h('span', { class: 'pp-num' }, i + 1), got ? h('span', { class: 'pp-stamp' }, a.icon) : h('span', { class: 'pp-icon' }, open ? a.icon : '🔒'),
+        const a = TG.aimags.byId(id), got = ps.stamps[id], open = unlocked(p, id), home = p.aimag === id, paid = !TG.aimagPass.locked(p, id);
+        return h('button', { class: 'pp-slot' + (got ? ' got' : '') + (open && !got ? ' next' : '') + (open ? '' : ' locked') + (paid ? '' : ' pass'), disabled: !open, onclick: () => TG.aimagPass.guard(id, () => TG.go('aimag', { id })) },
+          h('span', { class: 'pp-num' }, i + 1), got ? h('span', { class: 'pp-stamp' }, a.icon) : h('span', { class: 'pp-icon' }, a.icon),
+          !paid && i === TG.aimagPass.FREE ? h('span', { class: 'pp-price' }, TG.aimagPass.price()) : null,
           h('b', null, tx(a.name)), got ? h('small', null, TG.fmtDate(got)) : open ? h('small', null, L('Аялах →', 'Visit →')) : null, home ? h('span', { class: 'pp-home' }, L('Миний нутаг', 'Home')) : null);
       })),
     ]);
@@ -140,6 +141,7 @@
   function visit({ id, shell }) {
     const p = S.active(), a = TG.aimags.byId(id), j = J[id];
     if (!a || !j || !unlocked(p, id)) return screen({ shell });
+    if (TG.aimagPass.locked(p, id)) { setTimeout(() => TG.aimagPass.show(id), 60); return screen({ shell }); } // past the free provinces: Nomin and the travel pass
     const got = pass(p).stamps[id], i = ORDER.indexOf(id);
     const eth = TG.ethnic ? TG.ethnic.ETHNIC.filter((e) => e.aimags[0] === id || (e.aimags.includes(id) && e.id !== 'khalkh')) : [];
     const seen = ((p.travel || {})[id] || []).length, stampedAt = pass(p).stamps[id];

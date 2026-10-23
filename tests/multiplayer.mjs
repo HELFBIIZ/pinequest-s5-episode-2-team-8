@@ -76,7 +76,7 @@ try {
 
   await a.evaluate(() => TG._village.buyLot(2, 'red', 'gold'));
   await until(() => b.evaluate(() => { const l = TG._village.lots()[2]; return l && l.n === 'Бат' && l.roof === 'red'; }), 'B sees A\'s new ger');
-  if ((await a.evaluate(() => TG.store.active().village.coins)) !== 400) throw new Error('buying a ger did not cost 200 coins');
+  if ((await a.evaluate(() => TG.store.active().village.coins)) !== 550) throw new Error('buying a ger did not cost 50 coins');
   await b.evaluate(() => TG._village.buyLot(2, 'blue', 'red'));
   await sleep(400);
   if ((await b.evaluate(() => TG._village.lots()[2].n)) !== 'Бат') throw new Error('a taken lot was overwritten');
