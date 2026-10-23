@@ -445,7 +445,7 @@
     net.connect(); hud(); updateCtx();
     live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
     live.raf = requestAnimationFrame(frame);
-    if (!v.tutorial && TG.tutorial) setTimeout(() => live && live.root === root && TG.tutorial.start(false), 350); // first visit: the guide walks you through the game
+    if (!v.tutorial && !v.tutorialSeen && TG.tutorial) setTimeout(() => live && live.root === root && TG.tutorial.start(false), 350); // first visit: the guide walks you through the game
     else if (!v.tips) tips();
     setCleanup(stop);
   }
