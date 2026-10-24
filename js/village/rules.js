@@ -159,5 +159,34 @@
     return out;
   }
 
-  return { VERSION, W, H, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, DAIRY_ANIMALS, DAIRY, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, level, cleanLook, now };
+  // ---- building a ger by hand: the order, the parts each step uses, and where the parts come from
+  const GER_STEPS = ['shal', 'khana', 'khaalga', 'toono', 'uni', 'esgii', 'buurees', 'buslvvr', 'tulga']; // floor, walls, door, crown, roof poles, felt, cover, ropes, stove
+  const GER_DONE = GER_STEPS.length;
+  const GER_NEEDS = { shal: {}, khana: { khana: 5 }, khaalga: { khaalga: 1 }, toono: { toono: 1, bagana: 2 }, uni: { uni: 9 }, esgii: { esgii: 2 }, buurees: { buurees: 1 }, buslvvr: { buslvvr: 3 }, tulga: {} };
+  /** Can this step be done now? stage = how many steps are already done. */
+  function gerTry(stage, step, parts) {
+    if (stage >= GER_DONE) return { ok: false, why: 'done' };
+    if (GER_STEPS[stage] !== step) return { ok: false, why: 'order', next: GER_STEPS[stage] };
+    const missing = {};
+    for (const [k, n] of Object.entries(GER_NEEDS[step])) if ((parts[k] || 0) < n) missing[k] = n - (parts[k] || 0);
+    return Object.keys(missing).length ? { ok: false, why: 'parts', missing } : { ok: true };
+  }
+  function gerUse(parts, step) { const out = { ...parts }; for (const [k, n] of Object.entries(GER_NEEDS[step])) out[k] = (out[k] || 0) - n; return out; }
+  // Grandpa Craftsman makes the wooden parts; he takes wool and dairy foods, or coins
+  const TRADES = [
+    { id: 'khana', gives: { khana: 5 }, goods: { wool: 2, aaruul: 2 }, coins: 30 },
+    { id: 'khaalga', gives: { khaalga: 1 }, goods: { urum: 1 }, coins: 10 },
+    { id: 'toono', gives: { toono: 1, bagana: 2, buslvvr: 3 }, goods: { wool: 2, aaruul: 1 }, coins: 25 },
+    { id: 'uni', gives: { uni: 9 }, goods: { wool: 2 }, coins: 15 },
+  ];
+  const COVER_PRICE = 20;
+  function tradeCost(id, pay) { const t = TRADES.find((x) => x.id === id); return !t ? null : pay === 'coins' ? { coins: t.coins } : { ...t.goods }; }
+  const SHEAR_WOOL = 2, SHEAR_REGROW_MS = 45000, FELT_WOOL = 4;
+  /** How far a lot's ger is built; gers saved before hands-on building have no stage and count as finished. */
+  function lotStage(lot) { if (!lot) return 0; const s = lot.stage; return Number.isInteger(s) && s >= 1 && s <= GER_DONE ? s : GER_DONE; }
+  /** Roof poles go in all around the crown to keep it level: three in a row on one side tilts it. sides: 0 east, 1 south, 2 west, 3 north. */
+  function unisTilt(sides) { const n = sides.length; return n >= 3 && sides[n - 1] === sides[n - 2] && sides[n - 2] === sides[n - 3]; }
+
+  return { GER_STEPS, GER_DONE, GER_NEEDS, gerTry, gerUse, TRADES, COVER_PRICE, tradeCost, SHEAR_WOOL, SHEAR_REGROW_MS, FELT_WOOL, lotStage, unisTilt,
+    VERSION, W, H, LOTS, GER_PRICE, GER_LEVEL, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, DAIRY_ANIMALS, DAIRY, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, level, cleanLook, now };
 });
