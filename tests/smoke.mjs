@@ -174,6 +174,12 @@ try {
   for (const btn of ['bag', 'talk', 'quests']) { await page.evaluate((b) => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector(`.v-round[aria-label="${b}"]`).click(); }, btn); await sleep(300); await check(`village ${btn} panel`, '.modal'); }
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); document.querySelector('.v-pills .v-pill').click(); }); await sleep(250); await check('village shop', '.v-shop');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.arena(); }); await sleep(300); await check('village wrestling panel', '.v-wr-head');
+  if ((await page.evaluate(() => document.querySelectorAll('.v-wr-mode').length)) !== 2) errors.push('wrestling: the arena should offer two ways to wrestle');
+  // wrestling school: page through to the end, then a practice bout that explains the chosen move
+  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.school(); }); await sleep(300); await check('wrestling school', '.v-school .v-school-say');
+  for (let i = 0; i < 12 && !(await page.evaluate(() => /🤼/.test(document.querySelector('.v-school').textContent))); i++) { await page.evaluate(() => [...document.querySelectorAll('.v-school .btn.primary')].pop().click()); await sleep(80); }
+  if (!(await page.evaluate(() => document.querySelectorAll('.v-school .v-row').length === 0 && /🤼/.test(document.querySelector('.v-school').textContent)))) errors.push('wrestling school: did not reach the practice page');
+  await page.evaluate(() => [...document.querySelectorAll('.v-school .btn.primary')].pop().click()); await sleep(400); await check('practice bout', '.v-wrestle .v-wr-coach');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.tournament(1); }); await sleep(400); await check('village wrestling match', '.v-wrestle canvas');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   step = 'ger locked before the lesson';
@@ -550,15 +556,6 @@ try {
   const traced = await page.evaluate(() => { const c = TG.bichig._cur, { W, H, lay, item } = c, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d'); TG.bichig.drawGlyph(x, item.g, lay, W, H, '#000'); const d = x.getImageData(0, 0, W, H).data, st = []; for (let y = 0; y < H; y += 5) for (let X = 0; X < W; X += 5) if (d[(y * W + X) * 4 + 3] > 100) st.push([{ x: X, y }]); c.setStrokes(st); c.check(); return (TG.store.active().bichig || { s: {} }).s.a || 0; });
   if (!traced) errors.push('academy: tracing the letter carefully did not earn a star');
   await check('academy after a good tracing', '.bc-tile.done');
-  // family tree: fill one branch -> one star
-  step = 'family tree';
-  await page.evaluate(() => TG.go('tree')); await sleep(300);
-  await check('family tree', '.tree .tree-node');
-  await page.evaluate(() => document.querySelectorAll('.tree-node')[10].click()); await sleep(250);
-  await page.evaluate(() => { document.querySelector('.form .input').value = 'Дорж'; [...document.querySelectorAll('.form .btn.primary')].pop().click(); }); await sleep(400);
-  if ((await page.evaluate(() => TG.familyTree.filled(TG.store.active()))) !== 1) errors.push('family tree: saving a branch did not count');
-  await check('a lit star on the tree', '.tree-node.on');
-
   for (const screen of ['memories', 'about']) {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');

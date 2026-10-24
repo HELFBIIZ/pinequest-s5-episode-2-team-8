@@ -127,6 +127,7 @@
       const left = [
         [T('Бөх яаж барилдах вэ?', 'How do I wrestle?'), async () => {
           await say('proud', 'Зүүн талд Наадмын талбай бий. Засуултай уулзаад барилд. Мэхээ сонгоод товч дарахад л болно.', 'The Naadam arena is to the east. Talk to the herald, pick a move and press the button. That’s all!');
+          await say('wink', 'Мэх мэдэхгүй бол «Барилдаж сурах»-ыг сонго. Бүгдийг нь энгийнээр тайлбарлаад, багштай дасгал хийлгэнэ.', 'Not sure about the moves? Choose “Learn to wrestle”. Everything is explained simply, then you practise with a coach.');
           await say('happy', 'Мэх бүр өөр: зарим нь цагаа тааруулах, зарим нь хурдан дарах, зарим нь дараад барих. Эхний даваанууд амархан шүү!', 'Each move is a little game: tap on time, tap fast, or hold and let go. The first rounds are easy!');
           await say('tease', 'Ялсан хойноо бүргэд шиг дэвэхээ мартуузай! 🦅', 'And when you win, don’t forget the eagle dance! 🦅');
         }],

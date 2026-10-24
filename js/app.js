@@ -6,7 +6,7 @@
   let cleanup = null, screen = 'village', params = {}, parentUntil = 0;
 
   // ---------------- navigation ----------------
-  const NAV_ORDER = ['village', 'learn', 'bichig', 'passport', 'aimag', 'tree', 'achievements', 'family', 'memories'];
+  const NAV_ORDER = ['village', 'learn', 'bichig', 'passport', 'aimag', 'achievements', 'family', 'memories'];
   const calm = () => S.state.settings.reduceMotion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   function transition(kind, update) {
     document.documentElement.dataset.vt = kind;
@@ -84,7 +84,6 @@
         item('🐕', L('Басартай ярилцах', 'Talk with Basar'), () => TG.basar.open()),
         item('🏅', L('Миний амжилтууд', 'My achievements'), () => TG.go('achievements')),
         item('🛂', L('Аймгийн паспорт', 'Aimag passport'), () => TG.go('passport')),
-        item('🌳', L('Миний ургийн мод (7 үе)', 'My family tree (7 generations)'), () => TG.go('tree')),
         item('🎨', L('Дүрээ өөрчлөх', 'Change my character'), () => TG.go('create')),
         item('🍃', L('Улирлын тухай', 'About the season'), () => TG.seasons.open()),
         item('🎙️', L('Гэр бүлийн дурсамж', 'Family memory book'), () => TG.go('memories')),
@@ -200,7 +199,6 @@
   SCREENS.village = () => TG.villageScreen({ setCleanup });
   SCREENS.learn = () => TG.learn.hub({ shell });
   SCREENS.lesson = (p) => TG.learn.lesson({ ...p, shell, setCleanup });
-  SCREENS.tree = () => TG.familyTree.screen({ shell, rerender: () => render() });
   SCREENS.passport = () => TG.passport.screen({ shell });
   SCREENS.bichig = () => TG.bichig.screen({ shell });
   SCREENS.aimag = (p) => TG.passport.visit({ ...p, shell });
