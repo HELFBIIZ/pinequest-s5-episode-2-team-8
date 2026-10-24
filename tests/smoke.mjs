@@ -151,6 +151,22 @@ try {
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
   if (!(await page.evaluate(() => !!TG._village.dog()))) errors.push('village: Basar the dog is not following the player');
+
+  step = 'phaser village';
+  const ph = await page.evaluate(() => { const v = TG._village.phaser && TG._village.phaser(); return v ? { ver: Phaser.VERSION, active: v.scene.sys.isActive(), cv: !!document.querySelector('.village canvas.v-canvas'), n: v.scene.children.list.reduce((s, c) => s + (c.list ? c.list.length : 1), 0) } : null; });
+  if (!ph || ph.ver !== '4.2.1' || !ph.active || !ph.cv || ph.n < 20) errors.push('village: Phaser 4.2.1 scene should be running and drawing the village, got ' + JSON.stringify(ph));
+  // rotate the phone: the engine canvas refits
+  await page.setViewport({ width: 844, height: 390 }); await sleep(400);
+  if (!(await page.evaluate(() => { const c = document.querySelector('.village canvas.v-canvas'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.width - innerWidth) < 2 && Math.abs(r.height - innerHeight) < 2; }))) errors.push('village: canvas should refit after rotating');
+  await page.setViewport({ width: 390, height: 844 }); await sleep(400);
+  // leave and come back five times: still exactly one engine
+  for (let i = 0; i < 5; i++) { await page.evaluate(() => TG.go('learn')); await sleep(150); await page.evaluate(() => TG.go('village')); await sleep(300); }
+  const games = await page.evaluate(() => document.querySelectorAll('.village canvas.v-canvas').length + ':' + (TG.villageView ? TG.villageView.count() : 'x'));
+  if (games !== '1:1') errors.push('village: exactly one Phaser canvas and one game after re-entering, got canvases:games ' + games);
+  // the player walks: the game loop runs inside the engine
+  const x0 = await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); const l = TG._village.live(); l.me.path = []; l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; TG._village.goTo({ x: 24, y: 13 }); return 17; }); await sleep(1500);
+  const walked = await page.evaluate(() => { const l = TG._village.live(); return { px: l.me.px, py: l.me.py, path: l.me.path.length, modal: !!document.querySelector('.modal-back'), dlg: TG.dialog.active() }; });
+  if (Math.abs(walked.px - x0) < 0.5) errors.push('village: the player should walk inside the Phaser loop, ' + JSON.stringify({ x0, ...walked }));
   // the dairy yard: let the calf suckle, milk the cow in rhythm, then make aaruul at the rack
   step = 'dairy yard';
   if (await page.evaluate(() => !!TG.store.active().village.garden)) errors.push('dairy yard: the old garden data was not removed');
