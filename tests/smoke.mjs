@@ -401,6 +401,8 @@ try {
   await page.evaluate(() => TG.seasons.open()); await sleep(250);
   await check('season explainer', '.season-modal .season-wheel .sw-i.on');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  const fx = await page.evaluate(() => { const v = TG._village.phaser(), f = v && v.fx && v.fx(); return f && { ...f, want: TG._village.live().season }; });
+  if (!fx || fx.season !== fx.want || fx.emitters < 1) errors.push('village: season particles should run on Phaser, got ' + JSON.stringify(fx));
   if (!(await page.evaluate(() => TG.store.active().village.quests.list.some((q) => q.season)))) errors.push('seasons: there is no season quest today');
   // townspeople: accept a task, do it, collect the reward
   step = 'townspeople quests';

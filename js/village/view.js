@@ -34,6 +34,13 @@
       this.water = put(this.world, this.add.graphics().setDepth(0.5));
       this.shadows = put(this.world, this.add.graphics().setDepth(0.6));
       this.uiG = put(this.ui, this.add.graphics().setDepth(0));
+      // the season and the evening: a tint and falling snow, leaves, petals or butterflies over the ground (under everyone),
+      // then a dark evening veil with warm lantern light over everything
+      this.tint = put(this.world, this.add.rectangle(0, 0, 1, 1, 0xffffff, 0).setOrigin(0, 0).setScrollFactor(0).setDepth(0.7));
+      this.veil = put(this.world, this.add.rectangle(0, 0, 1, 1, 0x121646, 0.38).setOrigin(0, 0).setScrollFactor(0).setDepth(90).setVisible(false));
+      this.glow = put(this.world, this.add.graphics().setDepth(91).setBlendMode(Phaser.BlendModes.ADD));
+      this.lanterns = WD.objects.filter((o) => o.kind === 'lantern');
+      this.sfx = { season: null, w: 0, emitter: null };
       this.waterTiles = [];
       for (let y = 0; y < WD.H; y++) for (let x = 0; x < WD.W; x++) if (WD.g[y][x] === 'w') this.waterTiles.push([x, y]);
       for (const type of ['pointerdown', 'pointermove', 'pointerup']) this.input.on(type, (p) => this.pointer(type.slice(7), p));
@@ -111,6 +118,7 @@
       cam.scrollX = Math.round(clamp(f.cam.x - vw / 2, 0, Math.max(0, WD.W * T - vw)) * zoom) / zoom;
       cam.scrollY = Math.round(clamp(f.cam.y - vh / 2, 0, Math.max(0, WD.H * T - vh)) * zoom) / zoom;
       this.drawWater(t, cam, vw, vh);
+      this.seasonFx(f.season, f.night, vw, vh);
       const snap = (v) => Math.round(v * zoom) / zoom;
       // ground shadows, under everyone
       const sg = this.shadows; sg.clear(); sg.fillStyle(0x1e140a, 0.25);
@@ -130,6 +138,41 @@
       for (const tg of f.tags) this.tag(tg, g);
       for (const d of f.texts) { const [x, y] = this.S(d.x, d.y); this.text(d.id, d.text, x, y, d.font === 'rubik' ? { px: Math.round(k * 5), font: 'Rubik, sans-serif', outline: null, color: d.color, alpha: d.alpha } : { s: d.size, color: d.color, alpha: d.alpha }); }
       for (const mk of f.marks) this.mark(mk, g, t);
+    }
+
+    /** One particle texture per season, its variants side by side as frames 0, 1, 2…, drawn pixel by pixel like the rest of the art. */
+    flakes(name, w, hh, paints) {
+      const key = 'fx:' + name;
+      if (!this.textures.exists(key)) {
+        const c = TG.pixel.mk(w * paints.length, hh); paints.forEach((p, i) => { c.x.save(); c.x.translate(i * w, 0); p(c.x); c.x.restore(); });
+        const tx = this.textures.addCanvas(key, c.c); paints.forEach((p, i) => tx.add(String(i), 0, i * w, 0, w, hh));
+      }
+      return { key, frame: paints.map((p, i) => String(i)) };
+    }
+    seasonFx(id, night, vw, vh) {
+      const fx = this.sfx, R = (x, X, Y, w, hh, col) => { x.fillStyle = col; x.fillRect(X, Y, w, hh); };
+      this.tint.setDisplaySize(vw + 2, vh + 2);
+      if (fx.season !== id || Math.abs(fx.w - vw) > 1) {
+        fx.season = id; fx.w = vw;
+        if (fx.emitter) fx.emitter.destroy();
+        // the tint, as before: a light frost, a warm autumn glow, a faint spring blush
+        this.tint.setBlendMode(id === 'autumn' ? Phaser.BlendModes.MULTIPLY : Phaser.BlendModes.NORMAL);
+        if (id === 'winter') this.tint.setFillStyle(0xebf2fa, 0.16); else if (id === 'autumn') this.tint.setFillStyle(0xffd59a, 1); else if (id === 'spring') this.tint.setFillStyle(0xffc8e6, 0.06); else this.tint.setFillStyle(0xffffff, 0);
+        const tex = id === 'winter' ? this.flakes('snow', 2, 1, [(x) => R(x, 0, 0, 1, 1, '#ffffff'), (x) => { R(x, 0, 0, 1, 1, '#ffffff'); R(x, 1, 0, 1, 1, '#dce8f5'); }])
+          : id === 'autumn' ? this.flakes('leaf', 2, 2, ['#e8752a', '#c9461e', '#f2b33d'].map((c, i) => (x) => { R(x, 0, 0, 2, 1, c); R(x, i % 2, 1, 1, 1, '#a8501c'); }))
+          : id === 'spring' ? this.flakes('petal', 2, 1, [(x) => R(x, 0, 0, 1, 1, '#ffb7d5'), (x) => { R(x, 0, 0, 1, 1, '#ffffff'); R(x, 1, 0, 1, 1, '#ff8fb1'); }])
+          : this.flakes('fly', 3, 1, ['#ffd34e', '#b49cff'].map((c) => (x) => { R(x, 0, 0, 1, 1, c); R(x, 1, 0, 1, 1, '#ffffff'); R(x, 2, 0, 1, 1, c); }));
+        const fall = id !== 'summer', sp = id === 'winter' ? { min: 14, max: 30 } : { min: 10, max: 19 };
+        fx.emitter = put(this.world, this.add.particles(0, 0, tex.key, fall
+          ? { frame: tex.frame, x: { min: -20, max: vw + 20 }, y: -6, speedY: sp, speedX: { min: -6, max: 6 }, lifespan: ((vh + 30) / sp.min) * 1000, frequency: (((vh + 30) / ((sp.min + sp.max) / 2)) * 1000) / (id === 'winter' ? 34 : 28), alpha: id === 'winter' ? 0.7 : 1, advance: 20000 }
+          : { frame: tex.frame, x: { min: 0, max: vw }, y: { min: 0, max: vh }, speedX: { min: -10, max: 10 }, speedY: { min: -6, max: 6 }, lifespan: 5000, frequency: 500, alpha: { start: 1, end: 0 }, advance: 5000 }));
+        fx.emitter.setScrollFactor(0).setDepth(0.8);
+      }
+      // evening: dark veil + stepped lantern glow
+      this.veil.setVisible(!!night).setDisplaySize(vw + 2, vh + 2);
+      const g = this.glow; g.clear(); if (!night) return;
+      const ring = (cx, cy, rx, ry, a) => { g.fillStyle(0xffc86e, a); for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy * dy) / ((ry + 0.5) * (ry + 0.5))))); g.fillRect(cx - hw, cy + dy, hw * 2 + 1, 1); } };
+      for (const o of this.lanterns) { const X = o.x * T + 8, Y = o.y * T - 6; ring(X, Y, 26, 20, 0.1); ring(X, Y, 15, 12, 0.14); ring(X, Y, 6, 5, 0.2); }
     }
 
     drawWater(t, cam, vw, vh) {
@@ -227,6 +270,7 @@
     const view = {
       game, scene, k: () => scene.m.k,
       /** The part of the map on screen, in art px. */
+      fx: () => ({ season: scene.sfx ? scene.sfx.season : null, emitters: scene.sfx && scene.sfx.emitter ? 1 : 0, night: !!(scene.veil && scene.veil.visible) }),
       viewport: () => { const c = scene.cameras && scene.cameras.main; return c ? { x: c.scrollX, y: c.scrollY, w: scene.m.devW / c.zoom, h: scene.m.devH / c.zoom } : { x: 0, y: 0, w: 0, h: 0 }; },
       destroy() { window.removeEventListener('resize', onResize); if (cur === view) cur = null; games--; game.destroy(false); },
     };

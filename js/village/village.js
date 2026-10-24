@@ -991,7 +991,7 @@
   function model(t) {
     if (!live) return null;
     const pn = performance.now(), v = V();
-    const F = { cam: { x: live.cam.x * T + 8, y: live.cam.y * T + 4 }, sprites: [], shadows: [], texts: [], tags: [], marks: [] };
+    const F = { cam: { x: live.cam.x * T + 8, y: live.cam.y * T + 4 }, season: live.season, night: TG.seasons.night(), sprites: [], shadows: [], texts: [], tags: [], marks: [] };
     const sprite = (id, img, x, y, depth, flip, alpha) => F.sprites.push({ id, img, x, y, depth, flip, alpha });
     const shadow = (id, x, y) => F.shadows.push({ id, x, y });
     const text = (id, str, x, y, size, color, alpha) => { if (str != null && str !== '') F.texts.push({ id, text: String(str), x, y, size, color, alpha }); }; // never draw "null" for a missing name
