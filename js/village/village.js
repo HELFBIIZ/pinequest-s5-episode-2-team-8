@@ -90,7 +90,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -2065,7 +2065,11 @@
       h('p', { class: 'hint' }, !next ? L('Та хамгийн дээд цол Аварга хүртсэн! 🏆', 'You hold the highest title, Avarga! 🏆')
         : next.id === 'avarga' ? L('Наадамд дахин түрүүлбэл Аварга цол хүртэнэ!', 'Win the Naadam once more to become an Avarga!')
           : L(`Наадамд ${next.need} давбал «${tx(next.name)}» цол хүртэнэ.`, `Win ${next.need} rounds at the Naadam to earn the "${tx(next.name)}" title.`)),
-      h('button', { class: 'btn primary big block', onclick: () => { close(); tournament(1); } }, L('Наадамд барилдах (9 даваа)', 'Wrestle in the Naadam (9 rounds)')),
+      h('div', { class: 'v-wr-modes' },
+        h('button', { class: 'v-wr-mode px-card', onclick: () => { close(); tournament(1); } }, wrestlerPic('push', RED, 40),
+          h('b', null, L('Чөлөөтэй барилдах', 'Wrestle freely')), h('small', null, L('Наадамд 9 даваа барилдаж цол аваарай', 'Wrestle 9 rounds at the Naadam and earn titles'))),
+        h('button', { class: 'v-wr-mode px-card', onclick: () => { close(); wrestleSchool(); } }, wrestlerPic('dance', BLUE, 40),
+          h('b', null, L('Барилдаж сурах', 'Learn to wrestle')), h('small', null, wr.school ? L('Мэх бүрийг энгийнээр дахин үзэх', 'Go over every move again, nice and simple') : L('Мэх бүрийг энгийнээр тайлбарлаад дасгал хийнэ', 'Every move explained simply, then a practice bout')))),
       h('button', { class: 'btn block', style: { marginTop: '8px' }, onclick: () => techBook() }, '📖 ', L(`Мэхний ном (${R.MOVES.length} мэх)`, `Technique book (${R.MOVES.length} moves)`)),
       live.online ? h('div', { style: { marginTop: '12px' } }, h('div', { class: 'label' }, L('Найзтайгаа барилдах', 'Wrestle a friend')),
         others.length ? h('div', { class: 'v-list' }, others.map((o) => h('div', { class: 'v-row' }, portrait(o.look, 28), h('div', { class: 'v-row-b' }, h('b', null, o.name), h('small', null, `${L('Түвшин', 'Level')} ${o.lvl}`)),
@@ -2080,6 +2084,47 @@
       h('div', { class: 'v-list' }, R.MOVES.map((m) => h('div', { class: 'v-row' }, h('span', { class: 'v-tech-n' }, used[m.id] || 0),
         h('div', { class: 'v-row-b' }, h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, tx(m.fact)), h('small', null, '✓ ', L('Давна', 'Beats'), ': ', m.beats.map((b2) => tx(R.MOVES.find((q) => q.id === b2).name)).join(', '))))))), { cls: 'v-modal' });
   }
+  // ---------------- wrestling school: the basics and every move, told as you'd tell a five-year-old, then a practice bout
+  const SKILL_KID = {
+    timing: { name: Tx('Цагаа тааруулах', 'Tap on time'), how: Tx('Жижиг зураас нааш цааш гүйнэ. Ногоон дээр ирэхэд нь дар, эрвээхэй барьж байгаа юм шиг!', 'A little line runs back and forth. Tap when it’s in the green, like catching a butterfly!') },
+    hold: { name: Tx('Дараад барих', 'Press and hold'), how: Tx('Товчоо дараад барь. Аяганд сүү хийх шиг зураас дүүрнэ. Шар дээр хүрэхэд нь тавь. Хэт удаан битгий бариарай!', 'Press the button and keep holding. The bar fills up like pouring milk into a cup. Let go when it reaches the yellow. Not too long!') },
+    combo: { name: Tx('Хөлийн хөдөлгөөн', 'Happy feet'), how: Tx('Сумнууд гарч ирнэ. Яг тэр дарааллаар нь хурдан дар. Хөлөөрөө бүжиглэж байгаа юм шиг!', 'Arrows pop up. Press them in the same order, quickly. It’s like a little dance with your feet!') },
+    mash: { name: Tx('Бүх хүчээрээ', 'Super strong'), how: Tx('Аль болох хурдан дар, дар, дар! Дарах бүрт чи улам хүчтэй болно.', 'Tap, tap, tap as fast as you can! Every tap makes you stronger.') },
+    balance: { name: Tx('Тэнцвэр', 'Stay steady'), how: Tx('Найз чинь чамайг нааш цааш түлхэнэ. ◀ ▶ дарж зүүгээ голд нь байлга. Гуалин дээгүүр алхаж байгаа юм шиг!', 'Your friend pushes you this way and that. Press ◀ ▶ to keep the needle in the middle, like walking along a log!') },
+  };
+  const SCHOOL = [
+    { pic: ['grip', 'grip'], title: Tx('Бөх гэж юу вэ?', 'What is wrestling?'), say: [Tx('Хоёр бөх бие биенээ барьж аваад түлхэлцэж, татацгаана.', 'Two wrestlers hold on to each other, then push and pull.'), Tx('Хэн нь түрүүлж унавал тэр нь ялагдана. Яг л тоглоом шиг!', 'Whoever falls down first loses. It’s just like a game!')] },
+    { pic: ['dance', 'fall'], title: Tx('Яаж ялах вэ?', 'How do you win?'), say: [Tx('Найзынхаа өвдөг, тохой, нуруу эсвэл толгойг газарт хүргэвэл чи ялна.', 'If your friend’s knee, elbow, back or head touches the ground, you win.'), Tx('Хөл, гар газарт хүрвэл зүгээр. Тэр унасанд тооцогдохгүй.', 'Feet and hands on the ground are okay. That doesn’t count as falling.')] },
+    { pic: ['idle', 'idle'], title: Tx('Бөхийн хувцас', 'Wrestler clothes'), say: [Tx('Зодог бол урд нь задгай, ханцуйтай жижигхэн цамц.', 'The zodog is a little jacket with long sleeves and an open front.'), Tx('Шуудаг бол богинохон өмд. Гутал нь хамар нь дээшээ эргэсэн том гутал.', 'The shuudag is tiny shorts, and the gutal are big boots with curly toes.')] },
+    { pic: ['dance', 'dance'], title: Tx('Бүргэдийн бүжиг', 'The eagle dance'), say: [Tx('Барилдахын өмнө бөхчүүд бүргэд шиг гараа дэвж бүжиглэнэ. Үүнийг “дэвээ” гэдэг.', 'Before wrestling, wrestlers flap their arms like a big eagle. This is called “devee”.'), Tx('Тоглоомд товч гэрэлтэх бүрт дар. Сайн бүжиглэвэл эхний мэх чинь илүү хүчтэй болно!', 'In the game, tap when the button glows. Dance well and your first move gets stronger!')] },
+    { pic: ['push', 'grip'], title: Tx('Мэх гэж юу вэ?', 'What is a move?'), say: [Tx('Мэх бол найзаа унагах арга. Хайч, чулуу, даавуу шиг: мэх бүр заримыг нь дийлж, заримд нь дийлдэнэ.', 'A move is a trick to make your friend fall. It’s like rock, paper, scissors: every move beats some moves and loses to others.'), Tx('Мэхний доор “>” тэмдгийн ард ямар мэхийг дийлдэг нь бичээстэй.', 'Under each move, after the “>” sign, you can see which moves it beats.'), Tx('Нэг мэхийг дахин дахин хийвэл найз чинь таачихна. Өөр өөр мэх хий!', 'If you use the same move again and again, your friend will guess it. Mix them up!')] },
+    ...Object.keys(SKILL_KID).map((skill) => ({ skill })),
+    { pic: ['grip', 'grip'], title: Tx('Одоо туршаад үзье!', 'Now let’s try it!'), say: [Tx('Багштайгаа дасгал барилдаан хийе. Багш зөөлөн барилдана, санаа зовох хэрэггүй.', 'Let’s have a practice bout with the coach. The coach goes easy, so don’t worry.'), Tx('Мэх сонгох бүрт тэр мэх юу хийдгийг, яаж хийхийг дахин сануулна.', 'Every time you pick a move, you’ll see what it does and how to do it.')], last: true },
+  ];
+  function wrestleSchool() {
+    let i = 0;
+    const box = h('div', { class: 'v-school' }), close = TG.modal(box, { cls: 'v-modal' });
+    const pair = ([a, b]) => { const opp = wrestlerPic(b, BLUE, 56); opp.style.transform = 'scaleX(-1)'; return h('div', { class: 'v-school-pic' }, wrestlerPic(a, RED, 56), opp); };
+    const draw = () => {
+      const pg = SCHOOL[i], sk = pg.skill && SKILL_KID[pg.skill];
+      rc(box,
+        h('div', { class: 'eyebrow' }, L('Бөхийн сургууль', 'Wrestling school'), ` · ${i + 1}/${SCHOOL.length}`),
+        sk ? h('div', { class: 'v-school-pic v-school-icon' }, SKILL_ICON[pg.skill]) : pair(pg.pic),
+        h('h2', null, tx(sk ? sk.name : pg.title)),
+        (sk ? [sk.how] : pg.say).map((t) => h('p', { class: 'v-school-say' }, tx(t))),
+        sk ? [h('div', { class: 'label' }, L('Ингэж хийдэг мэхүүд', 'Moves you do this way')),
+          h('div', { class: 'v-list' }, R.MOVES.filter((m) => (SKILL[m.id] || 'timing') === pg.skill).map((m) => h('div', { class: 'v-row' }, h('div', { class: 'v-row-b' }, h('b', null, tx(m.name)), h('small', null, tx(m.kid))))))] : null,
+        h('div', { class: 'v-school-dots' }, SCHOOL.map((_, k) => h('i', { class: k === i ? 'on' : k < i ? 'done' : '' }))),
+        h('div', { class: 'row-btns' },
+          i > 0 ? h('button', { class: 'btn', onclick: () => { i--; draw(); } }, '◀ ', L('Буцах', 'Back')) : h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')),
+          pg.last ? h('button', { class: 'btn primary', onclick: () => { close(); practiceBout(); } }, '🤼 ', L('Дасгал барилдаан', 'Practice bout'))
+            : h('button', { class: 'btn primary', onclick: () => { i++; TG.sfx.tap(); draw(); } }, L('Дараах', 'Next'), ' ▶')));
+      if (pg.last && !V().wr.school) { V().wr.school = 1; S.save(); }
+    };
+    draw();
+  }
+  // a practice bout: the slowest round, a gentle coach, the move explained as you pick it, and nothing to win or lose
+  function practiceBout() { wrestleMatch({ ai: true, practice: true, round: 1, opp: { name: L('Багш', 'Coach'), skill: 0.06, skin: R.SKINS[2] } }); }
   function tournament(round) {
     const opp = { name: WR_NAMES[(round * 5 + Math.floor(Math.random() * 4)) % WR_NAMES.length], skill: 0.12 + round * 0.07, skin: TG.pick(R.SKINS) };
     wrestleMatch({ ai: true, round, opp }, (won) => {
@@ -2109,10 +2154,11 @@
     // each даваа is harder: more points to win, a faster timing bar, a narrower sweet spot and a sharper opponent
     const rnd = cfg.ai ? cfg.round : 4, need = cfg.ai && cfg.round >= 7 ? 3 : 2;
     const young = ((S.active() || {}).age || 10) <= 9;   // little ones get a slower marker and wider targets
-    const barSpeed = (cfg.ai ? 2.1 + rnd * 0.2 : 3) * (young ? 0.85 : 1), sharp = Math.max(1, (cfg.ai ? 1 + rnd * 0.08 : 1.15) - (young ? 0.1 : 0));
+    const barSpeed = (cfg.ai ? 2.1 + rnd * 0.2 : 3) * (young ? 0.85 : 1) * (cfg.practice ? 0.8 : 1), sharp = Math.max(1, (cfg.ai ? 1 + rnd * 0.08 : 1.15) - (young ? 0.1 : 0));
     const grunt = (k, pitch) => TG.voice && TG.voice.grunt(k, pitch); // wrestlers grunt, huff and scuff the sand
     const cv = h('canvas', { class: 'v-wr-canvas', width: 192, height: 108 }), cx = cv.getContext('2d');
     const score = h('div', { class: 'v-wr-score' }), msg = h('div', { class: 'v-wr-msg' }, L('Мэхээ сонго!', 'Choose your move!'));
+    const coach = cfg.practice ? h('div', { class: 'teach v-wr-coach' }) : null;   // the school's coach explains as you go
     const moves = h('div', { class: 'v-wr-moves' }), marker = h('i', { class: 'v-wr-marker' });
     const goBtn = h('button', { class: 'btn primary big block' }, L('Хүч! (Space)', 'Power! (Space)'));
     const timing = h('div', { class: 'v-wr-timing hidden' }, h('div', { class: 'v-wr-bar' }, h('i', { class: 'v-wr-zone', style: { width: Math.round(36 / sharp) + '%', left: (50 - 18 / sharp) + '%' } }), marker), goBtn);
@@ -2129,12 +2175,15 @@
     const feathers = Array.from({ length: DEVEE_TAPS }, () => h('i', { class: 'v-wr-feather' }));
     const deveeBtn = h('button', { class: 'btn primary big', onclick: () => deveeTap() }, '🦅 ', L('Дэвэх (Space)', 'Flap (Space)'));
     const deveeBox = h('div', { class: 'v-wr-devee hidden' }, h('div', { class: 'v-wr-feathers' }, ...feathers), deveeBtn);
-    const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
-      h('div', { class: 'v-wr-title' }, h('h2', null, `${live.name} · ${cfg.opp.name}`), viewBtn), cv, herald, score, msg, deveeBox, moves, timing, skillBox, tail);
+    const body = h('div', { class: 'v-wrestle' }, h('div', { class: 'eyebrow' }, cfg.practice ? L('Бөхийн сургууль · Дасгал', 'Wrestling school · Practice') : cfg.ai ? `${L('Наадам', 'Naadam')} · ${L('Даваа', 'Round')} ${cfg.round}/9 · ${need} ${L('унагаалт', 'falls')} · ${'★'.repeat(Math.ceil(cfg.round / 3))}` : L('Найзтай барилдаан', 'Friendly match')),
+      h('div', { class: 'v-wr-title' }, h('h2', null, `${live.name} · ${cfg.opp.name}`), viewBtn), cv, herald, score, msg, coach, deveeBox, moves, timing, skillBox, tail);
     const drawScore = () => rc(score, h('span', { class: 'me' }, live.name, ' ', '●'.repeat(st.a) + '○'.repeat(Math.max(0, need - st.a))), h('span', { class: 'them' }, '●'.repeat(st.b) + '○'.repeat(Math.max(0, need - st.b)), ' ', cfg.opp.name));
     const moveLabel = (id) => tx(R.MOVES.find((m) => m.id === id).name);
     const setPhase = (p) => {
       st.phase = p;
+      if (coach && p === 'choose') rc(coach, h('b', null, '💡 ', L('Мэхээ сонго', 'Pick a move')), h('p', null, L('Дуртай мэхээ дар. “>” тэмдгийн ард тэр мэхний дийлдэг мэхүүд бий. Өөр өөр мэх туршаарай!', 'Tap any move you like. After the “>” are the moves it beats. Try a different one each time!')));
+      if (coach && p === 'devee') rc(coach, h('b', null, '💡 ', L('Бүргэд шиг бүжиглэ', 'Dance like an eagle')), h('p', null, L('Товч гэрэлтэх бүрт дар. Сайн бүжиглэвэл эхний мэх чинь хүчтэй болно!', 'Tap each time the button glows. A good dance makes your first move stronger!')));
+      if (coach && p === 'done') coach.remove();
       moves.classList.toggle('hidden', p !== 'choose'); timing.classList.toggle('hidden', p !== 'timing'); deveeBox.classList.toggle('hidden', p !== 'devee'); skillBox.classList.toggle('hidden', p !== 'skill');
       if (p === 'choose') rc(moves, ...R.MOVES.map((m) => h('button', { class: 'btn' + (m.id === st.lastPlayer ? ' v-wr-repeat' : ''), title: tx(m.fact), onclick: () => { st.move = m.id; startSkill(m.id); } },
         h('b', null, `${SKILL_ICON[SKILL[m.id] || 'timing']} ${tx(m.name)}`), h('small', null, '> ' + m.beats.map(moveLabel).join(', ')))));
@@ -2180,6 +2229,7 @@
     };
     function startSkill(id) {
       const type = SKILL[id] || 'timing'; st.t0 = performance.now();
+      if (coach) rc(coach, h('b', null, '💡 ', moveLabel(id)), h('p', null, tx(R.MOVES.find((m) => m.id === id).kid)), h('p', null, `${SKILL_ICON[type]} ${tx(SKILL_KID[type].how)}`));
       if (type === 'timing') { setPhase('timing'); msg.textContent = L('Ногоон хэсэгт хүрэхэд дар!', 'Press when the marker is in the green!'); return; }
       const sk = st.skill = { type, t0: performance.now(), el: {} };
       if (type === 'combo') { sk.seq = Array.from({ length: 3 + Math.min(2, Math.floor(rnd / 4)) }, () => Math.floor(Math.random() * 4)); sk.i = 0; sk.err = 0; sk.limit = Math.max(3400, 5600 - rnd * 180) * (young ? 1.2 : 1); }
@@ -2329,7 +2379,8 @@
         res.champion ? h('div', { class: 'v-zasuul' }, '🏆 ', L('Та Наадамд түрүүллээ!', 'You won the whole Naadam!')) : null,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => close() }, L('Хаах', 'Close')),
-          cfg.ai ? (won && cfg.round < 9 ? h('button', { class: 'btn primary', onclick: () => { close(); tournament(cfg.round + 1); } }, L('Дараагийн даваа', 'Next round'), ' ▶')
+          cfg.practice ? [h('button', { class: 'btn', onclick: () => { close(); practiceBout(); } }, '🔁 ', L('Дахиад', 'Again')), h('button', { class: 'btn primary', onclick: () => { close(); tournament(1); } }, L('Жинхэнэ барилдаан', 'Wrestle for real'), ' ▶')]
+          : cfg.ai ? (won && cfg.round < 9 ? h('button', { class: 'btn primary', onclick: () => { close(); tournament(cfg.round + 1); } }, L('Дараагийн даваа', 'Next round'), ' ▶')
             : h('button', { class: 'btn primary', onclick: () => { close(); tournament(1); } }, L('Шинэ Наадам', 'New Naadam'))) : null));
       if (cfg.remote && live) live.match = null;
     }

@@ -277,7 +277,6 @@
       h('div', { class: 'hub-row' },
         h('button', { class: 'hub-card px-card', onclick: () => TG.go('bichig') }, TG.bichig.pixelGlyph('ᠮᠣᠩᠭᠣᠯ', 18, 40, 2, '#5a2d10'), h('b', null, L('Монгол бичиг', 'Mongol script')), h('small', null, `✍️ ${TG.bichig.done(p)}/${TG.bichig.ALL.length}`)),
         h('button', { class: 'hub-card px-card', onclick: () => TG.go('passport') }, h('span', null, '🛂'), h('b', null, L('Аймгийн паспорт', 'Aimag passport')), h('small', null, L(`${TG.passport.stamps(p)}/22 тамга`, `${TG.passport.stamps(p)}/22 stamps`))),
-        h('button', { class: 'hub-card px-card', onclick: () => TG.go('tree') }, h('span', null, '🌳'), h('b', null, L('Ургийн мод', 'Family tree')), h('small', null, `⭐ ${TG.familyTree.filled(p)}/12`)),
         h('button', { class: 'hub-card px-card', onclick: () => TG.seasons.open() }, h('span', null, TG.seasons.current().icon), h('b', null, tx(TG.seasons.current().name)), h('small', null, L('Улирлын тухай', 'About the season')))),
       h('div', { class: 'l-grid' }, LESSONS.map(card)),
       h('section', { class: 'px-card l-quizcard' },

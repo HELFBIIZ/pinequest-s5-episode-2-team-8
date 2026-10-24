@@ -68,6 +68,23 @@
     M('suga', 'Сугадах', 'Sugadakh (armpit throw)', 'Өрсөлдөгчийн сугаар орж, мөрөн дээгүүрээ эргүүлэн хаядаг мэх.', 'Get in under their arm and turn them over your shoulder.'),
     M('tahim', 'Тахимдах', 'Takhimdakh (knee grab)', 'Өрсөлдөгчийн өвдөгний ар талаас шүүрэн татаж унагадаг мэх.', 'Grab behind their knee and pull them down.'),
   ];
+  // the same moves told simply, for the wrestling school (as you'd explain it to a five-year-old)
+  const KID = {
+    push: T('Мөрөөрөө хүнд хаалга түлхэж байгаа юм шиг түлхэнэ. Найз чинь ганхаад хойшоо унана!', 'Lean in and push with your shoulder, like pushing a big heavy door. Your friend wobbles and falls back!'),
+    pull: T('Зодгоос нь бариад тэрэг чирж байгаа юм шиг өөр лүүгээ татна. Тэр урагшаа өвдөг сөхөрнө!', 'Grab their jacket and pull them to you, like pulling a wagon. They tip forward onto their knees!'),
+    hook: T('Хөлөө түүний хөлийн гадуур дэгээ шиг ороогоод татна. Тэр бүдэрч унана!', 'Wrap your leg around the outside of theirs, like a hook. Pull, and they trip!'),
+    inhook: T('Хөлөө түүний хөлийн дотуур оруулж дэгээднэ. Тэр хөлөө алдаад хойшоо суучихна!', 'Slip your leg inside theirs and hook it. Their feet slide and they sit down backwards!'),
+    hip: T('Эргээд ташаагаа урд нь тавина. Толгод давж өнхрөх бөмбөг шиг ташаан дээгүүрээ өнхрүүлнэ.', 'Turn around and put your hip in front. Roll them over it, like a ball rolling over a little hill.'),
+    leg: T('Хурдан бөхийж нэг хөлийг нь шүүрнэ. Нэг хөл дээр зогсоход ганхдаг, тэгээд л унана!', 'Bend down fast and grab one leg. Standing on one leg is wobbly, so down they go!'),
+    lift: T('Баавгай шиг чанга тэврээд газраас өргөнө. Тэгээд нуруугаар нь зөөлөн газар тавина.', 'Give a big bear hug and lift them off the ground. Then set them down on their back.'),
+    havirah: T('Хөлөөрөө шүүр шиг шүүрдэж түүний хөлийг холдуулна. Хөлгүй бол зогсож чадахгүй!', 'Swish your foot like a broom and sweep their foot away. No foot, no standing!'),
+    humruh: T('Түүнийг урагш доош нь дарж, хувин хөмрөх шиг хөмрүүлнэ.', 'Push them down and forward so they tip right over, like tipping a bucket.'),
+    toigdoh: T('Хоёр гараараа сайн барьж, салхинд зогсох мод шиг хөдлөхгүй бай. Тэгээд эргүүлж унагана.', 'Hold on tight with both hands and stand still like a tree in the wind. Then turn them over.'),
+    hongodoh: T('Тэнцвэрээ хадгалж, түүний хөлийг доороос нь шүүрч авна. Жаахан жүдо шиг!', 'Keep your balance and scoop their leg out from under them. It’s a bit like judo!'),
+    suga: T('Гүүрэн доогуур орох шиг суган доогуур нь шургаад, мөрөн дээгүүрээ эргүүлнэ.', 'Duck under their arm, like going under a bridge, and roll them over your shoulder.'),
+    tahim: T('Өвдөгний ар талаас нь бариад татна. Өвдөг нугардаг болохоор сандал шиг эвхэгдээд унана!', 'Reach behind their knee and pull. Knees bend, so they fold down like a chair!'),
+  };
+  MOVES.forEach((m) => { m.kid = KID[m.id]; });
   const HALF = Math.floor((MOVES.length - 1) / 2); // each move beats the next half of the circle and loses to the half before it
   MOVES.forEach((m, i) => { m.beats = Array.from({ length: HALF }, (_, k) => MOVES[(i + k + 1) % MOVES.length].id); });
   const beats = (x, y) => { const m = MOVES.find((q) => q.id === x); return !!m && m.beats.includes(y); };
