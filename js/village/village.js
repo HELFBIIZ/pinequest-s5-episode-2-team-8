@@ -16,8 +16,10 @@
     const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, produce: {}, milkT: {}, fish: {},
       owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, rod: 1, room: 'NUTAG',
       quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
-      energy: 100, ate: {}, lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
+      energy: 100, ate: {}, lots: [], ger: { stage: 0, lot: -1, parts: {}, wool: 0, fluff: 0, mats: 0, mistakes: 0, perfect: false }, shorn: {}, wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
+    const oldGer = v.ger === undefined && v.gerBuilt; // a ger bought before gers were built by hand
     for (const k in d) if (v[k] === undefined) v[k] = d[k];
+    if (oldGer) { v.ger.stage = R.GER_DONE; v.ger.lot = (v.lots || []).findIndex((l) => l && l.by === v.id); }
     if (v.garden || v.seeds) { delete v.garden; delete v.seeds; delete v.can; delete v.water; for (const k of Object.keys(v.produce)) if (!R.DAIRY[k]) delete v.produce[k]; } // the garden became the dairy yard
     while (v.lots.length < R.LOTS) v.lots.push(null);
     return v;
@@ -90,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), reconnect: () => net.rejoin(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -221,6 +223,7 @@
         live.others.clear(); (m.players || []).forEach(addOther);
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
+        TG.gerwork.sync();
         if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Сервер хуучин хувилбартай байна. Барилдаан зөв ажиллахын тулд серверийг дахин асаагаарай (Ctrl+C, дараа нь node server.js).', '⚠️ The server is running an old version. Restart it (Ctrl+C, then node server.js) so wrestling works.')), 2500);
         break;
       case 'join': addOther(m.p); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
@@ -377,6 +380,7 @@
   const fmtLeft = (ms) => { const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}${L('с', 's')}`; };
 
   // ================================================================ screen
+  TG.gerwork.init({ V, live: () => live, net, reward, factCard, lotsArr, enterGer, colours: (i) => gerColours(i), save: () => S.save(), refresh: () => { if (live) { hud(); updateCtx(); } } });
   TG.villageScreen = ({ setCleanup }) => {
     quests();
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
@@ -438,7 +442,7 @@
     root.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }); // HUD buttons never keep focus
     live.miniBase = miniBase();
     els.mini.addEventListener('pointerdown', onMiniTap);
-    net.connect(); hud(); updateCtx();
+    net.connect(); hud(); updateCtx(); TG.gerwork.sync();
     live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
     // the Phaser engine runs the loop: it asks update() to move everything, then model() what to draw
     live.view = TG.villageView.mount(canvas, { tick: (dt) => live && update(dt), model, paused: () => !!((TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active())), pointer, mini: () => live && drawMini() });
@@ -518,7 +522,7 @@
       case 'rack': return ['dairy:aaruul', L('Ааруул хийх', 'Make aaruul')];
       case 'fish': return ['ui:fish', L('Загасчлах', 'Fish')];
       case 'sheep': return ['ui:heart', L('Илбэх', 'Pet')];
-      case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l ? L('Гэр авах', 'Buy ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
+      case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l || (l.by === V().id && R.lotStage(l) < R.GER_DONE) ? L('Гэр барих', 'Build a ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
       case 'zasuul': case 'arena': return ['ui:wrestle', L('Барилдах', 'Wrestle')];
       case 'ovoo': return ['ui:ovoo', L('Овоо тахих', 'Visit ovoo')];
       case 'uya': return ['ui:horse', L('Морь', 'Horses')];
@@ -1018,7 +1022,7 @@
     person('me', { ...live.me, look: v.look });
     const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
     shadow('dog', dg.x * T, dg.y * T + 1); sprite('dog', PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.y + 0.05, dg.flip);
-    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; sprite('lot:' + i, PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2, o.y + 2); text('lot:' + i, l.n, o.x * T + 24, o.y * T - 4, 1, l.by === v.id ? '#f7c646' : '#ffffff'); });
+    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; sprite('lot:' + i, PX.gerStage(R.lotStage(l), R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2, o.y + 2); text('lot:' + i, l.n, o.x * T + 24, o.y * T - 4, 1, l.by === v.id ? '#f7c646' : '#ffffff'); });
     // the dairy yard's animals: cows and goats shift about, mares stand by their foals on the зэл
     for (const o of WD.objects) {
       if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); shadow('obj:' + o.id, o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite('obj:' + o.id, img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, o.y + 0.2, turn); }
@@ -1824,9 +1828,10 @@
 
   // ================================================================ own ger (housing)
   function lotAction(i) {
-    const l = lotsArr()[i];
-    if (!l) return myLot() >= 0 ? TG.toast(L('Танд аль хэдийн гэр байна!', 'You already have a ger!')) : buyGer(i);
-    if (l.by === V().id) return enterGer(i);
+    const l = lotsArr()[i], v = V();
+    if (!l) return myLot() >= 0 && myLot() !== i ? TG.toast(L('Танд аль хэдийн гэр байна!', 'You already have a ger!')) : TG.gerwork.build(i);
+    if (l.by === v.id) return R.lotStage(l) < R.GER_DONE ? TG.gerwork.build(i) : enterGer(i);
+    if (R.lotStage(l) < R.GER_DONE) return TG.toast(`🏗️ ${l.n} ${L('гэрээ барьж байна. Дараа нь зочлоорой!', 'is still building their ger. Visit when it is done!')}`);
     enterGer(i, true);
   }
   function gerPreview(roof, door, scale) {
@@ -1835,40 +1840,24 @@
     return c;
   }
   const swatches = (map, cur, onPick, cls = '') => h('div', { class: 'v-chips' }, Object.entries(map).map(([k, c]) => h('button', { class: 'v-chip v-swatch ' + cls + (cur === k ? ' active' : ''), style: { background: c }, 'aria-label': k, onclick: () => onPick(k) })));
-  function buyGer(i) {
-    const v = V(), body = h('div'); let roof = 'blue', door = 'red';
-    const learned = TG.learn && TG.learn.done('ger');
-    if (!learned) {
-      const close2 = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-gerbox' }, gerPreview('blue', 'red', 3)), h('h2', null, L('Эхлээд гэр барьж сур!', 'Learn to build a ger first!')),
-        h('p', { class: 'muted' }, L('Жинхэнэ малчид гэрээ өөрсдөө барьдаг. Сургуулийн гэрт “Монгол гэр барих” хичээлийг дуусгавал энд өөрийн гэрээ барих эрх нээгдэнэ.', 'Real herders build their own gers. Finish the “Build a Mongol ger” lesson in the school ger to unlock your own ger here.')),
-        h('button', { class: 'btn primary big block', onclick: () => { close2(); TG.go('lesson', { id: 'ger' }); } }, '⛺ ', L('Хичээл эхлэх', 'Start the lesson'))), { cls: 'v-modal' });
-      return;
-    }
-    const buy = () => {
-      if (lvl() < R.GER_LEVEL) return TG.toast(L(`${R.GER_LEVEL}-р түвшинд хүрээрэй.`, `Reach level ${R.GER_LEVEL} first.`));
-      if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, цагаан идээ зарж цуглуулаарай!', 'Not enough coins. Play games or sell dairy foods to earn more!'));
-      close();
-      if (live.online) net.send({ t: 'ger-buy', i, roof, door });
-      else { const lot = { by: v.id, n: live.name, roof, door, furn: [] }; onLot({ act: 'buy', i, lot, by: v.id }); }
-    };
-    const draw = () => rc(body, 
-      h('h2', null, L('Өөрийн гэр барих', 'Build your own ger')),
-      h('p', { class: 'muted' }, L('Гэр хороололд өөрийн монгол гэртэй болж, өнгийг нь сонгоод, тавилгаар чимээрэй. Найзууд чинь зочилж болно!', 'Get your own Mongolian ger, pick its colours and furnish it. Friends can come and visit!')),
+  /** Pick the roof band and door colours of a finished ger. */
+  function gerColours(i) {
+    const l = lotsArr()[i]; if (!l) return;
+    const body = h('div'); let roof = l.roof || 'blue', door = l.door || 'red';
+    const draw = () => rc(body,
+      h('h2', null, L('Гэрийнхээ өнгийг сонго', 'Choose your ger’s colours')),
       h('div', { class: 'v-gerbox' }, gerPreview(roof, door, 3)),
       h('div', { class: 'label' }, L('Дээврийн хээ', 'Roof band')), swatches(R.ROOF, roof, (k) => { roof = k; draw(); }),
       h('div', { class: 'label', style: { marginTop: '10px' } }, L('Хаалга', 'Door')), swatches(R.DOOR, door, (k) => { door = k; draw(); }, 'door'),
-      lvl() < R.GER_LEVEL ? h('div', { class: 'hint', style: { marginTop: '12px' } }, L(`Гэр барихад ${R.GER_LEVEL}-р түвшин хэрэгтэй.`, `You need level ${R.GER_LEVEL} to build a ger.`)) : null,
-      h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, disabled: lvl() < R.GER_LEVEL, onclick: buy }, L('Гэр барих', 'Build ger'), ` · ${R.GER_PRICE} `, pic('ui:coin', 16)));
+      h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => { saveLot(i, { roof, door }); const own = V().lots[i]; if (own && own.by === V().id) Object.assign(own, { roof, door }); S.save(); close(); } }, L('Болсон', 'Done')));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
   function onLot(m) {
     const v = V();
     lotsArr()[m.i] = m.lot;
-    if (m.by === v.id && m.act === 'buy') {
-      v.coins = Math.max(0, v.coins - R.GER_PRICE); v.gerBuilt = true; reward(0, 30); TG.sfx.win(); TG.confetti(70);
-      factCard('ui:ger', L('Шинэ гэр!', 'Your new ger!'), L('Монгол гэрийг нэг цагийн дотор барьж, нүүж болдог. Хаалга нь ихэвчлэн урд зүг рүү харсан байдаг.', 'A Mongolian ger can be put up in about an hour and moved anywhere. Its door traditionally faces south.'), '+30 XP');
-    } else if (m.act === 'buy') TG.toast(`🏠 ${m.lot.n} ${L('гэр барилаа!', 'built a ger!')}`);
+    if (m.by !== v.id && m.act === 'claim') TG.toast(`🏠 ${m.lot.n} ${L('гэр барьж эхэллээ!', 'started building a ger!')}`);
+    else if (m.by !== v.id && m.act === 'stage' && R.lotStage(m.lot) === R.GER_DONE) TG.toast(`🏠 ${m.lot.n} ${L('гэрээ барьж дууслаа!', 'finished building their ger!')}`);
     S.save(); if (live) { hud(); updateCtx(); }
   }
   function saveLot(i, patch) {

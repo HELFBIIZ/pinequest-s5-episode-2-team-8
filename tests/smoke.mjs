@@ -206,9 +206,18 @@ try {
   await page.evaluate(() => [...document.querySelectorAll('.v-school .btn.primary')].pop().click()); await sleep(400); await check('practice bout', '.v-wrestle .v-wr-coach');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.tournament(1); }); await sleep(400); await check('village wrestling match', '.v-wrestle canvas');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
-  step = 'ger locked before the lesson';
-  await page.evaluate(() => TG._village.lot(0)); await sleep(300);
-  if (!(await page.evaluate(() => /сур|Learn/i.test((document.querySelector('.modal h2') || {}).textContent || '')))) errors.push('village: building a ger should ask to finish the ger lesson first');
+  step = 'ger is built by hand, not bought';
+  await page.evaluate(() => { const v = TG.store.active().village; v.ger.parts = { khana: 5, khaalga: 1, toono: 1, bagana: 2, uni: 9, esgii: 2, buurees: 1, buslvvr: 3 }; v.coins = 40; });
+  const build = page.evaluate(() => TG._village.build(0)).catch((e) => ({ error: e.message }));
+  await sleep(400);
+  if ((await page.evaluate(() => TG.tasks.active() && TG.tasks.active().kind)) !== 'choose') errors.push('ger: building should start by choosing what comes first');
+  // wrong first step: felt before the floor → a hint, nothing lost
+  await page.evaluate(() => TG.tasks.pick('esgii')); await sleep(500);
+  if (!(await page.evaluate(() => TG.store.active().village.ger.mistakes === 1 && TG.store.active().village.ger.parts.esgii === 2))) errors.push('ger: a wrong step should count a mistake and keep the parts');
+  for (const st of ['shal', 'khana', 'khaalga', 'toono', 'uni', 'esgii', 'buurees', 'buslvvr', 'tulga']) { await page.evaluate((x) => TG.tasks.pick(x), st); await sleep(300); await page.evaluate(() => TG.tasks.finish()); await sleep(450); }
+  await Promise.race([build, sleep(3000)]);
+  const g = await page.evaluate(() => ({ st: TG.store.active().village.ger.stage, coins: TG.store.active().village.coins, built: TG.store.active().village.gerBuilt, lot: TG._village.lots()[0] && TG.vrules.lotStage(TG._village.lots()[0]) }));
+  if (g.st !== 9 || !g.built || g.lot !== 9 || g.coins !== 40) errors.push('ger: nine hands-on steps should finish the ger without spending coins, got ' + JSON.stringify(g));
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
   // Basar: offline answers and a quiz (no server here, so the offline knowledge must answer)
@@ -294,13 +303,12 @@ try {
   if (!(await page.evaluate(() => (TG.store.active().together || {}).friends >= 1))) errors.push('learn together: the friends quiz was not recorded');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
-  step = 'ger unlocked after the lesson';
-  await page.evaluate(() => TG.go('village')); await sleep(700);
-  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.lot(0); }); await sleep(300);
-  await check('ger builder unlocked', '.modal .v-gerbox + .label, .modal .v-chips');
-  // buy it, furnish it and walk inside
+  step = 'a save from before hands-on building keeps its ger';
+  await page.evaluate(() => { const v = TG.store.active().village; delete v.ger; v.gerBuilt = true; TG.store.save(); });
+  await page.evaluate(() => TG.go('learn')); await sleep(150); await page.evaluate(() => TG.go('village')); await sleep(700);
+  if ((await page.evaluate(() => (TG.store.active().village.ger || {}).stage)) !== 9) errors.push('old save: a ger built before this update should load finished');
+  // furnish it and walk inside
   step = 'inside my ger';
-  await page.evaluate(() => { TG.store.active().village.coins = 2000; TG.store.active().village.xp = 3000; [...document.querySelectorAll('.modal .btn.primary')].pop().click(); }); await sleep(700);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => { const l = TG._village.lots()[0]; if (l) l.furn = ['tulga', 'or', 'avdar', 'morinkhuur', 'shirdeg', 'shagai']; TG._village.enterGer(0); }); await sleep(500);
   await check('full-screen ger interior', '.fscene.ger-scene .scene-cv');

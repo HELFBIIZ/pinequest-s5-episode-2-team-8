@@ -74,13 +74,20 @@ try {
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && performance.now() - (o.jt || -1e9) < 2000; }), 'B sees A jump');
   ok('jumping shows for everyone');
 
-  await a.evaluate(() => TG._village.buyLot(2, 'red', 'gold'));
-  await until(() => b.evaluate(() => { const l = TG._village.lots()[2]; return l && l.n === 'Бат' && l.roof === 'red'; }), 'B sees A\'s new ger');
-  if ((await a.evaluate(() => TG.store.active().village.coins)) !== 550) throw new Error('buying a ger did not cost 50 coins');
-  await b.evaluate(() => TG._village.buyLot(2, 'blue', 'red'));
-  await sleep(400);
+  // building a ger by hand: each finished step shows for everyone, and costs no coins
+  await a.evaluate(() => { const v = TG.store.active().village; v.ger.parts = { khana: 5, khaalga: 1, toono: 1, bagana: 2, uni: 9, esgii: 2, buurees: 1, buslvvr: 3 }; });
+  a.evaluate(() => TG._village.build(2)).catch(() => {});
+  await sleep(300);
+  for (const s of ['shal', 'khana', 'khaalga']) { await a.evaluate((x) => TG.tasks.pick(x), s); await sleep(250); await a.evaluate(() => TG.tasks.finish()); await sleep(350); }
+  await until(() => b.evaluate(() => { const l = TG._village.lots()[2]; return l && l.n === 'Бат' && TG.vrules.lotStage(l) === 3; }), 'B sees A\'s ger at stage 3');
+  await a.evaluate(() => TG.tasks.cancel());
+  if ((await a.evaluate(() => TG.store.active().village.coins)) !== 600) throw new Error('building a ger should not cost coins');
+  // B started a ger on plot 2 while offline: plot 2 is A's now, so B's half-built ger moves to a free plot
+  await b.evaluate(() => { const v = TG.store.active().village; v.ger.stage = 1; v.ger.lot = 2; });
+  await b.evaluate(() => TG._village.reconnect());
+  await until(() => b.evaluate(() => TG._village.lots().some((l, i) => i !== 2 && l && l.n === 'Сарнай' && TG.vrules.lotStage(l) === 1)), 'B re-claims a different free plot when its old one is taken');
   if ((await b.evaluate(() => TG._village.lots()[2].n)) !== 'Бат') throw new Error('a taken lot was overwritten');
-  ok('owning a ger syncs to everyone; taken lots are protected');
+  ok('building a ger syncs stage by stage; taken plots are protected; progress follows the player into a room');
 
   // live wrestling: A invites B, B accepts, both play exchanges until someone wins
   const bId = await b.evaluate(() => TG.store.active().village.id);

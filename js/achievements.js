@@ -47,6 +47,7 @@
     A('all_chapters', 'naadam', 'fortress', 'Түүхийн баатар', 'Hero of history', 'Дөрвөн бүлгийг бүгдийг нь хамгаалах', 'Defend in all four chapters', (c) => Object.keys((c.v.camp || {}).won || {}).length >= 4, (c) => [Object.keys((c.v.camp || {}).won || {}).length, 4]),
     A('historian', 'learn', 'quill', 'Залуу түүхч', 'Young historian', 'Түүхчийн 5 даалгавар биелүүлэх', 'Finish 5 of the historian’s tasks', (c) => ((c.p.hist || {}).step || 0) >= 5, (c) => [(c.p.hist || {}).step || 0, 5]),
     A('ger_built', 'nutag', 'home', 'Өөрийн гэртэй', 'Home of my own', 'Нутагт өөрийн гэрээ барих', 'Build your own ger in Nutag', (c) => !!c.v.gerBuilt),
+    A('ger_perfect', 'nutag', 'home', 'Алдаагүй барьсан', 'Built without a slip', 'Нэг ч алдаагүйгээр гэрээ барих', 'Build your ger without a single mistake', (c) => !!(c.v.ger && c.v.ger.perfect)),
     A('fisher', 'nutag', 'rod', 'Загасчин', 'Fisher', '5 загас барих', 'Catch 5 fish', (c) => (c.v.fishCaught || 0) >= 5, (c) => [c.v.fishCaught || 0, 5]),
     A('rider', 'nutag', 'horse', 'Морь унаач', 'Rider', 'Морь унаж Нутгаар 200 алхам давхих', 'Ride 200 tiles around Nutag', (c) => (c.h.dist || 0) >= 200, (c) => [Math.floor(c.h.dist || 0), 200]),
     A('race_win', 'naadam', 'trophy', 'Түрүү морь', 'Winning horse', 'Морин уралдаанд түрүүлэх', 'Win a horse race', (c) => (c.h.wins || 0) >= 1),

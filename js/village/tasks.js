@@ -44,6 +44,8 @@
       this.layout();
       this.art.setScale(this.z * 0.6).setAlpha(0); // a little pop as it opens
       this.tweens.add({ targets: this.art, scale: this.z, alpha: 1, duration: 220, ease: 'Back.Out' });
+      if (spec.say) this.say(spec.say);       // e.g. grandpa's hint after a wrong step
+      if (spec.shake) this.time.delayedCall(260, () => this.shake());
     }
 
     /** Fit the stage: the biggest whole-pixel scale that leaves room for the title, the hint and the tray. */
@@ -60,9 +62,14 @@
       this.hint.setPosition(W / 2, this.oy + SH * this.z + 22 * d).setWordWrapWidth(W * 0.9);
       this.close.setPosition(this.ox + SW * this.z, this.oy - 44 * d);
       this.sayBox.setPosition(W / 2, this.oy + 6 * d).setWordWrapWidth(SW * this.z * 0.9);
-      const n = this.tray.length, cell = Math.min(64 * d, (W * 0.94) / Math.max(1, n)), y0 = this.oy + SH * this.z + 64 * d;
       if (again) this.art.setScale(this.z);
-      this.tray.forEach((t, i) => { const x = W / 2 + (i - (n - 1) / 2) * cell; t.img.setPosition(x, y0).setScale(Math.max(1, Math.floor((cell * 0.6) / t.img.width))); t.lab.setPosition(x, y0 + t.img.displayHeight / 2 + 4 * d).setWordWrapWidth(cell); });
+      // the tray of parts: one row for a few, two rows for many
+      const n = this.tray.length, cols = n > 5 ? Math.ceil(n / 2) : Math.max(1, n), cell = Math.min(80 * d, (W * 0.96) / cols), y0 = this.oy + SH * this.z + 60 * d;
+      this.tray.forEach((t, i) => {
+        const row = Math.floor(i / cols), inRow = Math.min(cols, n - row * cols), x = W / 2 + ((i % cols) - (inRow - 1) / 2) * cell, y = y0 + row * cell * 1.05;
+        t.img.setPosition(x, y).setScale(Math.max(2, Math.floor((cell * 0.5) / t.img.width)));
+        t.lab.setPosition(x, y + t.img.displayHeight / 2 + 3 * d).setWordWrapWidth(cell - 4 * d);
+      });
     }
     toStage(p) { return [(p.x - this.ox) / this.z, (p.y - this.oy) / this.z]; }
     toScreen(x, y) { return [this.ox + x * this.z, this.oy + y * this.z]; }
@@ -140,8 +147,10 @@
     /** A gentle wobble: nothing is lost, you just try again. */
     wobble() {
       this.st.mistakes++; TG.sfx.bad && TG.sfx.bad();
-      this.tweens.add({ targets: this.art, angle: { from: -3, to: 3 }, duration: 70, yoyo: true, repeat: 2, onComplete: () => this.art.setAngle(0) });
+      this.shake();
+      if (this.spec.onMiss) this.spec.onMiss(this.st);
     }
+    shake() { this.tweens.add({ targets: this.art, angle: { from: -3, to: 3 }, duration: 70, yoyo: true, repeat: 2, onComplete: () => this.art.setAngle(0) }); }
     pop(col) { this.tweens.add({ targets: this.art, scale: { from: this.z * 1.04, to: this.z }, duration: 160 }); this.flash = { col, t: this.time.now }; }
     say(text) { this.sayBox.setText(tx(text)).setVisible(true).setAlpha(1); this.st.sayT = this.time.now + 4000; }
     end(ok) {

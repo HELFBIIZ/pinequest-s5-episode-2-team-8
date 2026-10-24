@@ -13,4 +13,5 @@ assert.deepEqual(R.tradeCost('khana', 'goods'), { wool: 2, aaruul: 2 });
 assert.deepEqual(R.tradeCost('uni', 'coins'), { coins: 15 });
 assert.equal(R.lotStage(null), 0); assert.equal(R.lotStage({ by: 'u1' }), 9); assert.equal(R.lotStage({ by: 'u1', stage: 4 }), 4); assert.equal(R.lotStage({ by: 'u1', stage: 12 }), 9);
 assert.equal(R.unisTilt([0, 2, 0]), false); assert.equal(R.unisTilt([1, 1, 1]), true); assert.equal(R.unisTilt([1, 1]), false);
+assert.equal(R.GER_PRICE, undefined); // gers are built by hand now, never bought
 console.log('Ger rules: all checks passed.');

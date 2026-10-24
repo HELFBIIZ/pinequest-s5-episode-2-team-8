@@ -189,14 +189,20 @@ function onMessage(conn, text) {
       break;
     }
     // ---- own ger
-    case 'ger-buy': {
-      const i = m.i;
+    case 'ger-claim': { // laying the floor claims a plot; a ger already part-way up (from solo play or another room) brings its stage along
+      const i = m.i, stage = Number.isInteger(m.stage) ? Math.max(1, Math.min(R.GER_DONE, m.stage)) : 1;
       if (!Number.isInteger(i) || i < 0 || i >= R.LOTS) return;
       if (r.lots[i]) return conn.send({ t: 'deny', act: 'ger', why: 'taken' });
       if (r.lots.some((l) => l && l.by === p.id)) return conn.send({ t: 'deny', act: 'ger', why: 'own' });
-      r.lots[i] = { by: p.id, n: p.name, roof: R.ROOF[m.roof] ? m.roof : 'blue', door: R.DOOR[m.door] ? m.door : 'red', furn: [] };
+      r.lots[i] = { by: p.id, n: p.name, roof: R.ROOF[m.roof] ? m.roof : 'blue', door: R.DOOR[m.door] ? m.door : 'red', furn: [], stage };
       dirty = true;
-      broadcast(r, { t: 'lot', act: 'buy', i, lot: r.lots[i], by: p.id });
+      broadcast(r, { t: 'lot', act: 'claim', i, lot: r.lots[i], by: p.id });
+      break;
+    }
+    case 'ger-stage': { // one more building step done on your own plot
+      const i = r.lots.findIndex((l) => l && l.by === p.id); if (i < 0 || !Number.isInteger(m.stage)) return;
+      r.lots[i].stage = Math.max(1, Math.min(R.GER_DONE, m.stage)); dirty = true;
+      broadcast(r, { t: 'lot', act: 'stage', i, lot: r.lots[i], by: p.id });
       break;
     }
     case 'ger-style': {

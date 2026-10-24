@@ -303,6 +303,31 @@
     const key = roof + door; if (gerCache.has(key)) return gerCache.get(key);
     const m = mk(48, 50); m.x.translate(0, 2); ger(m.x, { x: 0, y: 0, roof, doorCol: door, id: 'own' }); gerCache.set(key, m.c); return m.c;
   }
+  /** A ger part-way up, as it stands on its plot while being built (stage = steps done; 9 is the finished ger). */
+  const stageCache = new Map();
+  function gerStage(stage, roof, door) {
+    if (stage >= 9) return gerSprite(roof, door);
+    const key = stage + roof + door; if (stageCache.has(key)) return stageCache.get(key);
+    const { c, x } = mk(48, 50), OUT = K.out, ORG = '#d9762b', ORGD = '#9a4a1a', WOOD = '#c9a26b', WOODD = '#8a5a33';
+    const floor = () => { R(x, 3, 43, 42, 5, OUT); R(x, 4, 44, 40, 3, WOOD); for (let X = 7; X < 44; X += 5) R(x, X, 44, 1, 3, WOODD); R(x, 4, 46, 40, 1, WOODD); };
+    const posts = () => { for (const X of [21, 26]) { R(x, X, 14, 2, 31, OUT); R(x, X, 15, 1, 29, ORG); } };
+    const lattice = () => {
+      for (let X = 3; X <= 45; X++) for (let Y = 30; Y <= 43; Y++) if ((X + Y) % 5 === 0 || (X - Y + 50) % 5 === 0) P(x, X, Y, (X + Y) % 10 === 0 ? ORGD : ORG);
+      R(x, 3, 29, 43, 1, ORGD); R(x, 2, 29, 1, 15, OUT); R(x, 46, 29, 1, 15, OUT);
+    };
+    const doorway = () => { R(x, 17, 30, 14, 18, OUT); R(x, 18, 31, 12, 16, ORG); R(x, 20, 33, 8, 13, door); R(x, 22, 36, 4, 6, '#f7c646'); };
+    const crown = () => { ell(x, 24, 13, 8, 3, OUT); ell(x, 24, 13, 7, 2, ORG); R(x, 21, 13, 6, 1, '#8fd0ff'); };
+    const poles = () => { for (let j = 0; j < 9; j++) { const ex = 3 + Math.round((j * 42) / 8); line(x, 24 + Math.round((ex - 24) / 5), 14, ex, 29, ORG); } };
+    if (stage <= 5) {
+      floor(); if (stage >= 4) posts(); if (stage >= 2) lattice(); if (stage >= 5) poles(); if (stage >= 3) doorway(); if (stage >= 4) crown();
+    } else {
+      // felt, then the white cover, then the ropes: the finished shape without its stove pipe yet
+      x.drawImage(gerSprite(roof, door), 0, 0); x.clearRect(24, 0, 8, 10);
+      if (stage === 6) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = 'rgba(150,118,78,.55)'; x.fillRect(0, 0, 48, 50); x.globalCompositeOperation = 'source-over'; doorway(); }
+      if (stage === 8) for (const Y of [33, 38, 43]) { R(x, 4, Y, 13, 1, '#5a3a22'); R(x, 31, Y, 13, 1, '#5a3a22'); }
+    }
+    stageCache.set(key, c); return c;
+  }
   // ------------------------------------------------------------ inside a ger: 320×210, standing at the south door looking north to the khoimor.
   // West (left) is the men's side: saddle and the airag bag. East (right) is the women's side: cupboard and water.
   const ROOM = { W: 320, H: 210, cx: 160, fy: 142, frx: 146, fry: 56 };
@@ -814,6 +839,21 @@
         tarag: () => bowl('#f6f2e9', () => { P(x, 7, 6, '#ffffff'); P(x, 8, 6, '#ffffff'); }),
         airag: () => bowl('#efe8d4', () => { P(x, 5, 6, '#ffffff'); P(x, 9, 6, '#ffffff'); P(x, 7, 5, '#ffffff'); }),
       })[id]();
+    } else if (kind === 'part') { // the parts of a ger, and the wool its felt is made from
+      const O = K.out, ORG = '#d9762b', ORGD = '#9a4a1a', FELT = '#d8c8a8', FELTD = '#b8a47e';
+      ({
+        shal: () => { R(x, 1, 6, 14, 6, O); R(x, 2, 7, 12, 4, '#c9a26b'); for (const X of [5, 9, 12]) R(x, X, 7, 1, 4, '#8a5a33'); },
+        khana: () => { R(x, 1, 3, 14, 11, O); R(x, 2, 4, 12, 9, '#f0e2c2'); for (let X = 2; X < 14; X++) for (let Y = 4; Y < 13; Y++) if ((X + Y) % 4 === 0 || (X - Y + 16) % 4 === 0) P(x, X, Y, ORG); },
+        khaalga: () => { R(x, 4, 1, 8, 14, O); R(x, 5, 2, 6, 12, '#e14b3d'); R(x, 6, 4, 4, 7, '#f7c646'); P(x, 7, 7, '#2b52a5'); P(x, 8, 7, '#2b52a5'); },
+        toono: () => { ell(x, 8, 8, 7, 5, O); ell(x, 8, 8, 6, 4, ORG); ell(x, 8, 8, 4, 2, '#8fd0ff'); R(x, 3, 8, 10, 1, ORGD); R(x, 8, 4, 1, 9, ORGD); },
+        bagana: () => { for (const X of [4, 10]) { R(x, X, 1, 3, 14, O); R(x, X + 1, 2, 1, 12, ORG); R(x, X + 1, 3, 1, 1, '#f7c646'); R(x, X + 1, 11, 1, 1, '#2b52a5'); } },
+        uni: () => { for (let i = 0; i < 5; i++) line(x, 2 + i * 2, 14, 6 + i * 2, 1, i % 2 ? ORGD : ORG); },
+        esgii: () => { R(x, 1, 5, 12, 8, O); R(x, 2, 6, 10, 6, FELT); R(x, 2, 11, 10, 1, FELTD); ell(x, 12, 9, 3, 4, O); ell(x, 12, 9, 2, 3, FELTD); P(x, 12, 9, FELT); },
+        buurees: () => { R(x, 1, 3, 14, 10, O); R(x, 2, 4, 12, 8, '#ffffff'); R(x, 2, 6, 12, 1, '#3f76db'); R(x, 2, 11, 12, 1, '#d8dde6'); },
+        buslvvr: () => { ell(x, 8, 8, 6, 6, O); ell(x, 8, 8, 5, 5, '#a46d3b'); ell(x, 8, 8, 3, 3, O); ell(x, 8, 8, 2, 2, '#c99257'); P(x, 13, 13, O); P(x, 14, 14, '#a46d3b'); },
+        tulga: () => { R(x, 3, 6, 10, 8, O); R(x, 4, 7, 8, 6, '#5a5a66'); R(x, 5, 9, 6, 3, '#f39b2c'); R(x, 7, 1, 2, 5, O); R(x, 6, 14, 1, 2, O); R(x, 9, 14, 1, 2, O); },
+        wool: () => { for (const [bx, by, r] of [[5, 9, 4], [10, 9, 4], [8, 6, 4]]) ell(x, bx, by, r, r - 1, O); for (const [bx, by, r] of [[5, 9, 3], [10, 9, 3], [8, 6, 3]]) ell(x, bx, by, r, r - 1, '#f6f2e9'); P(x, 7, 5, '#ffffff'); },
+      })[id]();
     } else if (kind === 'fish') {
       const col = { perch: ['#8fbf4a', '#5e8a2a', '#3a5a1a'], pike: ['#7a9a5a', '#4e6e36', '#2e4a20'], lenok: ['#c49a6a', '#8a6a42', '#5a3a1e'], taimen: ['#d9705a', '#a8483a', '#6e2a20'] }[id];
       ell(x, 7, 8, 6, 3, K.out); ell(x, 7, 8, 5, 2, col[0]); R(x, 2, 9, 10, 1, col[1]);
@@ -881,5 +921,5 @@
     return img;
   }
 
-  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, interior, gerRoom, ROOM, wrestler, wrestlerFront, beast, BEAST };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, gerStage, interior, gerRoom, ROOM, wrestler, wrestlerFront, beast, BEAST };
 })(window.TG);
