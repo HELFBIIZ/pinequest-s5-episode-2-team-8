@@ -645,6 +645,7 @@ try {
   for (const screen of ['memories', 'about']) {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
+    if (screen === 'about' && !(await page.evaluate(() => /Phaser 4/.test((document.querySelector('.about') || {}).textContent || '')))) errors.push('about: the pitch page should say the village is built with Phaser 4');
   }
 
   step = 'log out and log in with the picture password';
