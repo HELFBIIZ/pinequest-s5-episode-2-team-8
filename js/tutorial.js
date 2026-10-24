@@ -17,9 +17,9 @@
   const check = (r) => { if (!run || run.id !== r) throw new Stopped(); };
 
   function glow(sel) {
-    if (run && run.glowEl) { run.glowEl.classList.remove('tut-glow'); run.glowEl = null; }
+    if (run && run.glowEl) { run.glowEl.classList.remove('tut-glow'); const box = run.glowEl.closest('.v-more'); if (box) box.classList.remove('open'); run.glowEl = null; }
     const el = sel && document.querySelector(sel);
-    if (el && run) { el.classList.add('tut-glow'); run.glowEl = el; }
+    if (el && run) { el.classList.add('tut-glow'); run.glowEl = el; const box = el.closest('.v-more'); if (box) box.classList.add('open'); } // buttons behind "more" pop out while the guide points at them
   }
   function target(t) { TG._village.tut(Object.assign(live().tut || {}, { target: t })); }
 
