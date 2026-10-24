@@ -219,6 +219,22 @@ try {
   const g = await page.evaluate(() => ({ st: TG.store.active().village.ger.stage, coins: TG.store.active().village.coins, built: TG.store.active().village.gerBuilt, lot: TG._village.lots()[0] && TG.vrules.lotStage(TG._village.lots()[0]) }));
   if (g.st !== 9 || !g.built || g.lot !== 9 || g.coins !== 40) errors.push('ger: nine hands-on steps should finish the ger without spending coins, got ' + JSON.stringify(g));
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  // gathering for a ger: shear sheep, make felt, trade with Grandpa Craftsman
+  step = 'gathering for a ger';
+  await page.evaluate(() => { const v = TG.store.active().village; v.ger = { stage: 0, lot: -1, parts: {}, wool: 0, fluff: 0, mats: 0, mistakes: 0, perfect: false }; v.shorn = {}; v.produce.aaruul = 5; v.coins = 200; });
+  for (let i = 0; i < 2; i++) { const p = page.evaluate((k) => TG._village.shear(k), i).catch((e) => ({ error: e.message })); await sleep(350); await page.evaluate(() => TG.tasks && TG.tasks.finish()); await Promise.race([p, sleep(2000)]); }
+  if ((await page.evaluate(() => TG.store.active().village.ger.wool)) !== 4) errors.push('gathering: two shorn sheep should give 4 wool');
+  if ((await page.evaluate(() => TG._village.shearable && TG._village.shearable(0))) !== false) errors.push('gathering: a shorn sheep should not be shearable again right away');
+  for (let i = 0; i < 3; i++) { const p = page.evaluate(() => TG._village.felt()).catch((e) => ({ error: e.message })); await sleep(350); await page.evaluate(() => TG.tasks && TG.tasks.finish()); await Promise.race([p, sleep(2000)]); } // beat → lay & wet → roll
+  const fe = await page.evaluate(() => TG.store.active().village.ger);
+  if (fe.parts.esgii !== 1 || fe.fluff !== 0 || fe.mats !== 0) errors.push('gathering: beat → lay & wet → roll should make one felt, got ' + JSON.stringify(fe));
+  await page.evaluate(() => TG._village.npc('craftsman')); await sleep(300);
+  await check('grandpa craftsman trades', '.npc-talk .v-trade');
+  const coinsBefore = await page.evaluate(() => TG.store.active().village.coins); // rolling the felt paid a little
+  await page.evaluate(() => { const b = document.querySelector('.npc-talk .v-trade [data-trade="uni"][data-pay="coins"]'); if (b) b.click(); }); await sleep(200);
+  const tr2 = await page.evaluate((c0) => ({ uni: TG.store.active().village.ger.parts.uni, paid: c0 - TG.store.active().village.coins }), coinsBefore);
+  if (tr2.uni !== 9 || tr2.paid !== 15) errors.push('grandpa: buying roof poles for 15 coins should give 9 poles, got ' + JSON.stringify(tr2));
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
 
   // Basar: offline answers and a quiz (no server here, so the offline knowledge must answer)
   step = 'Basar chat (offline)';

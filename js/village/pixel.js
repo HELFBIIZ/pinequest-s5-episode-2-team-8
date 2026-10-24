@@ -303,6 +303,26 @@
     const key = roof + door; if (gerCache.has(key)) return gerCache.get(key);
     const m = mk(48, 50); m.x.translate(0, 2); ger(m.x, { x: 0, y: 0, roof, doorCol: door, id: 'own' }); gerCache.set(key, m.c); return m.c;
   }
+  /** A sheep just after shearing: its white wool becomes short, pinkish fleece. */
+  const shornCache = new Map();
+  function shorn(img) {
+    if (shornCache.has(img)) return shornCache.get(img);
+    const { c, x } = mk(img.width, img.height); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) if (p[i + 3] > 0 && p[i] > 200 && p[i + 1] > 195 && p[i + 2] > 180) { const k = p[i] > 235 ? 0 : 1; p[i] = k ? 214 : 236; p[i + 1] = k ? 178 : 204; p[i + 2] = k ? 160 : 186; }
+    x.putImageData(d, 0, 0); shornCache.set(img, c); return c;
+  }
+  /** The felt-making spot by the pasture: a hide on the ground, a wool pile, a water bucket and the roller. */
+  let feltMatC = null;
+  function feltMat() {
+    if (feltMatC) return feltMatC;
+    const { c, x } = mk(32, 16), O = K.out;
+    ell(x, 14, 10, 13, 5, O); ell(x, 14, 10, 12, 4, '#a46d3b'); ell(x, 14, 9, 10, 3, '#b98250');
+    for (const [X, Y] of [[8, 8], [13, 7], [18, 8]]) { R(x, X - 1, Y - 1, 5, 4, O); R(x, X, Y, 3, 2, '#f6f2e9'); }
+    R(x, 26, 6, 6, 8, O); R(x, 27, 7, 4, 6, '#8a5a33'); R(x, 27, 7, 4, 2, '#4aa6e2');
+    R(x, 2, 13, 22, 3, O); R(x, 3, 14, 20, 1, '#d8c8a8');
+    feltMatC = c; return c;
+  }
   /** A ger part-way up, as it stands on its plot while being built (stage = steps done; 9 is the finished ger). */
   const stageCache = new Map();
   function gerStage(stage, roof, door) {
@@ -586,7 +606,7 @@
     }
     for (let ty = 2; ty < h - 1; ty++) for (let tx = 1; tx < w - 1; tx++) if (g[ty][tx] === 'g' && hash(tx * 3, ty * 7) < 0.1) flower(x, tx * 16 + 4 + Math.floor(hash(tx, ty) * 8), ty * 16 + 5 + Math.floor(hash(ty, tx) * 7), [K.pink, K.gold, K.white, K.purple][Math.floor(hash(tx, ty * 5) * 4)]);
     if (W.ARENA) arenaFlags(x, W.ARENA);
-    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['npc', 'emee', 'npcq', 'cow', 'goat', 'general', 'historian'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery, academy, zel, churn, tulga, rack })[o.kind](x, o) }))];
+    const draws = [...trees.map((t) => ({ y: t.y, f: () => tree(x, t.x, t.y, t.pine) })), ...objects.filter((o) => !['felt', 'npc', 'emee', 'npcq', 'cow', 'goat', 'general', 'historian'].includes(o.kind)).map((o) => ({ y: o.y + o.h - 1, f: () => ({ ger, shop, board, well, lantern, lot, bleachers, ovoo, uya, archery, academy, zel, churn, tulga, rack })[o.kind](x, o) }))];
     draws.sort((a, b) => a.y - b.y).forEach((d) => d.f());
     return c;
   }
@@ -921,5 +941,5 @@
     return img;
   }
 
-  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, gerStage, interior, gerRoom, ROOM, wrestler, wrestlerFront, beast, BEAST };
+  TG.pixel = { horse, raceFlag, COATS, bankhar, bankharFace, K, DEEL, hash, mk, R, P, ell, blob, line, shade, renderStatic, drop, char, animal, icon, iconCanvas, gerSprite, gerStage, shorn, feltMat, interior, gerRoom, ROOM, wrestler, wrestlerFront, beast, BEAST };
 })(window.TG);

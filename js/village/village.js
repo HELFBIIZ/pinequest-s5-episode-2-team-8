@@ -92,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), reconnect: () => net.rejoin(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -380,7 +380,7 @@
   const fmtLeft = (ms) => { const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}${L('с', 's')}`; };
 
   // ================================================================ screen
-  TG.gerwork.init({ V, live: () => live, net, reward, factCard, lotsArr, enterGer, colours: (i) => gerColours(i), save: () => S.save(), refresh: () => { if (live) { hud(); updateCtx(); } } });
+  TG.gerwork.init({ V, live: () => live, net, reward, quest, factCard, lotsArr, enterGer, colours: (i) => gerColours(i), save: () => S.save(), refresh: () => { if (live) { hud(); updateCtx(); } } });
   TG.villageScreen = ({ setCleanup }) => {
     quests();
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
@@ -490,6 +490,8 @@
       onclick: () => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); } }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
       : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), h('small', null, '→'))]));
   }
+  /** While a ger is still to be built, a sheep with its wool grown is for shearing; otherwise for petting. */
+  const sheepAct = (q) => (V().ger.stage < R.GER_DONE && TG.gerwork.shearable(q.i) ? 'shear' : 'sheep');
   function contextAction() {
     if (!live || live.me.path.length || live.race) return null;
     const m = live.me, fx = m.px + 0.5, fy = m.py + 0.82;
@@ -498,7 +500,7 @@
     const consider = (d, a) => { if (d < bd) { bd = d; best = a; } };
     for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     consider(Math.hypot(fx - (WD.DOCK.x + 0.5), fy - (WD.DOCK.y + 0.7)), { type: 'fish' });
-    for (const q of live.sheep) consider(Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) - 0.35, { type: 'sheep', s: q });
+    for (const q of live.sheep) consider(Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) - 0.35, { type: sheepAct(q), s: q });
     if (best) return best;
     if ((WD.g[m.y] || [])[m.x] === 'a') return { type: 'arena' };
     return null;
@@ -522,6 +524,8 @@
       case 'rack': return ['dairy:aaruul', L('Ааруул хийх', 'Make aaruul')];
       case 'fish': return ['ui:fish', L('Загасчлах', 'Fish')];
       case 'sheep': return ['ui:heart', L('Илбэх', 'Pet')];
+      case 'shear': return ['part:wool', L('Хяргах', 'Shear')];
+      case 'felt': return ['part:esgii', TG.gerwork.feltLabel()];
       case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l || (l.by === V().id && R.lotStage(l) < R.GER_DONE) ? L('Гэр барих', 'Build a ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
       case 'zasuul': case 'arena': return ['ui:wrestle', L('Барилдах', 'Wrestle')];
       case 'ovoo': return ['ui:ovoo', L('Овоо тахих', 'Visit ovoo')];
@@ -554,6 +558,8 @@
       case 'churn': case 'tulga': case 'rack': return dairyStation(a.type);
       case 'fish': return fishing();
       case 'sheep': return petSheep(a.s);
+      case 'shear': { const m = live.me; if (Math.abs(a.s.x - m.x) > 1 || Math.abs(a.s.y - m.y) > 1) return TG.toast(L('Хонь холдчихлоо 🐑', 'The sheep wandered off 🐑')); return TG.gerwork.shear(a.s.i); }
+      case 'felt': return TG.gerwork.felt();
       case 'lot': return lotAction(a.i);
       case 'zasuul': case 'arena': return arenaModal();
       case 'ovoo': return ovooAction();
@@ -605,7 +611,7 @@
     { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
-    if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
+    if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: sheepAct(sh), s: sh }) : null; }
     const o = WD.occ[tx0 + ',' + ty0]; if (o && o.door) return goTo(o.door, o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     if (tx0 === WD.DOCK.x && ty0 === WD.DOCK.y) return goTo(WD.DOCK, { type: 'fish' });
     if (!WD.blocked(tx0, ty0)) return goTo({ x: tx0, y: ty0 }, null);
@@ -849,7 +855,7 @@
 
   // ---------------------------------------------------------------- minimap
   const MINI = { g: '#76b947', T: '#3f7a2c', p: '#d8ab6c', s: '#d9cdb5', w: '#4aa6e2', d: '#a46d3b', o: '#8c5a33', f: '#a46d3b', r: '#a5a5b0', a: '#e8c994' };
-  const MINI_OBJ = { ger: '#f4efe3', shop: '#e14b3d', board: '#a46d3b', well: '#77778a', lot: '#c8a06a', bleachers: '#a46d3b', ovoo: '#a5a5b0', uya: '#8a5a33', archery: '#e9a91f', academy: '#2f7d5b' };
+  const MINI_OBJ = { ger: '#f4efe3', shop: '#e14b3d', board: '#a46d3b', well: '#77778a', lot: '#c8a06a', bleachers: '#a46d3b', ovoo: '#a5a5b0', uya: '#8a5a33', archery: '#e9a91f', academy: '#2f7d5b', felt: '#d8c8a8' };
   /** One pixel per tile: ground, roads, water, buildings. */
   function miniBase() {
     const m = PX.mk(WD.W, WD.H);
@@ -1001,7 +1007,7 @@
     const shadow = (id, x, y) => F.shadows.push({ id, x, y });
     const text = (id, str, x, y, size, color, alpha) => { if (str != null && str !== '') F.texts.push({ id, text: String(str), x, y, size, color, alpha }); }; // never draw "null" for a missing name
     const frame = (o) => (o.moving ? 1 + (Math.floor(t * (o.running ? 13 : 8)) % 2) : 0);
-    live.sheep.forEach((q) => { shadow('sheep:' + q.i, q.px * T, q.py * T); sprite('sheep:' + q.i, PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.py, q.flip); });
+    live.sheep.forEach((q) => { shadow('sheep:' + q.i, q.px * T, q.py * T); const sh = PX.animal('sheep', Math.floor(t * 2 + q.i) % 2); sprite('sheep:' + q.i, TG.gerwork.shearable(q.i) ? sh : PX.shorn(sh), q.px * T, q.py * T + 2, q.py, q.flip); });
     if (live.season === 'spring') live.sheep.forEach((q) => sprite('lamb:' + q.i, PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.py + 0.3, q.flip)); // spring: the lambs are born
     // a rider on a Mongolian horse; face 1 = left, 2 = right
     const rider = (id, look, face, moving, wx, wy, depth, z = 0) => {
@@ -1026,6 +1032,7 @@
     // the dairy yard's animals: cows and goats shift about, mares stand by their foals on the зэл
     for (const o of WD.objects) {
       if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); shadow('obj:' + o.id, o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite('obj:' + o.id, img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, o.y + 0.2, turn); }
+      if (o.kind === 'felt') sprite('obj:felt', PX.feltMat(), o.x * T, o.y * T, o.y + 0.4);
       if (o.kind === 'zel') [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, kd], i) => { const img = PX.beast(kd, kd === 'foal' && Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = kd === 'mare' ? 0.75 : 0; sprite('zel:' + i, img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, o.y + my + 0.1, i % 2 === 1); });
     }
     const still = (id, o, look, dir) => { shadow(id, o.x * T, o.y * T); sprite(id, PX.char(look, dir, 0), o.x * T, o.y * T - 12, o.y); };
@@ -1124,6 +1131,11 @@
                 TG.toast(`${tx(it.name)}: ${L('худалдаж авлаа!', 'purchased!')}`); save();
               } }, `${it.price}`, pic('ui:coin', 14)));
       });
+      if (cur === 'tool') { // the white cover for your ger: canvas the herders buy in town
+        const g = v.ger, need = g.stage < 7 && !(g.parts.buurees > 0);
+        list.unshift(h('div', { class: 'v-row v-cover' }, icon('part:buurees'), h('div', { class: 'v-row-b' }, h('b', null, L('Гэрийн цагаан бүрээс', 'White ger cover')), h('small', null, need ? L('Эсгийн гадуур хучиж, бороо, нарнаас хамгаална.', 'Goes over the felt and keeps out rain and sun.') : L('✓ Танд байгаа', '✓ You have it'))),
+          need ? h('button', { class: 'btn sm', 'data-buy': 'buurees', onclick: () => { if (!pay(R.COVER_PRICE)) return; g.parts.buurees = (g.parts.buurees || 0) + 1; TG.toast(L('Бүрээс худалдаж авлаа!', 'You bought the cover!')); save(); } }, `${R.COVER_PRICE}`, pic('ui:coin', 14)) : h('span', { class: 'v-owned' }, '✓')));
+      }
       rc(body, 
         h('div', { class: 'v-shop-head' }, h('h2', null, L('Наадмын дэлгүүр', 'Naadam Shop')), h('span', { class: 'v-pill dark' }, pic('ui:coin', 18), ` ${v.coins}`)),
         h('div', { class: 'chips v-tabs' }, TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, pic(e, 18), ' ', t))),
@@ -1172,6 +1184,8 @@
     const close = TG.modal(h('div', null, h('h2', null, L('Цүнх', 'Bag')),
       h('div', { class: 'stat-cards' }, h('div', { class: 'stat' }, h('small', null, L('Түвшин', 'Level')), h('b', null, L1.l)), h('div', { class: 'stat' }, h('small', null, 'XP'), h('b', null, `${L1.cur}/${L1.need}`)), h('div', { class: 'stat' }, h('small', null, L('Зоос', 'Coins')), h('b', null, v.coins))),
       sec(L('Цагаан идээ', 'Dairy'), v.produce, R.DAIRY), sec(L('Загас', 'Fish'), v.fish, R.FISH),
+      (() => { const g = v.ger, have = [['wool', g.wool, L('Ноос', 'Wool')], ['wool', g.fluff, L('Сэвсгэр ноос', 'Fluffed wool')], ['esgii', g.mats, L('Нойтон ноос', 'Wet wool')], ...Object.entries(g.parts).map(([k, n]) => [k, n, k])].filter(([, n]) => n > 0);
+        return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, L('Гэрийн хэрэгсэл', 'Ger parts')), have.length ? h('div', { class: 'v-chips' }, have.map(([k, n, name]) => h('span', { class: 'v-chip wide' }, pic('part:' + k, 24), ` ${name === k ? TG.gerwork.partName(k) : name} ×${n}`))) : h('p', { class: 'muted' }, L('Хонь хяргаж, Мужаан өвөөтэй уулзаарай.', 'Shear sheep and visit Grandpa Craftsman.'))); })(),
       h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, '👗 ', L('Хувцас', 'Wardrobe')), h('button', { class: 'btn primary', onclick: () => { close(); shopModal('sell'); } }, '💰 ', L('Зарах', 'Sell')))), { cls: 'v-modal' });
   }
 
@@ -1567,6 +1581,11 @@
       chain: [NQ('archery', 3, 'Сурын талбайд 3 бай онооорой.', 'Hit 3 targets at the archery range.', 25, 30), NQ('archery', 6, 'Одоо 6 бай онооорой. Салхийг тооцоорой!', 'Now hit 6 targets. Mind the wind!', 35, 40), NQ('together', 1, 'Гэр бүлтэйгээ нэг бодит ажил хамт хийгээрэй.', 'Do one real-life activity with your family.', 40, 45)],
       done: Tx('Чи мэргэн болж байна! Сайн харваачийг монголчууд “мэргэн” гэж цоллодог.', 'You’re becoming a mergen! That is what Mongols call a great archer.'),
       tic: Tx('Ш-ш… ', 'Shh… '), bio: Tx('Ш-ш… Тайван. Сур харваа бол тэвчээрийн спорт. Аав маань надад гурван настайгаас нум заасан.', 'Shh… calm. Archery is a sport of patience. My father taught me the bow when I was three.') },
+    craftsman: { name: Tx('Мужаан өвөө Тулга', 'Grandpa Craftsman Tulga'), look: { deel: 'brown', skin: '#C98E5E', hat: 'mongol', neck: null, face: null, pet: null },
+      hello: Tx('Сайн уу! Би гэрийн мод хийдэг мужаан. Хана, хаалга, тооно, униа бүгдийг гараараа хийнэ.', 'Hello! I am a craftsman: I make every wooden part of a ger by hand, walls, door, toono and poles.'),
+      chain: [NQ('shear', 1, 'Эсгий хийхэд ноос хэрэгтэй. Нэг хонь хяргаад ир.', 'Felt needs wool. Go and shear a sheep.', 15, 20), NQ('felt', 1, 'Хонины хашааны хажууд эсгий хийх газар бий. Нэг эсгий өнхрүүлээд ир.', 'There is a felt spot by the sheep pasture. Roll one felt.', 25, 30), NQ('ger', 1, 'Одоо гэрээ өөрийн гараар бариад үзүүлээрэй!', 'Now build your own ger with your own hands and show me!', 40, 50)],
+      done: Tx('Гайхалтай! Гэрээ өөрөө барьсан хүүхэд гэрийнхээ хэсэг бүрийг мэддэг болно.', 'Wonderful! A child who builds their own ger knows every part of it.'),
+      tic: Tx('Хм, ', 'Hmm, '), bio: Tx('Хм, би 50 жил гэрийн мод хийлээ. Хана бүрийг бургасаар, униаг шинэс модоор хийдэг. Хэзээ ч хадаас хэрэглэдэггүй, бүгдийг арьсан оосроор уяна!', 'Hmm, I have made ger frames for 50 years. Walls from willow, poles from larch. Never a nail: everything is tied with leather straps!') },
   };
   const npcState = (id) => { const v = V(); v.npc = v.npc || {}; return (v.npc[id] = v.npc[id] || { step: 0, p: 0, on: false }); };
   /** Progress the townspeople's tasks (called with every daily-quest event). */
@@ -1590,10 +1609,10 @@
     const draw = () => {
       const q = d.chain[st.step];
       const steps = h('div', { class: 'npc-steps' }, d.chain.map((_, i) => h('i', { class: i < st.step ? 'on' : i === st.step ? 'cur' : '' })));
-      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, speak(tx(d.tic) + tx(d.done))), asks(), h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
+      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, speak(tx(d.tic) + tx(d.done))), asks(), id === 'craftsman' ? TG.gerwork.tradeList(draw) : null, h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
       const ready = st.on && st.p >= q.n;
       rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)),
-        h('div', { class: 'emee-say' }, speak(st.on ? tx(d.tic) + (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)), asks(),
+        h('div', { class: 'emee-say' }, speak(st.on ? tx(d.tic) + (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)), asks(), id === 'craftsman' ? TG.gerwork.tradeList(draw) : null,
         st.on ? h('div', null, h('div', { class: 'meter' }, h('span', { style: { width: (st.p / q.n) * 100 + '%' } })), h('small', { class: 'muted' }, `${st.p}/${q.n} · 🪙 +${q.c} · ⭐ +${q.x} XP`)) : null,
         h('div', { class: 'row-btns' },
           !st.on ? h('button', { class: 'btn primary', onclick: () => { st.on = true; st.p = 0; S.save(); TG.sfx.chime && TG.sfx.chime(); draw(); } }, L('Тэгье, хийе!', 'Okay, I’ll do it!'))

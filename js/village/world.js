@@ -65,6 +65,8 @@
     { id: 'historian', kind: 'historian', x: 29, y: 10, w: 1, h: 1, door: { x: 29, y: 11 } }, // the historian: history hunts across the aimags
     { id: 'academy', kind: 'academy', x: 49, y: 17, w: 4, h: 3, door: { x: 50, y: 20 } }, // Mongol script academy
     { id: 'emee', kind: 'emee', x: 6, y: 6, w: 1, h: 1, door: { x: 6, y: 7 } },
+    { id: 'felt', kind: 'felt', x: 19, y: 20, w: 2, h: 1, door: { x: 19, y: 21 } },       // felt making: beat, wet and roll the wool
+    { id: 'craftsman', kind: 'npcq', x: 15, y: 29, w: 1, h: 1, door: { x: 15, y: 30 } }, // Grandpa Craftsman: the ger's wooden parts
     // townspeople with quests (see NPCS in village.js)
     { id: 'herder', kind: 'npcq', x: 25, y: 16, w: 1, h: 1, door: { x: 25, y: 17 } },
     { id: 'fisher', kind: 'npcq', x: 23, y: 6, w: 1, h: 1, door: { x: 23, y: 7 } },

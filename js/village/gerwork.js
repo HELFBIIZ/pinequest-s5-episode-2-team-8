@@ -136,7 +136,7 @@
   function finish(i) {
     const v = api.V(), G = g(), p2 = (api.live() || {}).p2;
     v.gerBuilt = true; G.perfect = G.mistakes === 0;
-    api.reward(0, 30); TG.sfx.win(); TG.confetti(70);
+    api.reward(0, 30); api.quest('ger'); TG.sfx.win(); TG.confetti(70);
     if (together && p2) TG.store.logActivity && TG.store.logActivity({ kind: 'together', id: 'ger|family|' + p2.name });
     api.save(); TG.achievements && TG.achievements.check();
     const lesson = TG.learn && TG.learn.byId('ger'), { h } = TG;
@@ -148,5 +148,68 @@
       h('button', { class: 'btn primary block', style: { marginTop: '14px' }, onclick: () => { close(); api.colours(i); } }, L('Өнгийг нь сонгох', 'Choose its colours'))), { cls: 'v-modal' });
   }
 
-  TG.gerwork = { init: (a) => { api = a; }, build, stepSpec, sync, busy: () => busy };
+  // ---------------------------------------------------------------- gathering: wool, felt and the wooden parts
+  const shearable = (i) => Date.now() - ((api.V().shorn || {})[i] || 0) > R.SHEAR_REGROW_MS;
+  /** Shear one sheep: blunt shears, a calm sheep, two handfuls of wool. */
+  async function shear(i) {
+    const v = api.V(), sheep = TG.pixel.animal('sheep', 0);
+    if (!shearable(i)) return TG.toast('🐑 ' + L('Энэ хонины ноос дахин ургаж байна. Өөр хонь хярга!', 'This sheep’s wool is still growing back. Try another sheep!'));
+    const r = await TG.tasks.run({ kind: 'drag', n: 3, title: T('Хонь хяргах', 'Shear a sheep'), path: [[44, 52], [116, 52]],
+      hint: T('Хайч нь мохоо үзүүртэй, хонь тайван байна. Нуруугаар нь чирж ноосыг нь хярга.', 'The shears have blunt tips and the sheep is calm and unharmed. Drag along its back to shear the wool.'),
+      art: (x, t, st) => { const sc = 5, w = sheep.width * sc, X = Math.round(80 - w / 2), Y = 30, q = st.progress / st.n; x.fillStyle = '#76b947'; x.fillRect(0, 84, 160, 36); x.drawImage(sheep, X, Y, w, sheep.height * sc); x.save(); x.beginPath(); x.rect(X, Y, w * q, sheep.height * sc); x.clip(); x.drawImage(TG.pixel.shorn(sheep), X, Y, w, sheep.height * sc); x.restore(); } });
+    if (!r.done) return;
+    v.shorn = v.shorn || {}; v.shorn[i] = Date.now(); g().wool += R.SHEAR_WOOL;
+    api.quest('shear'); api.reward(0, 4); TG.toast('🧶 ' + L(`+${R.SHEAR_WOOL} ноос. Ноосоор эсгий хийнэ.`, `+${R.SHEAR_WOOL} wool. Wool becomes felt.`)); api.save(); api.refresh();
+  }
+  const fluffArt = (n) => (x) => { x.fillStyle = '#a46d3b'; x.fillRect(24, 70, 112, 26); x.fillStyle = '#8a5a33'; x.fillRect(24, 94, 112, 2); for (let i = 0; i < n; i++) { const X = 40 + (i % 5) * 18, Y = 62 - Math.floor(i / 5) * 8; x.fillStyle = '#2b1e2e'; x.fillRect(X - 1, Y - 1, 16, 10); x.fillStyle = '#f6f2e9'; x.fillRect(X, Y, 14, 8); } };
+  const feltSpec = () => {
+    const G = g(), two = TG.tasks.players() === 2;
+    if (G.mats >= 1) return { step: 'roll', spec: { kind: 'rhythm', n: 10, water: true, two: 'help', speed: 0.9, win: 0.24, title: T('Эсгий өнхрүүлэх', 'Roll the felt'),
+      hint: two ? T('Нэг нь хэмнэлтэй өнхрүүл, нөгөө нь хатахад ус цац! Эрт үед эсгийг морьдоор чирж өнхрүүлдэг байжээ.', 'One rolls in rhythm, the other sprinkles water when it dries! Long ago, horses pulled the felt roll.')
+        : T('Басар өнхрүүлж байна. Хатахад нь цэнхэр дусал дээр дарж ус цац!', 'Basar pulls the roll. When it dries, tap the blue drop to sprinkle water!'),
+      art: (x, t) => { x.fillStyle = '#76b947'; x.fillRect(0, 70, 160, 50); const rx = 40 + ((t * 20) % 60); x.fillStyle = '#2b1e2e'; x.fillRect(rx - 13, 55, 34, 22); x.fillStyle = '#d8c8a8'; x.fillRect(rx - 12, 56, 32, 20); x.fillStyle = '#b8a47e'; for (let i = 0; i < 4; i++) x.fillRect(rx - 12 + i * 8, 56, 2, 20); if (!two) x.drawImage(TG.pixel.bankhar(1 + (Math.floor(t * 6) % 2)), rx + 26, 58); } } };
+    if (G.fluff >= R.FELT_WOOL) return { step: 'lay', spec: { kind: 'spots', title: T('Ноос дэлгэж норгох', 'Lay and wet the wool'),
+      hint: T('Ноосоо давхарлаж дэлгээд, дээрээс нь ус цац. Ус, дулаан ноосыг хооронд нь наалдуулна.', 'Spread the wool in layers, then sprinkle water on top. Water and warmth make the fibres stick together.'),
+      spots: [[48, 74], [72, 74], [96, 74], [120, 74], [56, 50], [84, 46], [112, 50]], art: (x, t, st) => fluffArt(Math.min(4, st.progress) * 2)(x) } };
+    if (G.wool >= 1) return { step: 'beat', spec: { kind: 'rhythm', n: 8, speed: 0.9, win: 0.24, title: T('Ноос цохих', 'Beat the wool'),
+      hint: T('Хоёр саваагаар ноосоо хэмнэлтэй цохиж сэвсийлгэ. Тэгвэл эсгий жигд болно.', 'Beat the wool with two sticks, in rhythm, to fluff it up so the felt comes out even.'),
+      art: (x, t, st) => { fluffArt(Math.max(2, 8 - st.progress))(x); const up = Math.floor(t * 6) % 2; x.fillStyle = '#6b4220'; x.fillRect(46, 30 + up * 8, 4, 30); x.fillRect(110, 38 - up * 8, 4, 30); } } };
+    return null;
+  };
+  /** The felt spot does the next felt step: beat the wool, lay and wet it, or roll it into felt. */
+  async function felt() {
+    const G = g(), f = feltSpec();
+    if (!f) return TG.toast('🐑 ' + L('Эхлээд хонио хяргаж ноос ав.', 'Shear a sheep first to get wool.'));
+    const r = await TG.tasks.run(f.spec);
+    if (!r.done) return;
+    if (f.step === 'beat') { G.fluff += G.wool; G.wool = 0; TG.toast('☁️ ' + L('Ноос сэвсийлээ!', 'The wool is fluffy!')); }
+    else if (f.step === 'lay') { G.fluff -= R.FELT_WOOL; G.mats++; TG.toast('💧 ' + L('Нойтон ноос бэлэн. Одоо өнхрүүлнэ!', 'Wet wool ready. Now roll it!')); }
+    else {
+      G.mats--; G.parts.esgii = (G.parts.esgii || 0) + 1; api.quest('felt'); api.reward(5, 10);
+      if (r.together) { const p2 = (api.live() || {}).p2; if (p2 && TG.store.logActivity) TG.store.logActivity({ kind: 'together', id: 'ger|family|' + p2.name }); }
+      TG.toast('🧶 ' + L(`Эсгий бэлэн боллоо! (${G.parts.esgii}/2)`, `A felt is ready! (${G.parts.esgii}/2)`));
+    }
+    api.save(); api.refresh();
+  }
+  const feltLabel = () => { const f = feltSpec(); return !f ? L('Эсгий хийх', 'Make felt') : f.step === 'roll' ? L('Эсгий өнхрүүлэх', 'Roll felt') : f.step === 'lay' ? L('Ноос дэлгэх', 'Lay wool') : L('Ноос цохих', 'Beat wool'); };
+  // Grandpa Craftsman's trades: goods from your herd, or coins
+  const HAVE = { wool: () => g().wool, aaruul: () => (api.V().produce || {}).aaruul || 0, urum: () => (api.V().produce || {}).urum || 0, coins: () => api.V().coins };
+  const GOOD = { wool: T('ноос', 'wool'), aaruul: T('ааруул', 'aaruul'), urum: T('өрөм', 'öröm'), coins: T('зоос', 'coins') };
+  const MADE = { khana: T('Бургасаар хийсэн эвхэгддэг тор', 'Folding lattice made of willow'), khaalga: T('Урагш харах будагтай хаалга', 'A painted door that faces south'),
+    toono: T('Тооно, хоёр багана, гурван бүслүүр', 'The crown, two posts and three ropes'), uni: T('Шинэс модоор хийсэн 9 унь', 'Nine roof poles of larch wood') };
+  const canPay = (cost) => Object.entries(cost).every(([k, n]) => HAVE[k]() >= n);
+  function pay(cost) { const v = api.V(), G = g(); for (const [k, n] of Object.entries(cost)) { if (k === 'wool') G.wool -= n; else if (k === 'coins') v.coins -= n; else v.produce[k] -= n; } }
+  /** The trade list in Grandpa Craftsman's talk. */
+  function tradeList(redraw) {
+    const { h } = TG, G = g(), costTxt = (c) => Object.entries(c).map(([k, n]) => `${n} ${tx(GOOD[k])}`).join(' + ');
+    return h('div', { class: 'v-trade v-list' }, R.TRADES.map((t) => {
+      const goods = R.tradeCost(t.id, 'goods'), coins = R.tradeCost(t.id, 'coins'), have = Object.entries(t.gives).every(([k, n]) => (G.parts[k] || 0) >= n);
+      const btn = (kind, cost) => h('button', { class: 'btn sm' + (kind === 'coins' ? '' : ' primary'), 'data-trade': t.id, 'data-pay': kind, disabled: !canPay(cost), title: canPay(cost) ? '' : L('Хүрэлцэхгүй байна', 'Not enough'),
+        onclick: () => { if (!canPay(cost)) return; pay(cost); for (const [k, n] of Object.entries(t.gives)) G.parts[k] = (G.parts[k] || 0) + n; TG.sfx.chime && TG.sfx.chime(); TG.toast('🪵 ' + Object.keys(t.gives).map((k) => tx(PART[k])).join(', ') + L(' авлаа!', ' — got it!')); api.save(); api.refresh(); redraw(); } }, costTxt(cost));
+      return h('div', { class: 'v-row' }, TG.pixel.icon('part:' + t.id, 32), h('div', { class: 'v-row-b' }, h('b', null, Object.keys(t.gives).map((k) => `${tx(PART[k])} ×${t.gives[k]}`).join(', ')), h('small', null, have ? L('✓ Танд байгаа', '✓ You have these') : tx(MADE[t.id]))),
+        h('div', { class: 'row-btns' }, btn('goods', goods), btn('coins', coins)));
+    }));
+  }
+
+  TG.gerwork = { init: (a) => { api = a; }, partName: (k) => tx(PART[k] || T(k, k)), build, stepSpec, sync, busy: () => busy, shear, shearable, felt, feltLabel, tradeList, feltSpec };
 })(window.TG);
