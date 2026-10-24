@@ -319,6 +319,16 @@ try {
   await check('village minimap', '.village .v-mini');
   await page.keyboard.down('Space'); await sleep(100); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => performance.now() - (TG._village.live().me.jt || 0) < 1000))) errors.push('village: Space did not jump');
+  // the hands-on task scene (Phaser): a real two-stroke drag finishes a drag task
+  step = 'hands-on task scene';
+  const tr = page.evaluate(() => TG.tasks.run({ kind: 'drag', title: { mn: 'Тест', en: 'Test' }, hint: { mn: 'Чир', en: 'Drag' }, path: [[20, 60], [140, 60]], n: 2, art: () => {} })).catch((e) => ({ error: e.message }));
+  await sleep(400);
+  const act = await page.evaluate(() => TG.tasks.active());
+  if (!act || act.kind !== 'drag' || act.n !== 2) errors.push('task scene: drag task should be active, got ' + JSON.stringify(act));
+  for (let i = 0; i < 2; i++) { const [a, b] = await page.evaluate(() => [TG.villageView.current().taskToCss(20, 60), TG.villageView.current().taskToCss(140, 60)]); await page.mouse.move(a[0], a[1]); await page.mouse.down(); await page.mouse.move(b[0], b[1], { steps: 12 }); await page.mouse.up(); await sleep(250); }
+  const res = await Promise.race([tr, sleep(3000).then(() => null)]);
+  if (!res || !res.done) { errors.push('task scene: two real drags should finish the task, got ' + JSON.stringify(res)); await page.evaluate(() => TG.tasks && TG.tasks.cancel && TG.tasks.cancel()); }
+  if (await page.evaluate(() => !!TG.tasks.active())) errors.push('task scene: the task should close when finished');
   // walking into a rock hops over it
   const rock = await page.evaluate(() => {
     const W = TG.vworld; let r = null;

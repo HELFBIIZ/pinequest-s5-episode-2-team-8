@@ -563,7 +563,7 @@
   // ---------------------------------------------------------------- input
   // a finger (or mouse) that drags on the map becomes a joystick right where it landed; a quick tap walks to that spot
   const STICK_R = 50;
-  function pointer(type, p) { if (type === 'down') onPointerDown(p); else if (type === 'move') onPointerMove(p); else onPointerUp(p); }
+  function pointer(type, p) { if (TG.tasks && TG.tasks.active() && type !== 'up') return; if (type === 'down') onPointerDown(p); else if (type === 'move') onPointerMove(p); else onPointerUp(p); }
   /** p comes from the Phaser view: id, x/y (screen), wx/wy (world art px). */
   function onPointerDown(e) {
     if (!live) return;
@@ -624,6 +624,7 @@
   }
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
+    if (TG.tasks && TG.tasks.active()) return; // a hands-on task has the keys
     // while someone is just talking (no answers to pick), you can still walk: only the movement keys get through
     const talking = TG.dialog && TG.dialog.active() && !(TG.dialog.free() && (KEYS[e.code] || /Shift/.test(e.code)));
     if (!live || document.querySelector('.modal-back') || talking || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;

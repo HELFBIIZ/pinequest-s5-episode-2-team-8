@@ -270,6 +270,8 @@
     const view = {
       game, scene, k: () => scene.m.k,
       /** The part of the map on screen, in art px. */
+      /** For tests: a point on the hands-on task stage, in CSS pixels. */
+      taskToCss: (x, y) => TG.tasks && TG.tasks.toCss(x, y),
       fx: () => ({ season: scene.sfx ? scene.sfx.season : null, emitters: scene.sfx && scene.sfx.emitter ? 1 : 0, night: !!(scene.veil && scene.veil.visible) }),
       viewport: () => { const c = scene.cameras && scene.cameras.main; return c ? { x: c.scrollX, y: c.scrollY, w: scene.m.devW / c.zoom, h: scene.m.devH / c.zoom } : { x: 0, y: 0, w: 0, h: 0 }; },
       destroy() { window.removeEventListener('resize', onResize); if (cur === view) cur = null; games--; game.destroy(false); },
