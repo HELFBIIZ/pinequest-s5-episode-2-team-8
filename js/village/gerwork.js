@@ -70,9 +70,8 @@
   // ---------------------------------------------------------------- the plot
   /** Keep the local copy of my plot (solo play) in step with my build, and tell the room when online. */
   function putLot(i, stage, first) {
-    const v = api.V(), live = api.live(), local = v.lots;
-    const mine = local[i] && local[i].by === v.id ? local[i] : null;
-    local[i] = Object.assign(mine || { by: v.id, n: live ? live.name : '', roof: 'blue', door: 'red', furn: [] }, { stage });
+    const v = api.V(), live = api.live(), local = v.lots, own = local.findIndex((l) => l && l.by === v.id), at = own >= 0 ? own : i; // one local copy, wherever it is
+    local[at] = Object.assign(own >= 0 ? local[own] : { by: v.id, n: live ? live.name : '', roof: 'blue', door: 'red', furn: [] }, { stage });
     if (live && live.online) {
       if (first || !(live.lots || []).some((l) => l && l.by === v.id)) api.net.send({ t: 'ger-claim', i, roof: local[i].roof, door: local[i].door, stage });
       else api.net.send({ t: 'ger-stage', stage });
@@ -83,7 +82,11 @@
   function sync() {
     const v = api.V(), live = api.live(), G = g();
     if (!live || G.stage < 1) return;
-    if (!live.online) { if (!(v.lots[G.lot] && v.lots[G.lot].by === v.id)) { const i = v.lots.findIndex((l) => !l); if (i >= 0) { G.lot = i; putLot(i, G.stage); } } return; }
+    if (!live.online) { // solo: your ger lives on your own local plot (the room may have given you another number)
+      const own = v.lots.findIndex((l) => l && l.by === v.id);
+      if (own >= 0) { if (R.lotStage(v.lots[own]) !== G.stage) { v.lots[own].stage = G.stage; api.save(); } return; }
+      const i = !v.lots[G.lot] && G.lot >= 0 ? G.lot : v.lots.findIndex((l) => !l); if (i >= 0) putLot(i, G.stage); return;
+    }
     const lots = live.lots || [], at = lots.findIndex((l) => l && l.by === v.id);
     if (at >= 0) { G.lot = at; if (R.lotStage(lots[at]) < G.stage) api.net.send({ t: 'ger-stage', stage: G.stage }); return; }
     const i = !lots[G.lot] ? G.lot : lots.findIndex((l) => !l);

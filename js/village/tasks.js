@@ -4,13 +4,13 @@
   const { tx } = TG;
   const SW = 160, SH = 120; // the task stage, in art pixels
   const DARK = 0x2b1e2e, GOLD = 0xf7c646, CREAM = 0xfff8e6, GREEN = 0x7fe07a;
-  let cur = null; // the running TaskScene
+  let cur = null, seq = 0; // the running TaskScene; every run gets its own scene key
 
   const players = () => { const l = TG._village && TG._village.live(); return l && l.p2 ? 2 : 1; };
   const near = (ax, ay, bx, by, r) => Math.hypot(ax - bx, ay - by) <= r;
 
   class TaskScene extends Phaser.Scene {
-    constructor(spec, done) { super('task'); this.spec = spec; this.done = done; }
+    constructor(spec, done) { super('task' + ++seq); this.spec = spec; this.done = done; }
 
     create() {
       const spec = this.spec, vs = this.game.scene.getScene('village');
@@ -232,7 +232,7 @@
       const root = view.game.canvas.parentElement; root && root.classList.add('tasking');
       const scene = new TaskScene(spec, (r) => { root && root.classList.remove('tasking'); resolve(r); });
       cur = scene;
-      view.game.scene.add('task', scene, true);
+      try { view.game.scene.add(scene.sys.settings.key, scene, true); } catch (e) { cur = null; root && root.classList.remove('tasking'); resolve({ done: false, mistakes: 0, together: false }); }
     });
   }
 
@@ -241,6 +241,8 @@
     active: () => (cur && cur.st ? { kind: cur.spec.kind, progress: cur.st.progress, n: cur.st.n } : null),
     say: (text) => cur && cur.st && cur.say(text),
     finish: () => cur && cur.st && cur.end(true),
+    /** The village is closing: the open task ends as not done, and the controls are free again. */
+    abort: () => { if (!cur) return; const c = cur; cur = null; c.over = true; c.done({ done: false, mistakes: c.st ? c.st.mistakes : 0, together: false }); },
     cancel: () => cur && cur.st && cur.end(false),
     pick: (id) => cur && cur.st && cur.pick(id),
     /** For tests: where a point on the task stage is on the screen, in CSS pixels. */

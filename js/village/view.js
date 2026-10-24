@@ -68,7 +68,7 @@
 
     pointer(type, p) {
       const e = p.event || {}, cam = this.cameras.main;
-      this.hooks.pointer(type, { id: p.id, x: e.clientX ?? p.x, y: e.clientY ?? p.y, wx: cam.scrollX + p.x / this.m.k, wy: cam.scrollY + p.y / this.m.k, touch: !!p.wasTouch, event: e });
+      this.hooks.pointer(type, { id: p.id, x: e.clientX ?? p.x, y: e.clientY ?? p.y, wx: cam.scrollX + p.x / cam.zoom, wy: cam.scrollY + p.y / cam.zoom, touch: !!p.wasTouch, event: e });
     }
 
     /** Get (or make) the pooled object for this id; anything not asked for this frame is removed at the end of it. */
@@ -80,7 +80,7 @@
     sweep() { for (const [id, o] of this.pool) if (o.__n !== this.n) { o.destroy(); this.pool.delete(id); } }
 
     /** World art px -> screen px (the text and marker layer works in real screen pixels, so the pixel font stays crisp). */
-    S(wx, wy) { const cam = this.cameras.main, k = this.m.k; return [(wx - cam.scrollX) * k, (wy - cam.scrollY) * k]; }
+    S(wx, wy) { const cam = this.cameras.main, z = cam.zoom; return [(wx - cam.scrollX) * z, (wy - cam.scrollY) * z]; }
     fontPx(s = 1) { return Math.max(10, Math.round((5 * Math.max(2, this.m.k) * s) / 5) * 5); }
     text(id, str, x, y, o = {}) {
       const fs = o.px || this.fontPx(o.s), out = o.outline === undefined ? DARK : o.outline, w = Math.max(1, Math.round(fs / 10));
@@ -261,7 +261,8 @@
     const m = measure(canvas.parentElement);
     const scene = new VillageScene(hooks, m);
     const game = new Phaser.Game({
-      type: webgl() ? Phaser.WEBGL : Phaser.CANVAS, canvas, // a game on our own canvas must name its renderer parent: null, width: m.devW, height: m.devH, zoom: 1 / m.dpr, pixelArt: true, backgroundColor: '#76b947',
+      type: webgl() ? Phaser.WEBGL : Phaser.CANVAS, canvas, // a game on our own canvas must name its renderer
+      parent: null, width: m.devW, height: m.devH, zoom: 1 / m.dpr, pixelArt: true, roundPixels: false, backgroundColor: '#76b947', // the view snaps to whole screen pixels itself
       banner: false, input: { keyboard: false, activePointers: 3 }, scale: { mode: Phaser.Scale.NONE }, audio: { noAudio: true }, scene: [scene],
     });
     const onResize = () => { const nm = measure(canvas.parentElement); Object.assign(scene.m, nm); if (scene.sys && scene.sys.isActive()) scene.applySize(); };
@@ -274,7 +275,7 @@
       taskToCss: (x, y) => TG.tasks && TG.tasks.toCss(x, y),
       fx: () => ({ season: scene.sfx ? scene.sfx.season : null, emitters: scene.sfx && scene.sfx.emitter ? 1 : 0, night: !!(scene.veil && scene.veil.visible) }),
       viewport: () => { const c = scene.cameras && scene.cameras.main; return c ? { x: c.scrollX, y: c.scrollY, w: scene.m.devW / c.zoom, h: scene.m.devH / c.zoom } : { x: 0, y: 0, w: 0, h: 0 }; },
-      destroy() { window.removeEventListener('resize', onResize); if (cur === view) cur = null; games--; game.destroy(false); },
+      destroy() { window.removeEventListener('resize', onResize); if (TG.tasks) TG.tasks.abort(); if (cur === view) cur = null; games--; game.destroy(false); },
     };
     cur = view;
     return view;
