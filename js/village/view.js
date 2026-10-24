@@ -202,7 +202,16 @@
   }
 
   let gl = null;
-  const webgl = () => { if (gl === null) { try { const c = document.createElement('canvas'); gl = !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { gl = false; } } return gl; };
+  /** WebGL on a real graphics chip; software-only WebGL (no GPU: SwiftShader, llvmpipe) is slower than plain canvas, so use Canvas there. */
+  const webgl = () => {
+    if (gl !== null) return gl;
+    try {
+      const c = document.createElement('canvas'), x = c.getContext('webgl2') || c.getContext('webgl'), ext = x && x.getExtension('WEBGL_debug_renderer_info');
+      gl = !!x && !(ext && /swiftshader|llvmpipe|software/i.test(x.getParameter(ext.UNMASKED_RENDERER_WEBGL)));
+      if (x && x.getExtension('WEBGL_lose_context')) x.getExtension('WEBGL_lose_context').loseContext();
+    } catch (e) { gl = false; }
+    return gl;
+  };
 
   /** Start the engine on the village's canvas. hooks: tick(dt), model(t) -> frame, paused(), pointer(type, p), mini(). */
   function mount(canvas, hooks) {

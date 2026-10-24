@@ -42,6 +42,9 @@ const check = async (label, selector) => {
 
 try {
   await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
+  // let the offline cache finish installing first, so its take-over can never reload the page in the middle of a check
+  await page.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready);
+  for (let i = 0; i < 100 && !(await page.evaluate(() => !navigator.serviceWorker || !!navigator.serviceWorker.controller)); i++) await sleep(100);
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
   await check('register screen', '.auth .big-input');
