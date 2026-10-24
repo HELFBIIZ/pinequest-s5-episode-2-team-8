@@ -235,6 +235,32 @@ try {
   const tr2 = await page.evaluate((c0) => ({ uni: TG.store.active().village.ger.parts.uni, paid: c0 - TG.store.active().village.coins }), coinsBefore);
   if (tr2.uni !== 9 || tr2.paid !== 15) errors.push('grandpa: buying roof poles for 15 coins should give 9 poles, got ' + JSON.stringify(tr2));
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  // two people on one screen: Mom joins as player 2, the arrow keys are hers, and the toono needs both
+  step = 'play together on one screen';
+  await page.evaluate(() => { const l = TG._village.live(); l.me.path = []; l.me.vx = l.me.vy = 0; l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; TG._village.together && TG._village.together('f1'); }); await sleep(300);
+  const p2 = await page.evaluate(() => { const l = TG._village.live(); if (!l.p2) return null; l.p2.px = 19; l.p2.py = 13; return { name: l.p2.name, x: l.p2.px }; });
+  if (!p2 || !/Ээж|Mom/.test(p2.name)) errors.push('together: Mom should join as player 2, got ' + JSON.stringify(p2));
+  else {
+    await page.keyboard.down('ArrowRight'); await sleep(500); await page.keyboard.up('ArrowRight');
+    const moved = await page.evaluate((x0) => { const l = TG._village.live(); return [l.p2.px > x0 + 0.5, Math.abs(l.me.px - 17) < 0.05]; }, p2.x);
+    if (!moved[0] || !moved[1]) errors.push('together: arrow keys should move player 2 only, got ' + JSON.stringify(moved));
+    await page.evaluate(() => { TG.store.active().village.ger.parts = { toono: 1, bagana: 2 }; });
+    const hr = page.evaluate(() => TG.tasks.run(TG.gerwork.stepSpec('toono'))).catch((e) => ({ error: e.message })); await sleep(400);
+    await page.keyboard.down('KeyE'); await sleep(500);
+    if (await page.evaluate(() => { const a = TG.tasks.active(); return !a || a.progress > 0; })) errors.push('together: the toono should not rise with only one player holding');
+    await page.keyboard.down('Enter'); await sleep(1900); await page.keyboard.up('Enter'); await page.keyboard.up('KeyE');
+    const hres = await Promise.race([hr, sleep(2000).then(() => null)]);
+    if (!hres || !hres.done || !hres.together) { errors.push('together: holding with both players should lift the toono together, got ' + JSON.stringify(hres)); await page.evaluate(() => TG.tasks.cancel()); }
+    await page.evaluate(() => TG._village.together(null)); await sleep(200);
+    if (await page.evaluate(() => !!TG._village.live().p2)) errors.push('together: calling it again should remove player 2');
+  }
+  // alone: a stray second finger changes nothing, and one finger lifts the toono because grandpa holds the other post
+  const sr = page.evaluate(() => TG.tasks.run(TG.gerwork.stepSpec('toono'))).catch((e) => ({ error: e.message })); await sleep(400);
+  const tc = await page.evaluate(() => TG.villageView.current().taskToCss(60, 60));
+  if (tc) { await page.mouse.move(tc[0], tc[1]); await page.mouse.down(); await sleep(1900); await page.mouse.up(); } // one hand (headless desktop Chrome has no touch for Phaser)
+  const sres = await Promise.race([sr, sleep(2000).then(() => null)]);
+  if (!sres || !sres.done) { errors.push('solo: one finger should lift the toono with grandpa holding the other post, got ' + JSON.stringify(sres)); await page.evaluate(() => TG.tasks.cancel()); }
+  await check('no player-2 controls in solo play', '.village:not(:has(.v-stick.p2.on))');
 
   // Basar: offline answers and a quiz (no server here, so the offline knowledge must answer)
   step = 'Basar chat (offline)';

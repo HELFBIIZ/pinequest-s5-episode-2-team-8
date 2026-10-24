@@ -92,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -404,13 +404,15 @@
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
       help: h('button', { class: 'v-pill px-frame v-help', 'aria-label': L('Заавар', 'Tutorial'), title: L('Заавар: хөтөчтэй хамт тоглоом сурах', 'Tutorial: learn the game with the guide'), onclick: () => TG.tutorial && TG.tutorial.start(true) }, '?'),
       stick: h('div', { class: 'v-stick', 'aria-hidden': 'true' }, h('i')),
+      stick2: h('div', { class: 'v-stick p2', 'aria-hidden': 'true' }, h('i')),
+      together: h('button', { class: 'v-pill px-frame v-together', 'aria-label': L('Хамтдаа тоглох', 'Play together'), title: L('Хамтдаа: нэг дэлгэц дээр хоёулаа', 'Together: two players on one screen'), onclick: () => togetherModal() }, '🤝'),
       stickHint: h('div', { class: 'v-stick-hint' + (coarse && !(V() || {}).stickUsed ? '' : ' gone'), 'aria-hidden': 'true' }, L('👆 Дэлгэц дээр чирж алх', '👆 Drag on the screen to walk')),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
         h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
-        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.help)),
-      els.race, els.battle, els.stick, els.stickHint,
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.together, els.help)),
+      els.race, els.battle, els.stick, els.stick2, els.stickHint,
       h('div', { class: 'v-bottom' },
         h('div', { class: 'v-tools' },
           els.fp, els.horse,
@@ -579,10 +581,18 @@
     if (!live) return;
     if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
     if (TG.dialog && TG.dialog.active() && !TG.dialog.free()) return; // the guide just talking doesn't stop you walking (tap or joystick)
+    if (live.p2 && !live.p2.hidden && e.x > innerWidth / 2) { if (!live.drag2) live.drag2 = { id: e.id, x0: e.x, y0: e.y, on: false }; return; } // player 2's thumb
     if (live.drag) return; // one finger steers, the other presses buttons
     live.drag = { id: e.id, x0: e.x, y0: e.y, wx: e.wx, wy: e.wy, on: false };
   }
   function onPointerMove(e) {
+    const d2 = live && live.drag2;
+    if (d2 && d2.id === e.id) { // player 2's joystick
+      const dx = e.x - d2.x0, dy = e.y - d2.y0, dist = Math.hypot(dx, dy), st = live.els.stick2;
+      if (!d2.on) { if (dist < 12) return; d2.on = true; const r = live.root.getBoundingClientRect(); st.style.left = d2.x0 - r.left + 'px'; st.style.top = d2.y0 - r.top + 'px'; st.classList.add('on'); }
+      const q = dist > STICK_R ? STICK_R / dist : 1; live.p2.stick = { x: (dx * q) / STICK_R, y: (dy * q) / STICK_R };
+      st.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`; return;
+    }
     const d = live && live.drag; if (!d || d.id !== e.id) return;
     const dx = e.x - d.x0, dy = e.y - d.y0, dist = Math.hypot(dx, dy), els = live.els;
     if (!d.on) {
@@ -597,11 +607,13 @@
     els.stick.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`;
   }
   function onPointerUp(e) {
+    if (live && live.drag2 && live.drag2.id === e.id) return endStick2();
     const d = live && live.drag; if (!d || d.id !== e.id) return;
     live.drag = null;
     if (d.on) return endStick();
     onTap(d.wx / T, d.wy / T);
   }
+  function endStick2() { if (!live) return; live.drag2 = null; if (live.p2) live.p2.stick = null; live.els.stick2.classList.remove('on'); live.els.stick2.firstChild.style.transform = ''; }
   function endStick() { if (!live) return; live.drag = null; live.stick = null; live.els.stick.classList.remove('on'); live.els.stick.firstChild.style.transform = ''; }
   /** A tap on the map at world tile coordinates. */
   function onTap(wx, wy) {
@@ -632,12 +644,16 @@
     live.floaters.push({ x: t.x, y: t.y, ring: true, t0: performance.now() });
     updateCtx();
   }
+  const P2KEYS = { ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u' };
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
     if (TG.tasks && TG.tasks.active()) return; // a hands-on task has the keys
     // while someone is just talking (no answers to pick), you can still walk: only the movement keys get through
     const talking = TG.dialog && TG.dialog.active() && !(TG.dialog.free() && (KEYS[e.code] || /Shift/.test(e.code)));
     if (!live || document.querySelector('.modal-back') || talking || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (live.p2 && P2KEYS[e.code]) { e.preventDefault(); live.p2.keys.add(P2KEYS[e.code]); return; }
+    if (live.p2 && (e.code === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); if (!e.repeat) p2Action(); return; }
+    if (live.p2 && e.code === 'ShiftRight') { live.p2.running = true; return; }
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
@@ -660,6 +676,8 @@
   }
   function onKeyUp(e) {
     if (!live) return;
+    if (live.p2 && P2KEYS[e.code]) live.p2.keys.delete(P2KEYS[e.code]);
+    if (live.p2 && e.code === 'ShiftRight') live.p2.running = false;
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = false; if (live.race) live.race.sprint = false; }
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
@@ -913,6 +931,57 @@
       TG.sfx.pop && TG.sfx.pop();
     } else if (cmd === 'out' && g && !g.out) { g.out = pn; TG.sfx.tick && TG.sfx.tick(); }
   }
+  // ================================================================ two players on one screen
+  /** Player 2 walks with the arrow keys (or the right-hand joystick) and steps aside while player 1 rides, races, fights or has a panel open. */
+  function moveP2(dt) {
+    const p = live.p2, m = live.me;
+    const busy = !!(live.ride || live.race || live.battle || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()));
+    if (busy) { p.hidden = true; p.vx = p.vy = 0; p.moving = false; return; }
+    if (p.hidden) { const at = besideMe(); p.px = at.x; p.py = at.y; p.hidden = false; }
+    const k = p.keys, st = p.stick, sm = st ? Math.hypot(st.x, st.y) : 0;
+    let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), mag = 1, tvx = 0, tvy = 0;
+    if (!ix && !iy && sm > 0.18) { ix = st.x; iy = st.y; mag = clamp((sm - 0.18) / 0.45, 0.45, 1); }
+    const SP = p.running ? 7.6 : SPEED;
+    if (ix || iy) { const n = Math.hypot(ix, iy); tvx = (ix / n) * SP * mag; tvy = (iy / n) * SP * mag; }
+    const a = Math.min(1, dt * ACCEL); p.vx += (tvx - p.vx) * a; p.vy += (tvy - p.vy) * a;
+    if (Math.abs(p.vx) < 0.01) p.vx = 0; if (Math.abs(p.vy) < 0.01) p.vy = 0;
+    const over = !freeAt(p.px + 0.5, p.py + 0.82), d0 = Math.hypot(p.px - m.px, p.py - m.py);
+    const ok = (x, y) => Math.hypot(x - m.px, y - m.py) <= 14 || Math.hypot(x - m.px, y - m.py) < d0; // a gentle tether: never wander off the shared screen
+    if (p.vx && freeAt(p.px + 0.5 + p.vx * dt, p.py + 0.82, over) && ok(p.px + p.vx * dt, p.py)) p.px += p.vx * dt; else p.vx = 0;
+    if (p.vy && freeAt(p.px + 0.5, p.py + 0.82 + p.vy * dt, over) && ok(p.px, p.py + p.vy * dt)) p.py += p.vy * dt; else p.vy = 0;
+    const speed = Math.hypot(p.vx, p.vy); p.moving = speed > 0.3;
+    if (p.moving) p.dir = Math.abs(p.vx) > Math.abs(p.vy) * 0.9 ? (p.vx < 0 ? 1 : 2) : (p.vy < 0 ? 3 : 0);
+    if (Math.abs(p.vx) > 0.3) p.face = p.vx < 0 ? 1 : 2;
+    p.x = Math.floor(p.px + 0.5); p.y = Math.floor(p.py + 0.82);
+  }
+  /** Player 2's hands: shear the sheep beside them, or work the felt. */
+  function p2Action() {
+    const p = live && live.p2; if (!p || p.hidden) return;
+    const fx = p.px + 0.5, fy = p.py + 0.82, felt = WD.objects.find((o) => o.kind === 'felt');
+    if (felt && Math.hypot(fx - (felt.door.x + 0.5), fy - (felt.door.y + 0.7)) < 1.4) return TG.gerwork.felt();
+    const sh = live.sheep.find((q) => Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) < 1.4);
+    if (sh && sheepAct(sh) === 'shear') return TG.gerwork.shear(sh.i);
+    TG.toast('🤝 ' + L(`${p.name}: хонь эсвэл эсгий хийх газрын дэргэд Enter дар.`, `${p.name}: press Enter next to a sheep or the felt spot.`));
+  }
+  /** A family member (or a friend) joins on this screen; null sends them home. */
+  function together(fid) {
+    if (!live) return;
+    if (fid === null || fid === undefined) { if (live.p2) TG.toast(`👋 ${live.p2.name}`); live.p2 = null; endStick2(); hud(); return; }
+    const f = (S.state.family || []).find((x) => x.id === fid), v = V(), at = besideMe(), deels = Object.keys(R.DEELS);
+    const deel = deels[(deels.indexOf(v.look.deel) + 3) % deels.length];
+    live.p2 = { id: 'p2', name: f ? tx(f.name) : L('Найз', 'Friend'), look: { ...v.look, deel, pet: null, ride: null, title: null }, px: at.x, py: at.y, x: Math.floor(at.x + 0.5), y: Math.floor(at.y + 0.82),
+      vx: 0, vy: 0, dir: 0, face: 2, moving: false, running: false, jt: 0, keys: new Set(), stick: null, hidden: false };
+    TG.sfx.chime && TG.sfx.chime(); TG.toast(`🤝 ${live.p2.name} ${L('хамт тоглож байна! Сум товч, Enter: тэр. Дэлгэцийн баруун тал: түүний джойстик.', 'is playing too! Arrow keys and Enter are theirs; the right half of the screen is their joystick.')}`); hud();
+  }
+  function togetherModal() {
+    const fam = S.state.family || [], body = h('div');
+    const pick = (id) => { close(); together(id); };
+    rc(body, h('h2', null, '🤝 ', L('Хамтдаа тоглох', 'Play together')), h('p', { class: 'muted' }, L('Нэг утас, таблет дээр хоёулаа: тоноо хамт өргөж, эсгийгээ хамт өнхрүүлээрэй!', 'Two of you on one phone or tablet: lift the toono and roll felt together!')),
+      h('div', { class: 'v-list' }, [...fam.map((f) => h('button', { class: 'btn block', onclick: () => pick(f.id) }, `${f.emoji} ${tx(f.name)}`)), h('button', { class: 'btn block', onclick: () => pick('') }, `🧒 ${L('Найз', 'Friend')}`)]),
+      live && live.p2 ? h('button', { class: 'btn danger block', style: { marginTop: '10px' }, onclick: () => pick(null) }, L('Хамтдаа тоглохоо болих', 'Stop playing together')) : null);
+    const close = TG.modal(body, { cls: 'v-modal' });
+  }
+
   function update(dt) {
     const m = live.me, k = live.keys, v0 = V();
     const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || !!live.stick || m.path.length > 0);
@@ -964,8 +1033,10 @@
     m.netT += dt;
     const movedSince = Math.hypot(m.px - m.sent.x, m.py - m.sent.y);
     if ((m.netT > 0.1 && movedSince > 0.03) || (!m.moving && movedSince > 0.001)) { m.netT = 0; m.sent = { x: m.px, y: m.py }; net.send({ t: 'move', x: +m.px.toFixed(2), y: +m.py.toFixed(2), dir: m.dir }); }
-    // smooth camera
-    const ca = Math.min(1, dt * 7); live.cam.x += (m.px - live.cam.x) * ca; live.cam.y += (m.py - live.cam.y) * ca;
+    if (live.p2) moveP2(dt);
+    // smooth camera (between both players when two play on one screen)
+    const p2 = live.p2 && !live.p2.hidden ? live.p2 : null, cx = p2 ? (m.px + p2.px) / 2 : m.px, cy = p2 ? (m.py + p2.py) / 2 : m.py;
+    const ca = Math.min(1, dt * 7); live.cam.x += (cx - live.cam.x) * ca; live.cam.y += (cy - live.cam.y) * ca;
     follow(m.petPos, m.px - 0.45, m.py + 0.25, dt);
     { // Басар trots behind you and sits beside you when you stop
       const dg = live.dog, [ddx, ddy] = DIRS[m.dir], tx2 = m.moving ? m.px - ddx * 0.95 + (ddy ? 0.6 : 0) : m.px + 1.1, ty2 = m.moving ? m.py - ddy * 0.7 + 0.15 : m.py + 0.25;
@@ -1026,6 +1097,8 @@
     if (live.race) live.race.npcs.forEach((n, i) => { rider('race:' + i, n.look, n.face, live.race.phase === 'go' && !n.done, n.px, n.py, n.py); if (live.race.phase === 'go') text('race:' + i, n.name, n.px * T + 8, n.py * T - 22, 0.8, '#ffffff'); });
     for (const o of live.others.values()) person('o:' + o.id, o);
     person('me', { ...live.me, look: v.look });
+    const p2 = live.p2 && !live.p2.hidden ? live.p2 : null;
+    if (p2) { person('p2', p2); F.zoomOut = clamp(Math.hypot(p2.px - live.me.px, p2.py - live.me.py) / 9, 1, 1.6); }
     const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
     shadow('dog', dg.x * T, dg.y * T + 1); sprite('dog', PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.y + 0.05, dg.flip);
     lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; sprite('lot:' + i, PX.gerStage(R.lotStage(l), R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2, o.y + 2); text('lot:' + i, l.n, o.x * T + 24, o.y * T - 4, 1, l.by === v.id ? '#f7c646' : '#ffffff'); });
@@ -1075,6 +1148,7 @@
     };
     for (const o of live.others.values()) tag('o:' + o.id, o, o.name, o.lvl, false);
     tag('me', live.me, live.name, R.level(v.xp).l, true);
+    if (p2) tag('p2', p2, p2.name, '🤝', false);
     const tt = live.tut && live.tut.target;
     if (tt && !live.race) { // the tutorial points at where to go: a bouncing arrow over the spot, and a compass arrow over you when it is far away
       F.marks.push({ id: 'tut', kind: 'arrow', x: tt.x * T + 8, y: tt.y * T - 26, label: tt.label });
