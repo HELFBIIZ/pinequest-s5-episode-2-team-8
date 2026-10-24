@@ -35,6 +35,9 @@ jobs:
       - name: Every referenced file exists and is cached offline
         run: node tests/check-assets.mjs
 
+      - name: Ger rules (shared by the browser and the server)
+        run: node tests/ger-rules.mjs
+
       - name: Browser smoke test (register, Нутаг, Basar, every lesson)
         run: |
           npm install --no-save --no-package-lock --silent puppeteer-core@22.15.0

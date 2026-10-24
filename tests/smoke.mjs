@@ -31,6 +31,10 @@ await page.setRequestInterception(true);
 page.on('request', (r) => { const u = new URL(r.url()); if (u.protocol.startsWith('http') && u.hostname !== 'localhost') { external.push(r.url()); r.abort(); } else r.continue(); });
 let step = 'load';
 page.on('pageerror', (e) => errors.push(`${step}: ${e.message}`));
+// if the page ever reloads by itself, say when and whether the offline cache's take-over did it
+await page.evaluateOnNewDocument(() => { if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', () => sessionStorage.setItem('smoke-cc', String(Date.now()))); });
+let settled = false;
+page.on('framenavigated', async (f) => { if (!settled || f !== page.mainFrame()) return; const cc = await page.evaluate(() => sessionStorage.getItem('smoke-cc')).catch(() => '?'); errors.push(`${step}: the page reloaded by itself (offline-cache take-over before it: ${cc ? 'yes' : 'no'})`); });
 page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push(`${step}: console error: ${m.text()}`); });
 const check = async (label, selector) => {
   step = label;
@@ -42,8 +46,12 @@ const check = async (label, selector) => {
 
 try {
   await page.goto(`${base}/index.html`, { waitUntil: 'networkidle0' });
+  // let the offline cache finish installing first, so its take-over can never reload the page in the middle of a check
+  await page.evaluate(() => navigator.serviceWorker && navigator.serviceWorker.ready);
+  for (let i = 0; i < 100 && !(await page.evaluate(() => !navigator.serviceWorker || !!navigator.serviceWorker.controller)); i++) await sleep(100);
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
+  settled = true;
   await check('register screen', '.auth .big-input');
 
   // register through the real screens: name -> age -> mascot -> picture password
@@ -151,6 +159,23 @@ try {
   const solo = await page.evaluate(() => { const L = TG._village.live(); return L && L.status; });
   if (solo !== 'solo') errors.push(`village: expected solo mode without a server, got "${solo}"`);
   if (!(await page.evaluate(() => !!TG._village.dog()))) errors.push('village: Basar the dog is not following the player');
+
+  step = 'phaser village';
+  const ph = await page.evaluate(() => { const v = TG._village.phaser && TG._village.phaser(); return v ? { ver: Phaser.VERSION, active: v.scene.sys.isActive(), cv: !!document.querySelector('.village canvas.v-canvas'), n: v.scene.children.list.reduce((s, c) => s + (c.list ? c.list.length : 1), 0), pixelArt: v.game.config.pixelArt, aa: v.game.config.antialias } : null; });
+  if (ph && (ph.pixelArt !== true || ph.aa !== false)) errors.push('village: pixel art must be drawn crisp (pixelArt on, no smoothing), got ' + JSON.stringify(ph));
+  if (!ph || ph.ver !== '4.2.1' || !ph.active || !ph.cv || ph.n < 20) errors.push('village: Phaser 4.2.1 scene should be running and drawing the village, got ' + JSON.stringify(ph));
+  // rotate the phone: the engine canvas refits
+  await page.setViewport({ width: 844, height: 390 }); await sleep(400);
+  if (!(await page.evaluate(() => { const c = document.querySelector('.village canvas.v-canvas'); if (!c) return false; const r = c.getBoundingClientRect(); return Math.abs(r.width - innerWidth) < 2 && Math.abs(r.height - innerHeight) < 2; }))) errors.push('village: canvas should refit after rotating');
+  await page.setViewport({ width: 390, height: 844 }); await sleep(400);
+  // leave and come back five times: still exactly one engine
+  for (let i = 0; i < 5; i++) { await page.evaluate(() => TG.go('learn')); await sleep(150); await page.evaluate(() => TG.go('village')); await sleep(300); }
+  const games = await page.evaluate(() => document.querySelectorAll('.village canvas.v-canvas').length + ':' + (TG.villageView ? TG.villageView.count() : 'x'));
+  if (games !== '1:1') errors.push('village: exactly one Phaser canvas and one game after re-entering, got canvases:games ' + games);
+  // the player walks: the game loop runs inside the engine
+  const x0 = await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); const l = TG._village.live(); l.me.path = []; l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; TG._village.goTo({ x: 24, y: 13 }); return 17; }); await sleep(1500);
+  const walked = await page.evaluate(() => { const l = TG._village.live(); return { px: l.me.px, py: l.me.py, path: l.me.path.length, modal: !!document.querySelector('.modal-back'), dlg: TG.dialog.active() }; });
+  if (Math.abs(walked.px - x0) < 0.5) errors.push('village: the player should walk inside the Phaser loop, ' + JSON.stringify({ x0, ...walked }));
   // the dairy yard: let the calf suckle, milk the cow in rhythm, then make aaruul at the rack
   step = 'dairy yard';
   if (await page.evaluate(() => !!TG.store.active().village.garden)) errors.push('dairy yard: the old garden data was not removed');
@@ -182,10 +207,96 @@ try {
   await page.evaluate(() => [...document.querySelectorAll('.v-school .btn.primary')].pop().click()); await sleep(400); await check('practice bout', '.v-wrestle .v-wr-coach');
   await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.tournament(1); }); await sleep(400); await check('village wrestling match', '.v-wrestle canvas');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
-  step = 'ger locked before the lesson';
-  await page.evaluate(() => TG._village.lot(0)); await sleep(300);
-  if (!(await page.evaluate(() => /сур|Learn/i.test((document.querySelector('.modal h2') || {}).textContent || '')))) errors.push('village: building a ger should ask to finish the ger lesson first');
+  step = 'ger is built by hand, not bought';
+  await page.evaluate(() => { const v = TG.store.active().village; v.ger.parts = { khana: 5, khaalga: 1, toono: 1, bagana: 2, uni: 9, esgii: 2, buurees: 1, buslvvr: 3 }; v.coins = 40; });
+  const build = page.evaluate(() => TG._village.build(0)).catch((e) => ({ error: e.message }));
+  await sleep(400);
+  if ((await page.evaluate(() => TG.tasks.active() && TG.tasks.active().kind)) !== 'choose') errors.push('ger: building should start by choosing what comes first');
+  // wrong first step: felt before the floor → a hint, nothing lost
+  await page.evaluate(() => TG.tasks.pick('esgii')); await sleep(500);
+  if (!(await page.evaluate(() => TG.store.active().village.ger.mistakes === 1 && TG.store.active().village.ger.parts.esgii === 2))) errors.push('ger: a wrong step should count a mistake and keep the parts');
+  for (const st of ['shal', 'khana', 'khaalga', 'toono', 'uni', 'esgii', 'buurees', 'buslvvr', 'tulga']) { await page.evaluate((x) => TG.tasks.pick(x), st); await sleep(300); await page.evaluate(() => TG.tasks.finish()); await sleep(450); }
+  await Promise.race([build, sleep(3000)]);
+  const g = await page.evaluate(() => ({ st: TG.store.active().village.ger.stage, coins: TG.store.active().village.coins, built: TG.store.active().village.gerBuilt, lot: TG._village.lots()[0] && TG.vrules.lotStage(TG._village.lots()[0]) }));
+  if (g.st !== 9 || !g.built || g.lot !== 9 || g.coins !== 40) errors.push('ger: nine hands-on steps should finish the ger without spending coins, got ' + JSON.stringify(g));
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
+  // gathering for a ger: shear sheep, make felt, trade with Grandpa Craftsman
+  step = 'gathering for a ger';
+  await page.evaluate(() => { const v = TG.store.active().village; v.ger = { stage: 0, lot: -1, parts: {}, wool: 0, fluff: 0, mats: 0, mistakes: 0, perfect: false }; v.shorn = {}; v.produce.aaruul = 5; v.coins = 200; });
+  for (let i = 0; i < 2; i++) { const p = page.evaluate((k) => TG._village.shear(k), i).catch((e) => ({ error: e.message })); await sleep(350); await page.evaluate(() => TG.tasks && TG.tasks.finish()); await Promise.race([p, sleep(2000)]); }
+  if ((await page.evaluate(() => TG.store.active().village.ger.wool)) !== 4) errors.push('gathering: two shorn sheep should give 4 wool');
+  if ((await page.evaluate(() => TG._village.shearable && TG._village.shearable(0))) !== false) errors.push('gathering: a shorn sheep should not be shearable again right away');
+  for (let i = 0; i < 3; i++) { const p = page.evaluate(() => TG._village.felt()).catch((e) => ({ error: e.message })); await sleep(350); await page.evaluate(() => TG.tasks && TG.tasks.finish()); await Promise.race([p, sleep(2000)]); } // beat → lay & wet → roll
+  const fe = await page.evaluate(() => TG.store.active().village.ger);
+  if (fe.parts.esgii !== 1 || fe.fluff !== 0 || fe.mats !== 0) errors.push('gathering: beat → lay & wet → roll should make one felt, got ' + JSON.stringify(fe));
+  await page.evaluate(() => TG._village.npc('craftsman')); await sleep(300);
+  await check('grandpa craftsman trades', '.npc-talk .v-trade');
+  const coinsBefore = await page.evaluate(() => TG.store.active().village.coins); // rolling the felt paid a little
+  await page.evaluate(() => { const b = document.querySelector('.npc-talk .v-trade [data-trade="uni"][data-pay="coins"]'); if (b) b.click(); }); await sleep(200);
+  const tr2 = await page.evaluate((c0) => ({ uni: TG.store.active().village.ger.parts.uni, paid: c0 - TG.store.active().village.coins }), coinsBefore);
+  if (tr2.uni !== 9 || tr2.paid !== 15) errors.push('grandpa: buying roof poles for 15 coins should give 9 poles, got ' + JSON.stringify(tr2));
+  await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  // two people on one screen: Mom joins as player 2, the arrow keys are hers, and the toono needs both
+  step = 'play together on one screen';
+  await page.evaluate(() => { const l = TG._village.live(); l.me.path = []; l.me.vx = l.me.vy = 0; l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; TG._village.together && TG._village.together('f1'); }); await sleep(300);
+  const p2 = await page.evaluate(() => { const l = TG._village.live(); if (!l.p2) return null; l.p2.px = 19; l.p2.py = 13; return { name: l.p2.name, x: l.p2.px }; });
+  if (!p2 || !/Ээж|Mom/.test(p2.name)) errors.push('together: Mom should join as player 2, got ' + JSON.stringify(p2));
+  else {
+    await page.keyboard.down('ArrowRight'); await sleep(500); await page.keyboard.up('ArrowRight');
+    const moved = await page.evaluate((x0) => { const l = TG._village.live(); return [l.p2.px > x0 + 0.5, Math.abs(l.me.px - 17) < 0.05]; }, p2.x);
+    if (!moved[0] || !moved[1]) errors.push('together: arrow keys should move player 2 only, got ' + JSON.stringify(moved));
+    await page.evaluate(() => { TG.store.active().village.ger.parts = { toono: 1, bagana: 2 }; });
+    const hr = page.evaluate(() => TG.tasks.run(TG.gerwork.stepSpec('toono'))).catch((e) => ({ error: e.message })); await sleep(400);
+    await page.keyboard.down('KeyE'); await sleep(500);
+    if (await page.evaluate(() => { const a = TG.tasks.active(); return !a || a.progress > 0; })) errors.push('together: the toono should not rise with only one player holding');
+    await page.keyboard.down('Enter'); await sleep(1900); await page.keyboard.up('Enter'); await page.keyboard.up('KeyE');
+    const hres = await Promise.race([hr, sleep(2000).then(() => null)]);
+    if (!hres || !hres.done || !hres.together) { errors.push('together: holding with both players should lift the toono together, got ' + JSON.stringify(hres)); await page.evaluate(() => TG.tasks.cancel()); }
+    await page.evaluate(() => TG._village.together(null)); await sleep(200);
+    if (await page.evaluate(() => !!TG._village.live().p2)) errors.push('together: calling it again should remove player 2');
+  }
+  // alone: a stray second finger changes nothing, and one finger lifts the toono because grandpa holds the other post
+  const sr = page.evaluate(() => TG.tasks.run(TG.gerwork.stepSpec('toono'))).catch((e) => ({ error: e.message })); await sleep(400);
+  const tc = await page.evaluate(() => TG.villageView.current().taskToCss(60, 60));
+  if (tc) { await page.mouse.move(tc[0], tc[1]); await page.mouse.down(); await sleep(1900); await page.mouse.up(); } // one hand (headless desktop Chrome has no touch for Phaser)
+  const sres = await Promise.race([sr, sleep(2000).then(() => null)]);
+  if (!sres || !sres.done) { errors.push('solo: one finger should lift the toono with grandpa holding the other post, got ' + JSON.stringify(sres)); await page.evaluate(() => TG.tasks.cancel()); }
+  await check('no player-2 controls in solo play', '.village:not(:has(.v-stick.p2.on))');
+  // names stay on their characters when the camera zooms out for two players far apart
+  step = 'labels while zoomed out';
+  // the name sits beside the level box, so compare its offset from the character before and after zooming out
+  const tagOff = () => page.evaluate(() => { const sc = TG._village.phaser().scene, cam = sc.cameras.main, sp = sc.pool.get('s:me'), tg = sc.pool.get('t:me:nm'); return sp && tg ? { zoom: cam.zoom, k: sc.m.k, d: tg.x - (sp.x + 8 - cam.scrollX) * cam.zoom } : null; });
+  await page.evaluate(() => { const l = TG._village.live(); l.me.path = []; l.me.px = l.me.x = 17; l.me.py = l.me.y = 13; }); await sleep(600);
+  const off0 = await tagOff();
+  await page.evaluate(() => { TG._village.together('f1'); }); await sleep(200);
+  await page.evaluate(() => { const l = TG._village.live(); l.p2.px = 30; l.p2.py = 13; }); await sleep(900);
+  const off1 = await tagOff(), off = off0 && off1 ? { zoom: off1.zoom, k: off1.k, dx: Math.abs(off1.d - off0.d), off0, off1 } : null;
+  if (!off || off.zoom >= off.k || off.dx > 4) errors.push('two players: the name tag should stay over its character when zoomed out, got ' + JSON.stringify(off));
+  await page.evaluate(() => TG._village.together(null)); await sleep(200);
+  // a step finished by real input (not the test helper) leads straight to choosing the next step
+  step = 'ger step finished by hand';
+  await page.evaluate(() => { const v = TG.store.active().village; v.ger = { stage: 0, lot: -1, parts: { khana: 5, khaalga: 1, toono: 1, bagana: 2, uni: 9, esgii: 2, buurees: 1, buslvvr: 3 }, wool: 0, fluff: 0, mats: 0, mistakes: 0, perfect: false }; });
+  const bp = page.evaluate(() => TG._village.build(1)).catch((e) => ({ error: e.message }));
+  await sleep(400); await page.evaluate(() => TG.tasks.pick('shal')); await sleep(500);
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('KeyE'); await sleep(120); }
+  await sleep(900);
+  const nextKind = await page.evaluate(() => TG.tasks.active() && TG.tasks.active().kind);
+  if (nextKind !== 'choose') errors.push('ger: after laying the floor by hand, the next choice should open, got ' + JSON.stringify(nextKind) + ' ' + JSON.stringify(await Promise.race([bp, sleep(50).then(() => 'pending')])));
+  await page.evaluate(() => TG.tasks.cancel()); await Promise.race([bp, sleep(1000)]);
+  if (await page.evaluate(() => !!document.querySelector('.village.tasking'))) errors.push('ger: the village buttons should come back after a task');
+  await page.evaluate(() => { const v = TG.store.active().village; v.lots[1] = null; v.ger.stage = 9; v.ger.lot = 0; TG.store.save(); });
+  // leaving the village in the middle of a task frees the controls again
+  step = 'leaving during a task';
+  const lp = page.evaluate(() => TG.tasks.run({ kind: 'drag', title: { mn: 'Т', en: 'T' }, hint: { mn: 'Т', en: 'T' }, path: [[20, 60], [140, 60]], n: 2, art: () => {} })).catch((e) => ({ error: e.message }));
+  await sleep(400); await page.evaluate(() => TG.go('learn')); await sleep(200); await page.evaluate(() => TG.go('village')); await sleep(800);
+  const left = { active: await page.evaluate(() => !!TG.tasks.active()), res: await Promise.race([lp, sleep(1000).then(() => null)]) };
+  if (left.active || !left.res || left.res.done !== false) errors.push('tasks: leaving the village should close the open task, got ' + JSON.stringify(left));
+  // solo play never grows extra copies of your own ger
+  step = 'one ger per player in solo play';
+  await page.evaluate(() => { const v = TG.store.active().village; v.lots = v.lots.map((l) => (l && l.by === v.id ? null : l)); v.lots[0] = { by: v.id, n: 'Тест', roof: 'blue', door: 'red', furn: [], stage: 9 }; v.ger.stage = 9; v.ger.lot = 5; TG.store.save(); });
+  for (let i = 0; i < 2; i++) { await page.evaluate(() => TG.go('learn')); await sleep(150); await page.evaluate(() => TG.go('village')); await sleep(500); }
+  const mine = await page.evaluate(() => { const v = TG.store.active().village; return v.lots.filter((l) => l && l.by === v.id).length; });
+  if (mine !== 1) errors.push('solo: re-entering the village should keep exactly one of your gers, got ' + mine);
 
   // Basar: offline answers and a quiz (no server here, so the offline knowledge must answer)
   step = 'Basar chat (offline)';
@@ -270,13 +381,12 @@ try {
   if (!(await page.evaluate(() => (TG.store.active().together || {}).friends >= 1))) errors.push('learn together: the friends quiz was not recorded');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
 
-  step = 'ger unlocked after the lesson';
-  await page.evaluate(() => TG.go('village')); await sleep(700);
-  await page.evaluate(() => { document.querySelectorAll('.modal-x').forEach((x) => x.click()); TG._village.lot(0); }); await sleep(300);
-  await check('ger builder unlocked', '.modal .v-gerbox + .label, .modal .v-chips');
-  // buy it, furnish it and walk inside
+  step = 'a save from before hands-on building keeps its ger';
+  await page.evaluate(() => { const v = TG.store.active().village; delete v.ger; v.gerBuilt = true; TG.store.save(); });
+  await page.evaluate(() => TG.go('learn')); await sleep(150); await page.evaluate(() => TG.go('village')); await sleep(700);
+  if ((await page.evaluate(() => (TG.store.active().village.ger || {}).stage)) !== 9) errors.push('old save: a ger built before this update should load finished');
+  // furnish it and walk inside
   step = 'inside my ger';
-  await page.evaluate(() => { TG.store.active().village.coins = 2000; TG.store.active().village.xp = 3000; [...document.querySelectorAll('.modal .btn.primary')].pop().click(); }); await sleep(700);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   await page.evaluate(() => { const l = TG._village.lots()[0]; if (l) l.furn = ['tulga', 'or', 'avdar', 'morinkhuur', 'shirdeg', 'shagai']; TG._village.enterGer(0); }); await sleep(500);
   await check('full-screen ger interior', '.fscene.ger-scene .scene-cv');
@@ -300,6 +410,16 @@ try {
   await check('village minimap', '.village .v-mini');
   await page.keyboard.down('Space'); await sleep(100); await page.keyboard.up('Space');
   if (!(await page.evaluate(() => performance.now() - (TG._village.live().me.jt || 0) < 1000))) errors.push('village: Space did not jump');
+  // the hands-on task scene (Phaser): a real two-stroke drag finishes a drag task
+  step = 'hands-on task scene';
+  const tr = page.evaluate(() => TG.tasks.run({ kind: 'drag', title: { mn: 'Тест', en: 'Test' }, hint: { mn: 'Чир', en: 'Drag' }, path: [[20, 60], [140, 60]], n: 2, art: () => {} })).catch((e) => ({ error: e.message }));
+  await sleep(400);
+  const act = await page.evaluate(() => TG.tasks.active());
+  if (!act || act.kind !== 'drag' || act.n !== 2) errors.push('task scene: drag task should be active, got ' + JSON.stringify(act));
+  for (let i = 0; i < 2; i++) { const [a, b] = await page.evaluate(() => [TG.villageView.current().taskToCss(20, 60), TG.villageView.current().taskToCss(140, 60)]); await page.mouse.move(a[0], a[1]); await page.mouse.down(); await page.mouse.move(b[0], b[1], { steps: 12 }); await page.mouse.up(); await sleep(250); }
+  const res = await Promise.race([tr, sleep(3000).then(() => null)]);
+  if (!res || !res.done) { errors.push('task scene: two real drags should finish the task, got ' + JSON.stringify(res)); await page.evaluate(() => TG.tasks && TG.tasks.cancel && TG.tasks.cancel()); }
+  if (await page.evaluate(() => !!TG.tasks.active())) errors.push('task scene: the task should close when finished');
   // walking into a rock hops over it
   const rock = await page.evaluate(() => {
     const W = TG.vworld; let r = null;
@@ -382,6 +502,8 @@ try {
   await page.evaluate(() => TG.seasons.open()); await sleep(250);
   await check('season explainer', '.season-modal .season-wheel .sw-i.on');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(200);
+  const fx = await page.evaluate(() => { const v = TG._village.phaser(), f = v && v.fx && v.fx(); return f && { ...f, want: TG._village.live().season }; });
+  if (!fx || fx.season !== fx.want || fx.emitters < 1) errors.push('village: season particles should run on Phaser, got ' + JSON.stringify(fx));
   if (!(await page.evaluate(() => TG.store.active().village.quests.list.some((q) => q.season)))) errors.push('seasons: there is no season quest today');
   // townspeople: accept a task, do it, collect the reward
   step = 'townspeople quests';
@@ -446,7 +568,7 @@ try {
   const shots0 = await page.evaluate(() => TG._village.battleState().shots || 0);
   await page.keyboard.press('KeyF'); await sleep(100);
   // a raider one step away is hit (and the arrow gone) within a frame or two, so count the shot itself
-  if (!(await page.evaluate((n) => (TG._village.battleState().shots || 0) > n, shots0))) errors.push('first-person battle: F did not shoot');
+  if (!(await page.evaluate((n) => (TG._village.battleState().shots || 0) > n, shots0))) errors.push('first-person battle: F did not shoot, ' + (await page.evaluate(() => { const bt = TG._village.battleState(), L = TG._village.live(); return JSON.stringify({ over: bt.over, cd: bt.cd, herd: bt.herd, enemies: bt.enemies.map((e) => ({ x: +e.x.toFixed(1), y: +e.y.toFixed(1), flee: !!e.flee })), me: [+(L.me.px + 0.5).toFixed(1), +(L.me.py + 0.82).toFixed(1)] }); })));
   await page.evaluate(() => { const bt = TG._village.battleState(); bt.herd = 0; }); await sleep(600);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(300);
   await page.evaluate(() => TG._village.fpScene.close()); await sleep(400);
@@ -559,6 +681,7 @@ try {
   for (const screen of ['memories', 'about']) {
     await page.evaluate((s) => TG.go(s), screen); await sleep(250);
     await check(`screen ${screen}`, screen === 'about' ? '.about' : '.shell');
+    if (screen === 'about' && !(await page.evaluate(() => /Phaser 4/.test((document.querySelector('.about') || {}).textContent || '')))) errors.push('about: the pitch page should say the village is built with Phaser 4');
   }
 
   step = 'log out and log in with the picture password';

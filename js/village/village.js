@@ -16,8 +16,10 @@
     const d = { id: 'u' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4), xp: 0, coins: 40, produce: {}, milkT: {}, fish: {},
       owned: ['deel-blue'], look: { deel: 'blue', skin: R.SKINS[0], hat: null, face: null, neck: null, pet: null }, rod: 1, room: 'NUTAG',
       quests: { d: '', list: [] }, pets: {}, seen: {}, tips: false, pos: null,
-      energy: 100, ate: {}, lots: [], wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
+      energy: 100, ate: {}, lots: [], ger: { stage: 0, lot: -1, parts: {}, wool: 0, fluff: 0, mats: 0, mistakes: 0, perfect: false }, shorn: {}, wr: { best: 0, champ: 0, wins: 0, losses: 0, pvpW: 0, pvpL: 0, techs: {} }, ovoo: '', horse: { coat: 'bay', races: 0, wins: 0, top5: 0, best: 0, dist: 0 } };
+    const oldGer = v.ger === undefined && v.gerBuilt; // a ger bought before gers were built by hand
     for (const k in d) if (v[k] === undefined) v[k] = d[k];
+    if (oldGer) { v.ger.stage = R.GER_DONE; v.ger.lot = (v.lots || []).findIndex((l) => l && l.by === v.id); }
     if (v.garden || v.seeds) { delete v.garden; delete v.seeds; delete v.can; delete v.water; for (const k of Object.keys(v.produce)) if (!R.DAIRY[k]) delete v.produce[k]; } // the garden became the dairy yard
     while (v.lots.length < R.LOTS) v.lots.push(null);
     return v;
@@ -90,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { wardrobe: () => wardrobe(), battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), buyLot: (i, roof, door) => net.send({ t: 'ger-buy', i, roof, door }), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { wardrobe: () => wardrobe(), phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -222,6 +224,7 @@
         live.chat = (m.chat || []).slice(-CHAT_KEEP); renderChat();
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
+        TG.gerwork.sync();
         if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Сервер хуучин хувилбартай байна. Барилдаан зөв ажиллахын тулд серверийг дахин асаагаарай (Ctrl+C, дараа нь node server.js).', '⚠️ The server is running an old version. Restart it (Ctrl+C, then node server.js) so wrestling works.')), 2500);
         break;
       case 'join': addOther(m.p); addChat({ k: 'join', id: m.p.id, n: m.p.name }); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
@@ -379,6 +382,7 @@
   const fmtLeft = (ms) => { const s = Math.ceil(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}${L('с', 's')}`; };
 
   // ================================================================ screen
+  TG.gerwork.init({ V, live: () => live, net, reward, quest, factCard, lotsArr, enterGer, colours: (i) => gerColours(i), save: () => S.save(), refresh: () => { if (live) { hud(); updateCtx(); } } });
   TG.villageScreen = ({ setCleanup }) => {
     quests();
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
@@ -404,12 +408,14 @@
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
       help: h('button', { class: 'v-pill px-frame v-help', 'aria-label': L('Заавар', 'Tutorial'), title: L('Заавар: хөтөчтэй хамт тоглоом сурах', 'Tutorial: learn the game with the guide'), onclick: () => TG.tutorial && TG.tutorial.start(true) }, '?'),
       stick: h('div', { class: 'v-stick', 'aria-hidden': 'true' }, h('i')),
+      stick2: h('div', { class: 'v-stick p2', 'aria-hidden': 'true' }, h('i')),
+      together: h('button', { class: 'v-pill px-frame v-together', 'aria-label': L('Хамтдаа тоглох', 'Play together'), title: L('Хамтдаа: нэг дэлгэц дээр хоёулаа', 'Together: two players on one screen'), onclick: () => togetherModal() }, '🤝'),
       stickHint: h('div', { class: 'v-stick-hint' + (coarse && !(V() || {}).stickUsed ? '' : ' gone'), 'aria-hidden': 'true' }, L('👆 Дэлгэц дээр чирж алх', '👆 Drag on the screen to walk')),
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
-        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.help)),
-      els.race, els.battle, els.stick, els.stickHint,
+        h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.together, els.help)),
+      els.race, els.battle, els.stick, els.stick2, els.stickHint,
       h('div', { class: 'v-bottom' },
         // the three buttons used most stay out; the rest wait behind "more" so the map stays clear
         h('div', { class: 'v-tools' },
@@ -436,23 +442,20 @@
     const qRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
     if (R.ROOM_RE.test(qRoom) && v.room !== qRoom) { v.room = qRoom; S.save(); }
     const sp = v.pos && !WD.blocked(Math.floor(v.pos.x + 0.5), Math.floor(v.pos.y + 0.82)) ? v.pos : { x: 17, y: 13 };
-    live = { root, canvas, els, ctx: canvas.getContext('2d'), name: prof.name, status: 'connecting', online: false, offset: 0, lots: null, room: v.room,
+    live = { root, canvas, els, name: prof.name, status: 'connecting', online: false, offset: 0, lots: null, room: v.room,
       me: { x: Math.floor(sp.x + 0.5), y: Math.floor(sp.y + 0.82), px: sp.x, py: sp.y, vx: 0, vy: 0, path: [], dir: 0, moving: false, bubble: null, petPos: { x: sp.x, y: sp.y + 0.6 }, sent: { x: sp.x, y: sp.y }, netT: 0, stuck: 0 },
       season: TG.seasons.current().id, fx: [], cam: { x: sp.x, y: sp.y }, dog: { x: sp.x + 0.7, y: sp.y + 0.2, moving: false, flip: false, idle: 0, bubble: null, nextFact: performance.now() + 25000 }, keys: new Set(), others: new Map(), pending: null, floaters: [], match: null,
       sheep: [[24, 20], [28, 22], [31, 20], [26, 23]].map(([x, y], i) => ({ i, x, y, px: x, py: y, next: 1 + i, flip: false })),
-      raf: 0, last: performance.now(), view: {}, terrain: WD.renderStatic(), buf: PX.mk(1, 1), ctxTimer: 0, sel: null };
-    resize();
+      view: null, ctxTimer: 0, sel: null };
     document.fonts && document.fonts.load('10px Tiny5', 'Нутаг ӨҮ');
-    window.addEventListener('resize', resize);
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointermove', onPointerMove); canvas.addEventListener('pointerup', onPointerUp); canvas.addEventListener('pointercancel', onPointerUp);
     window.addEventListener('keydown', onKey, true); window.addEventListener('keyup', onKeyUp, true); window.addEventListener('blur', clearKeys);
     root.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }); // HUD buttons never keep focus
     live.miniBase = miniBase();
     els.mini.addEventListener('pointerdown', onMiniTap);
-    net.connect(); hud(); updateCtx();
+    net.connect(); hud(); updateCtx(); TG.gerwork.sync();
     live.unMusic = TG.music ? TG.music.onChange(() => hud()) : null;
-    live.raf = requestAnimationFrame(frame);
+    // the Phaser engine runs the loop: it asks update() to move everything, then model() what to draw
+    live.view = TG.villageView.mount(canvas, { tick: (dt) => live && update(dt), model, paused: () => !!((TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active())), pointer, mini: () => live && drawMini() });
     if (!v.tutorial && !v.tutorialSeen && TG.tutorial) setTimeout(() => live && live.root === root && TG.tutorial.start(false), 350); // first visit: the guide walks you through the game
     else if (!v.tips) tips();
     setCleanup(stop);
@@ -462,30 +465,13 @@
     if (!live) return;
     live.race = null;
     if (TG.tutorial) TG.tutorial.stop();
-    cancelAnimationFrame(live.raf);
-    window.removeEventListener('resize', resize); window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
+    live.view.destroy();
+    window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
     net.close();
     if (live.unMusic) live.unMusic();
     const v = V(); if (v) { v.pos = { x: +live.me.px.toFixed(2), y: +live.me.py.toFixed(2) }; v.energy = Math.round(v.energy * 10) / 10; S.save(); }
     live = null;
   }
-  function resize() {
-    if (!live) return;
-    const cssW = live.root.clientWidth || innerWidth, cssH = live.root.clientHeight || innerHeight, dpr = Math.min(3, devicePixelRatio || 1);
-    const devW = Math.round(cssW * dpr), devH = Math.round(cssH * dpr);
-    live.canvas.width = devW; live.canvas.height = devH;
-    let k = Math.max(1, Math.round(devW / ((cssW < 640 ? 11 : 24) * T)));
-    k = Math.max(k, Math.ceil(devW / (WD.W * T)), Math.ceil(devH / (WD.H * T)));
-    const bw = Math.ceil(devW / k), bh = Math.ceil(devH / k);
-    live.buf.c.width = bw + 1; live.buf.c.height = bh + 1; live.buf.x.imageSmoothingEnabled = false; // +1 px so sub-pixel scrolling never shows an edge
-    live.view = { devW, devH, dpr, k, bw, bh, cssW };
-  }
-  /** Camera in art pixels, NOT rounded: rounding here made the view jump a whole art pixel (4–6 screen pixels). */
-  function cam() {
-    const { bw, bh } = live.view;
-    return { x: clamp(live.cam.x * T + 8 - bw / 2, 0, WD.W * T - bw), y: clamp(live.cam.y * T + 4 - bh / 2, 0, WD.H * T - bh) };
-  }
-
   // ---------------------------------------------------------------- HUD
   function hudEnergy() { if (!live) return; const en = Math.round(V().energy ?? 100); live.els.energy.textContent = `🍖 ${en}`; live.els.energy.classList.toggle('low', en < 20); }
   function hud() {
@@ -514,6 +500,8 @@
       onclick: () => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); } }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
       : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), L('Саах →', 'Go milk →'))]));
   }
+  /** While a ger is still to be built, a sheep with its wool grown is for shearing; otherwise for petting. */
+  const sheepAct = (q) => (V().ger.stage < R.GER_DONE && TG.gerwork.shearable(q.i) ? 'shear' : 'sheep');
   function contextAction() {
     if (!live || live.me.path.length || live.race) return null;
     const m = live.me, fx = m.px + 0.5, fy = m.py + 0.82;
@@ -522,7 +510,7 @@
     const consider = (d, a) => { if (d < bd) { bd = d; best = a; } };
     for (const o of WD.objects) if (o.door) consider(Math.hypot(fx - (o.door.x + 0.5), fy - (o.door.y + 0.7)), o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     consider(Math.hypot(fx - (WD.DOCK.x + 0.5), fy - (WD.DOCK.y + 0.7)), { type: 'fish' });
-    for (const q of live.sheep) consider(Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) - 0.35, { type: 'sheep', s: q });
+    for (const q of live.sheep) consider(Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) - 0.35, { type: sheepAct(q), s: q });
     if (best) return best;
     if ((WD.g[m.y] || [])[m.x] === 'a') return { type: 'arena' };
     return null;
@@ -546,7 +534,9 @@
       case 'rack': return ['dairy:aaruul', L('Ааруул хийх', 'Make aaruul')];
       case 'fish': return ['ui:fish', L('Загасчлах', 'Fish')];
       case 'sheep': return ['ui:heart', L('Илбэх', 'Pet')];
-      case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l ? L('Гэр авах', 'Buy ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
+      case 'shear': return ['part:wool', L('Хяргах', 'Shear')];
+      case 'felt': return ['part:esgii', TG.gerwork.feltLabel()];
+      case 'lot': { const l = lotsArr()[a.i]; return ['ui:ger', !l || (l.by === V().id && R.lotStage(l) < R.GER_DONE) ? L('Гэр барих', 'Build a ger') : l.by === V().id ? L('Миний гэр', 'My ger') : L('Зочлох', 'Visit')]; }
       case 'zasuul': case 'arena': return ['ui:wrestle', L('Барилдах', 'Wrestle')];
       case 'ovoo': return ['ui:ovoo', L('Овоо тахих', 'Visit ovoo')];
       case 'uya': return ['ui:horse', L('Морь', 'Horses')];
@@ -578,6 +568,8 @@
       case 'churn': case 'tulga': case 'rack': return dairyStation(a.type);
       case 'fish': return fishing();
       case 'sheep': return petSheep(a.s);
+      case 'shear': { const m = live.me; if (Math.abs(a.s.x - m.x) > 1 || Math.abs(a.s.y - m.y) > 1) return TG.toast(L('Хонь холдчихлоо 🐑', 'The sheep wandered off 🐑')); return TG.gerwork.shear(a.s.i); }
+      case 'felt': return TG.gerwork.felt();
       case 'lot': return lotAction(a.i);
       case 'zasuul': case 'arena': return arenaModal();
       case 'ovoo': return ovooAction();
@@ -591,19 +583,27 @@
   // ---------------------------------------------------------------- input
   // a finger (or mouse) that drags on the map becomes a joystick right where it landed; a quick tap walks to that spot
   const STICK_R = 50;
+  function pointer(type, p) { if (TG.tasks && TG.tasks.active() && type !== 'up') return; if (type === 'down') onPointerDown(p); else if (type === 'move') onPointerMove(p); else onPointerUp(p); }
+  /** p comes from the Phaser view: id, x/y (screen), wx/wy (world art px). */
   function onPointerDown(e) {
     if (!live) return;
-    e.preventDefault();
     if (live.els.more.classList.contains('open')) { live.els.more.classList.remove('open'); return; } // a tap on the map just closes "more"
     if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
     if (TG.dialog && TG.dialog.active() && !TG.dialog.free()) return; // the guide just talking doesn't stop you walking (tap or joystick)
+    if (live.p2 && !live.p2.hidden && e.x > innerWidth / 2) { if (!live.drag2) live.drag2 = { id: e.id, x0: e.x, y0: e.y, on: false }; return; } // player 2's thumb
     if (live.drag) return; // one finger steers, the other presses buttons
-    live.drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false };
-    try { live.canvas.setPointerCapture(e.pointerId); } catch (er) { /* not supported */ }
+    live.drag = { id: e.id, x0: e.x, y0: e.y, wx: e.wx, wy: e.wy, on: false };
   }
   function onPointerMove(e) {
-    const d = live && live.drag; if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.x0, dy = e.clientY - d.y0, dist = Math.hypot(dx, dy), els = live.els;
+    const d2 = live && live.drag2;
+    if (d2 && d2.id === e.id) { // player 2's joystick
+      const dx = e.x - d2.x0, dy = e.y - d2.y0, dist = Math.hypot(dx, dy), st = live.els.stick2;
+      if (!d2.on) { if (dist < 12) return; d2.on = true; const r = live.root.getBoundingClientRect(); st.style.left = d2.x0 - r.left + 'px'; st.style.top = d2.y0 - r.top + 'px'; st.classList.add('on'); }
+      const q = dist > STICK_R ? STICK_R / dist : 1; live.p2.stick = { x: (dx * q) / STICK_R, y: (dy * q) / STICK_R };
+      st.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`; return;
+    }
+    const d = live && live.drag; if (!d || d.id !== e.id) return;
+    const dx = e.x - d.x0, dy = e.y - d.y0, dist = Math.hypot(dx, dy), els = live.els;
     if (!d.on) {
       if (dist < 12) return;
       d.on = true; live.me.path = []; live.pending = null;
@@ -616,22 +616,23 @@
     els.stick.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`;
   }
   function onPointerUp(e) {
-    const d = live && live.drag; if (!d || d.id !== e.pointerId) return;
+    if (live && live.drag2 && live.drag2.id === e.id) return endStick2();
+    const d = live && live.drag; if (!d || d.id !== e.id) return;
     live.drag = null;
     if (d.on) return endStick();
-    if (e.type === 'pointerup') onTap({ clientX: d.x0, clientY: d.y0 });
+    onTap(d.wx / T, d.wy / T);
   }
+  function endStick2() { if (!live) return; live.drag2 = null; if (live.p2) live.p2.stick = null; live.els.stick2.classList.remove('on'); live.els.stick2.firstChild.style.transform = ''; }
   function endStick() { if (!live) return; live.drag = null; live.stick = null; live.els.stick.classList.remove('on'); live.els.stick.firstChild.style.transform = ''; }
-  function onTap(e) {
+  /** A tap on the map at world tile coordinates. */
+  function onTap(wx, wy) {
     if (!live) return;
-    const r = live.canvas.getBoundingClientRect(), c = cam(), { k, devW } = live.view, sc = devW / r.width;
-    const ax = ((e.clientX - r.left) * sc) / k + c.x, ay = ((e.clientY - r.top) * sc) / k + c.y;
-    const wx = ax / T, wy = ay / T, tx0 = Math.floor(wx), ty0 = Math.floor(wy);
+    const tx0 = Math.floor(wx), ty0 = Math.floor(wy);
     if (live.battle) { const e = nearestEnemy(wx, wy + 0.4, 1.4); if (e) { shootAt(e.x, e.y); return; } }   // tap a raider to loose a whistling arrow
     { const dg = live.dog; if (Math.abs(dg.x + 0.55 - wx) < 0.8 && wy > dg.y - 0.6 && wy < dg.y + 1.1) return openBasar(); }
     for (const o of live.others.values()) if (Math.abs(o.px + 0.5 - wx) < 0.6 && wy > o.py - 0.8 && wy < o.py + 1) return playerCard(o);
     const sh = live.sheep.find((q) => Math.abs(q.px + 0.5 - wx) < 0.7 && Math.abs(q.py + 0.5 - wy) < 0.7);
-    if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: 'sheep', s: sh }) : null; }
+    if (sh) { const n = WD.nearestOpen(sh.x, sh.y, live.me.x, live.me.y); return n ? goTo(n, { type: sheepAct(sh), s: sh }) : null; }
     const o = WD.occ[tx0 + ',' + ty0]; if (o && o.door) return goTo(o.door, o.kind === 'lot' ? { type: 'lot', i: o.i } : o.kind === 'npc' ? { type: 'zasuul' } : o.kind === 'npcq' ? { type: 'npcq', id: o.id } : { type: o.id });
     if (tx0 === WD.DOCK.x && ty0 === WD.DOCK.y) return goTo(WD.DOCK, { type: 'fish' });
     if (!WD.blocked(tx0, ty0)) return goTo({ x: tx0, y: ty0 }, null);
@@ -652,11 +653,16 @@
     live.floaters.push({ x: t.x, y: t.y, ring: true, t0: performance.now() });
     updateCtx();
   }
+  const P2KEYS = { ArrowDown: 'd', ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u' };
   const KEYS = { ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u' };
   function onKey(e) {
+    if (TG.tasks && TG.tasks.active()) return; // a hands-on task has the keys
     // while someone is just talking (no answers to pick), you can still walk: only the movement keys get through
     const talking = TG.dialog && TG.dialog.active() && !(TG.dialog.free() && (KEYS[e.code] || /Shift/.test(e.code)));
     if (!live || document.querySelector('.modal-back') || talking || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()) || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || '')) return;
+    if (live.p2 && P2KEYS[e.code]) { e.preventDefault(); live.p2.keys.add(P2KEYS[e.code]); return; }
+    if (live.p2 && (e.code === 'Enter' || e.code === 'NumpadEnter')) { e.preventDefault(); if (!e.repeat) p2Action(); return; }
+    if (live.p2 && e.code === 'ShiftRight') { live.p2.running = true; return; }
     if (KEYS[e.code]) { e.preventDefault(); live.keys.add(KEYS[e.code]); return; }
     if (e.code === 'KeyB' && !e.repeat) { e.preventDefault(); openBasar(); return; }
     if (e.code === 'KeyF' && live.battle && !e.repeat) { e.preventDefault(); shootNearest(); return; }
@@ -679,6 +685,8 @@
   }
   function onKeyUp(e) {
     if (!live) return;
+    if (live.p2 && P2KEYS[e.code]) live.p2.keys.delete(P2KEYS[e.code]);
+    if (live.p2 && e.code === 'ShiftRight') live.p2.running = false;
     if (KEYS[e.code]) live.keys.delete(KEYS[e.code]);
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { live.run = false; if (live.race) live.race.sprint = false; }
     if (e.code === 'Space' && !document.querySelector('.modal-back')) { e.preventDefault(); e.stopPropagation(); }
@@ -776,17 +784,13 @@
       won ? h('div', { class: 'teach' }, h('b', null, '📜 ', L('Түүхэнд юу болсон бэ?', 'What really happened?')), h('p', null, tx(ch.after))) : null,
       h('button', { class: 'btn primary block', style: { marginTop: '12px' }, onclick: (e) => e.currentTarget.closest('.modal-back').querySelector('.modal-x').click() }, L('Гайхалтай!', 'Great!'))), { cls: 'v-modal' });
   }
-  function battleDraw(ents, drawRider, t) {
+  /** Raiders and defenders on horseback, arrows in flight, and each raider's courage hearts. */
+  function battleModel(F, rider, text) {
     const bt = live && live.battle; if (!bt) return;
-    for (const u of [...bt.enemies, ...bt.allies]) ents.push({ y: u.y - 0.82, f: () => drawRider(u.look, u.face || 2, true, u.x - 0.5, u.y - 0.82) });
-  }
-  function battleOverlay(ctx, S2, k) {
-    const bt = live && live.battle; if (!bt) return;
-    ctx.save(); ctx.lineWidth = Math.max(2, k * 0.8); ctx.strokeStyle = '#3a2516';
-    for (const a of bt.arrows) { const [x1, y1] = S2(a.x * T, a.y * T - 10), [x2, y2] = S2((a.x - a.dx * 0.5) * T, (a.y - a.dy * 0.5) * T - 10); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.fillStyle = '#f7c646'; ctx.fillRect(x1 - k, y1 - k, k * 2, k * 2); }
-    ctx.font = `${Math.round(k * 5)}px Rubik, sans-serif`; ctx.textAlign = 'center';
-    for (const e of bt.enemies) { const [sx, sy] = S2(e.x * T, e.y * T - 38); ctx.fillStyle = e.flee ? '#ffffff' : '#e14b3d'; ctx.fillText(e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), sx, sy); }
-    ctx.restore();
+    bt.enemies.forEach((u, i) => rider('raider:' + i, u.look, u.face || 2, true, u.x - 0.5, u.y - 0.82, u.y - 0.82));
+    bt.allies.forEach((u, i) => rider('ally:' + i, u.look, u.face || 2, true, u.x - 0.5, u.y - 0.82, u.y - 0.82));
+    bt.arrows.forEach((a, i) => F.marks.push({ id: 'shaft:' + i, kind: 'shaft', x: a.x * T, y: a.y * T - 10, x2: (a.x - a.dx * 0.5) * T, y2: (a.y - a.dy * 0.5) * T - 10 }));
+    bt.enemies.forEach((e, i) => F.texts.push({ id: 'heart:' + i, font: 'rubik', text: e.flee ? '😨' : '♥'.repeat(Math.max(0, e.courage)) + '♡'.repeat(Math.max(0, e.max - e.courage)), x: e.x * T, y: e.y * T - 38, color: e.flee ? '#ffffff' : '#e14b3d' }));
   }
   const battleLabel = () => { const bt = live && live.battle; return bt ? `⚔️ ${tx(bt.ch.name)} · ${L('Давалгаа', 'Wave')} ${bt.wave + 1}/${bt.ch.waves.length} · 🐑 ${bt.herd}/${HERD_MAX} · 😨 ${bt.repelled}/${bt.total}` : ''; };
 
@@ -878,7 +882,7 @@
 
   // ---------------------------------------------------------------- minimap
   const MINI = { g: '#76b947', T: '#3f7a2c', p: '#d8ab6c', s: '#d9cdb5', w: '#4aa6e2', d: '#a46d3b', o: '#8c5a33', f: '#a46d3b', r: '#a5a5b0', a: '#e8c994' };
-  const MINI_OBJ = { ger: '#f4efe3', shop: '#e14b3d', board: '#a46d3b', well: '#77778a', lot: '#c8a06a', bleachers: '#a46d3b', ovoo: '#a5a5b0', uya: '#8a5a33', archery: '#e9a91f', academy: '#2f7d5b' };
+  const MINI_OBJ = { ger: '#f4efe3', shop: '#e14b3d', board: '#a46d3b', well: '#77778a', lot: '#c8a06a', bleachers: '#a46d3b', ovoo: '#a5a5b0', uya: '#8a5a33', archery: '#e9a91f', academy: '#2f7d5b', felt: '#d8c8a8' };
   /** One pixel per tile: ground, roads, water, buildings. */
   function miniBase() {
     const m = PX.mk(WD.W, WD.H);
@@ -899,8 +903,8 @@
     for (const o of live.others.values()) dot(o.px + 0.5, o.py + 0.8, '#ffffff');
     if (Math.floor(pn / 450) % 2) dot(live.me.px + 0.5, live.me.py + 0.8, '#ffffff', 3);
     dot(live.me.px + 0.5, live.me.py + 0.8, '#e14b3d');
-    const { bw, bh } = live.view, c = cam(); m.strokeStyle = 'rgba(255,255,255,.85)'; m.lineWidth = 1;
-    m.strokeRect(Math.round((c.x / T) * s) + 0.5, Math.round((c.y / T) * s) + 0.5, Math.round((bw / T) * s) - 1, Math.round((bh / T) * s) - 1);
+    const vp = live.view.viewport(); m.strokeStyle = 'rgba(255,255,255,.85)'; m.lineWidth = 1;
+    m.strokeRect(Math.round((vp.x / T) * s) + 0.5, Math.round((vp.y / T) * s) + 0.5, Math.round((vp.w / T) * s) - 1, Math.round((vp.h / T) * s) - 1);
   }
   /** First tap opens the big map; on the big map, tap a place to walk there. */
   function onMiniTap(e) {
@@ -914,13 +918,6 @@
   }
 
   // ---------------------------------------------------------------- update + draw
-  function frame(ts) {
-    if (!live) return;
-    const dt = Math.min(0.05, (ts - live.last) / 1000); live.last = ts;
-    update(dt);
-    if (!(TG.scene && TG.scene.active()) && !(TG.fp && TG.fp.active())) { draw(ts / 1000); if ((live.mf = (live.mf || 0) + 1) % 2) drawMini(); }
-    live.raf = requestAnimationFrame(frame);
-  }
   const follow = (p, x, y, dt) => { p.x += (x - p.x) * Math.min(1, dt * 4); p.y += (y - p.y) * Math.min(1, dt * 4); };
   // ---------------------------------------------------------------- Nomin pops in and out (tutorial.js decides when)
   const POOF_MS = 420;
@@ -943,6 +940,57 @@
       TG.sfx.pop && TG.sfx.pop();
     } else if (cmd === 'out' && g && !g.out) { g.out = pn; TG.sfx.tick && TG.sfx.tick(); }
   }
+  // ================================================================ two players on one screen
+  /** Player 2 walks with the arrow keys (or the right-hand joystick) and steps aside while player 1 rides, races, fights or has a panel open. */
+  function moveP2(dt) {
+    const p = live.p2, m = live.me;
+    const busy = !!(live.ride || live.race || live.battle || document.querySelector('.modal-back') || (TG.scene && TG.scene.active()) || (TG.fp && TG.fp.active()));
+    if (busy) { p.hidden = true; p.vx = p.vy = 0; p.moving = false; return; }
+    if (p.hidden) { const at = besideMe(); p.px = at.x; p.py = at.y; p.hidden = false; }
+    const k = p.keys, st = p.stick, sm = st ? Math.hypot(st.x, st.y) : 0;
+    let ix = (k.has('r') ? 1 : 0) - (k.has('l') ? 1 : 0), iy = (k.has('d') ? 1 : 0) - (k.has('u') ? 1 : 0), mag = 1, tvx = 0, tvy = 0;
+    if (!ix && !iy && sm > 0.18) { ix = st.x; iy = st.y; mag = clamp((sm - 0.18) / 0.45, 0.45, 1); }
+    const SP = p.running ? 7.6 : SPEED;
+    if (ix || iy) { const n = Math.hypot(ix, iy); tvx = (ix / n) * SP * mag; tvy = (iy / n) * SP * mag; }
+    const a = Math.min(1, dt * ACCEL); p.vx += (tvx - p.vx) * a; p.vy += (tvy - p.vy) * a;
+    if (Math.abs(p.vx) < 0.01) p.vx = 0; if (Math.abs(p.vy) < 0.01) p.vy = 0;
+    const over = !freeAt(p.px + 0.5, p.py + 0.82), d0 = Math.hypot(p.px - m.px, p.py - m.py);
+    const ok = (x, y) => Math.hypot(x - m.px, y - m.py) <= 14 || Math.hypot(x - m.px, y - m.py) < d0; // a gentle tether: never wander off the shared screen
+    if (p.vx && freeAt(p.px + 0.5 + p.vx * dt, p.py + 0.82, over) && ok(p.px + p.vx * dt, p.py)) p.px += p.vx * dt; else p.vx = 0;
+    if (p.vy && freeAt(p.px + 0.5, p.py + 0.82 + p.vy * dt, over) && ok(p.px, p.py + p.vy * dt)) p.py += p.vy * dt; else p.vy = 0;
+    const speed = Math.hypot(p.vx, p.vy); p.moving = speed > 0.3;
+    if (p.moving) p.dir = Math.abs(p.vx) > Math.abs(p.vy) * 0.9 ? (p.vx < 0 ? 1 : 2) : (p.vy < 0 ? 3 : 0);
+    if (Math.abs(p.vx) > 0.3) p.face = p.vx < 0 ? 1 : 2;
+    p.x = Math.floor(p.px + 0.5); p.y = Math.floor(p.py + 0.82);
+  }
+  /** Player 2's hands: shear the sheep beside them, or work the felt. */
+  function p2Action() {
+    const p = live && live.p2; if (!p || p.hidden) return;
+    const fx = p.px + 0.5, fy = p.py + 0.82, felt = WD.objects.find((o) => o.kind === 'felt');
+    if (felt && Math.hypot(fx - (felt.door.x + 0.5), fy - (felt.door.y + 0.7)) < 1.4) return TG.gerwork.felt();
+    const sh = live.sheep.find((q) => Math.hypot(fx - (q.px + 0.5), fy - (q.py + 0.7)) < 1.4);
+    if (sh && sheepAct(sh) === 'shear') return TG.gerwork.shear(sh.i);
+    TG.toast('🤝 ' + L(`${p.name}: хонь эсвэл эсгий хийх газрын дэргэд Enter дар.`, `${p.name}: press Enter next to a sheep or the felt spot.`));
+  }
+  /** A family member (or a friend) joins on this screen; null sends them home. */
+  function together(fid) {
+    if (!live) return;
+    if (fid === null || fid === undefined) { if (live.p2) TG.toast(`👋 ${live.p2.name}`); live.p2 = null; endStick2(); hud(); return; }
+    const f = (S.state.family || []).find((x) => x.id === fid), v = V(), at = besideMe(), deels = Object.keys(R.DEELS);
+    const deel = deels[(deels.indexOf(v.look.deel) + 3) % deels.length];
+    live.p2 = { id: 'p2', name: f ? tx(f.name) : L('Найз', 'Friend'), look: { ...v.look, deel, pet: null, ride: null, title: null }, px: at.x, py: at.y, x: Math.floor(at.x + 0.5), y: Math.floor(at.y + 0.82),
+      vx: 0, vy: 0, dir: 0, face: 2, moving: false, running: false, jt: 0, keys: new Set(), stick: null, hidden: false };
+    TG.sfx.chime && TG.sfx.chime(); TG.toast(`🤝 ${live.p2.name} ${L('хамт тоглож байна! Сум товч, Enter: тэр. Дэлгэцийн баруун тал: түүний джойстик.', 'is playing too! Arrow keys and Enter are theirs; the right half of the screen is their joystick.')}`); hud();
+  }
+  function togetherModal() {
+    const fam = S.state.family || [], body = h('div');
+    const pick = (id) => { close(); together(id); };
+    rc(body, h('h2', null, '🤝 ', L('Хамтдаа тоглох', 'Play together')), h('p', { class: 'muted' }, L('Нэг утас, таблет дээр хоёулаа: тоноо хамт өргөж, эсгийгээ хамт өнхрүүлээрэй!', 'Two of you on one phone or tablet: lift the toono and roll felt together!')),
+      h('div', { class: 'v-list' }, [...fam.map((f) => h('button', { class: 'btn block', onclick: () => pick(f.id) }, `${f.emoji} ${tx(f.name)}`)), h('button', { class: 'btn block', onclick: () => pick('') }, `🧒 ${L('Найз', 'Friend')}`)]),
+      live && live.p2 ? h('button', { class: 'btn danger block', style: { marginTop: '10px' }, onclick: () => pick(null) }, L('Хамтдаа тоглохоо болих', 'Stop playing together')) : null);
+    const close = TG.modal(body, { cls: 'v-modal' });
+  }
+
   function update(dt) {
     const m = live.me, k = live.keys, v0 = V();
     const wantRun = (live.run || live.runLock) && !live.race && (k.size > 0 || !!live.stick || m.path.length > 0);
@@ -994,8 +1042,10 @@
     m.netT += dt;
     const movedSince = Math.hypot(m.px - m.sent.x, m.py - m.sent.y);
     if ((m.netT > 0.1 && movedSince > 0.03) || (!m.moving && movedSince > 0.001)) { m.netT = 0; m.sent = { x: m.px, y: m.py }; net.send({ t: 'move', x: +m.px.toFixed(2), y: +m.py.toFixed(2), dir: m.dir }); }
-    // smooth camera
-    const ca = Math.min(1, dt * 7); live.cam.x += (m.px - live.cam.x) * ca; live.cam.y += (m.py - live.cam.y) * ca;
+    if (live.p2) moveP2(dt);
+    // smooth camera (between both players when two play on one screen)
+    const p2 = live.p2 && !live.p2.hidden ? live.p2 : null, cx = p2 ? (m.px + p2.px) / 2 : m.px, cy = p2 ? (m.py + p2.py) / 2 : m.py;
+    const ca = Math.min(1, dt * 7); live.cam.x += (cx - live.cam.x) * ca; live.cam.y += (cy - live.cam.y) * ca;
     follow(m.petPos, m.px - 0.45, m.py + 0.25, dt);
     { // Басар trots behind you and sits beside you when you stop
       const dg = live.dog, [ddx, ddy] = DIRS[m.dir], tx2 = m.moving ? m.px - ddx * 0.95 + (ddy ? 0.6 : 0) : m.px + 1.1, ty2 = m.moving ? m.py - ddy * 0.7 + 0.15 : m.py + 0.25;
@@ -1027,189 +1077,103 @@
     live.ctxTimer -= dt; if (live.ctxTimer <= 0) { live.ctxTimer = 0.4; updateCtx(); }
   }
 
-  /** Season look, drawn into the low-res buffer so it stays pixel-crisp: tint plus falling snow, leaves or petals. */
-  function seasonFx(b, bw, bh, t, c) {
-    const id = live.season;
-    if (id === 'winter') { b.fillStyle = 'rgba(235,242,250,.16)'; b.fillRect(0, 0, bw + 1, bh + 1); } // a light frost, so the town stays clear and readable
-    else if (id === 'autumn') { b.globalCompositeOperation = 'multiply'; b.fillStyle = '#ffd59a'; b.fillRect(0, 0, bw + 1, bh + 1); b.globalCompositeOperation = 'source-over'; }
-    else if (id === 'spring') { b.fillStyle = 'rgba(255,200,230,.06)'; b.fillRect(0, 0, bw + 1, bh + 1); }
-    const n = id === 'winter' ? 34 : id === 'summer' ? 10 : 28;
-    for (let i = 0; i < n; i++) {
-      const sp = id === 'winter' ? 14 + (i % 5) * 4 : id === 'summer' ? 4 : 10 + (i % 4) * 3;
-      const x0 = (WD.hash(i, 7) * (bw + 40) + Math.sin(t * 0.8 + i) * (id === 'summer' ? 18 : 6)) % (bw + 40) - 20;
-      const y0 = id === 'summer' ? (WD.hash(i, 3) * bh + Math.sin(t * 1.7 + i) * 6) : ((WD.hash(i, 11) * (bh + 30) + t * sp) % (bh + 30)) - 15;
-      const X = Math.round(x0), Y = Math.round(y0);
-      if (id === 'winter') { b.globalAlpha = 0.7; PX.R(b, X, Y, 1, 1, '#ffffff'); if (i % 4 === 0) PX.R(b, X + 1, Y, 1, 1, '#dce8f5'); b.globalAlpha = 1; } // small, soft flakes that don't hide the town
-      else if (id === 'autumn') { PX.R(b, X, Y, 2, 1, ['#e8752a', '#c9461e', '#f2b33d'][i % 3]); PX.R(b, X + (Math.floor(t * 3 + i) % 2), Y + 1, 1, 1, '#a8501c'); }
-      else if (id === 'spring') { PX.R(b, X, Y, 1, 1, i % 2 ? '#ffb7d5' : '#ffffff'); if (i % 3 === 0) PX.R(b, X + 1, Y, 1, 1, '#ff8fb1'); }
-      else { const on = Math.floor(t * 6 + i) % 2; PX.R(b, X, Y, 1, 1, '#ffffff'); if (on) { PX.R(b, X - 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); PX.R(b, X + 1, Y, 1, 1, i % 2 ? '#ffd34e' : '#b49cff'); } } // butterflies
-    }
-  }
-  function draw(t) {
-    const ctx = live.ctx, b = live.buf.x, { devW, devH, dpr, k, bw, bh } = live.view, cf = cam(), nowMs = now(), pn = performance.now();
-    // 1) static world + crops into the low-res buffer at a whole-pixel camera…
-    const c = { x: Math.floor(cf.x), y: Math.floor(cf.y) };
-    b.fillStyle = '#76b947'; b.fillRect(0, 0, bw + 1, bh + 1);
-    b.drawImage(live.terrain, -c.x, -c.y);
-    const x0 = Math.max(0, Math.floor(c.x / T)), x1 = Math.min(WD.W - 1, Math.ceil((c.x + bw) / T)), y0 = Math.max(0, Math.floor(c.y / T)), y1 = Math.min(WD.H - 1, Math.ceil((c.y + bh) / T));
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      if (WD.g[y][x] !== 'w') continue;
-      const ph = (t * 0.9 + WD.hash(x, y) * 7) % 3; if (ph > 1.2) continue;
-      const X = x * T - c.x + 3 + Math.floor(WD.hash(y, x) * 9), Y = y * T - c.y + 4 + Math.floor(WD.hash(x + 1, y) * 9);
-      PX.R(b, X, Y, ph < 0.6 ? 3 : 2, 1, ph < 0.6 ? PX.K.foam : PX.K.waterL);
-    }
-    seasonFx(b, bw, bh, t, c);
-    // 2) …then upscale it, shifted by the camera's fractional part in real screen pixels (smooth scrolling)
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(live.buf.c, -Math.round((cf.x - c.x) * k), -Math.round((cf.y - c.y) * k), (bw + 1) * k, (bh + 1) * k);
-    // 3) characters straight onto the screen at screen-pixel precision (no art-pixel snapping = no shaking)
-    const SX = (wx) => Math.round((wx - cf.x) * k), SY = (wy) => Math.round((wy - cf.y) * k);
-    const sprite = (img, wx, wy, flip) => {
-      const X = SX(wx), Y = SY(wy), w = img.width * k, hh = img.height * k;
-      if (X > devW || Y > devH || X + w < 0 || Y + hh < 0) return;
-      if (flip) { ctx.save(); ctx.translate(X + w, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, w, hh); ctx.restore(); } else ctx.drawImage(img, X, Y, w, hh);
-    };
-    const shadow = (wx, wy) => { const X = SX(wx), Y = SY(wy); ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(X + 4 * k, Y + 13 * k, 9 * k, k); ctx.fillRect(X + 3 * k, Y + 14 * k, 11 * k, k); ctx.fillRect(X + 4 * k, Y + 15 * k, 9 * k, k); };
-    /** A pixel puff of smoke at a tile spot, q from 0 to 1. */
-    const poof = (wx, wy, q) => { const cx = SX(wx * T + 8), cy = SY(wy * T + 6), r = (3 + q * 9) * k, a = 1 - q;
-      for (let i = 0; i < 8; i++) { const ang = (i / 8) * Math.PI * 2 + q, px0 = Math.round(cx + Math.cos(ang) * r), py0 = Math.round(cy + Math.sin(ang) * r * 0.7), sz = Math.round((4 - q * 2) * k);
-        ctx.fillStyle = `rgba(43,30,46,${0.5 * a})`; ctx.fillRect(px0 - sz / 2 - k, py0 - sz / 2 - k, sz + 2 * k, sz + 2 * k); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(px0 - sz / 2, py0 - sz / 2, sz, sz); }
-      if (q < 0.5) { ctx.fillStyle = `rgba(247,198,70,${1 - q * 2})`; for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) ctx.fillRect(Math.round(cx + dx * r * 0.5 - k), Math.round(cy + dy * r * 0.5 - k), 2 * k, 2 * k); } };
-    const ents = [], frame = (o) => (o.moving ? 1 + (Math.floor(t * (o.running ? 13 : 8)) % 2) : 0);
-    live.sheep.forEach((q) => ents.push({ y: q.py, f: () => { shadow(q.px * T, q.py * T); sprite(PX.animal('sheep', Math.floor(t * 2 + q.i) % 2), q.px * T, q.py * T + 2, q.flip); } }));
-    if (live.season === 'spring') live.sheep.forEach((q) => ents.push({ y: q.py + 0.3, f: () => sprite(PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.flip) })); // spring: the lambs are born
-    const person = (o) => {
-      if (o.look.pet) ents.push({ y: o.petPos.y, f: () => { const a = PX.animal(o.look.pet, frame(o)); shadow(o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.px > o.petPos.x + 0.05); } });
-      const z = jumpZ(o, pn);
-      if (o.look.ride) ents.push({ y: o.py, f: () => drawRider(o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py, z) });
-      else ents.push({ y: o.py, f: () => { shadow(o.px * T, o.py * T); sprite(PX.char(o.look, o.dir, z ? 0 : frame(o)), o.px * T, o.py * T - 12 - z); } });
-    };
+  /** What is where this frame, for the Phaser view (view.js): sprites, ground shadows, names, labels and markers.
+      Positions are in world art pixels (16 per tile); the view does the camera, sorting and drawing. */
+  function model(t) {
+    if (!live) return null;
+    const pn = performance.now(), v = V();
+    const F = { cam: { x: live.cam.x * T + 8, y: live.cam.y * T + 4 }, season: live.season, night: TG.seasons.night(), sprites: [], shadows: [], texts: [], tags: [], marks: [] };
+    const sprite = (id, img, x, y, depth, flip, alpha) => F.sprites.push({ id, img, x, y, depth, flip, alpha });
+    const shadow = (id, x, y) => F.shadows.push({ id, x, y });
+    const text = (id, str, x, y, size, color, alpha) => { if (str != null && str !== '') F.texts.push({ id, text: String(str), x, y, size, color, alpha }); }; // never draw "null" for a missing name
+    const frame = (o) => (o.moving ? 1 + (Math.floor(t * (o.running ? 13 : 8)) % 2) : 0);
+    live.sheep.forEach((q) => { shadow('sheep:' + q.i, q.px * T, q.py * T); const sh = PX.animal('sheep', Math.floor(t * 2 + q.i) % 2); sprite('sheep:' + q.i, TG.gerwork.shearable(q.i) ? sh : PX.shorn(sh), q.px * T, q.py * T + 2, q.py, q.flip); });
+    if (live.season === 'spring') live.sheep.forEach((q) => sprite('lamb:' + q.i, PX.animal('lamb', Math.floor(t * 3 + q.i) % 2), q.px * T + (q.flip ? -9 : 12), q.py * T + 6, q.py + 0.3, q.flip)); // spring: the lambs are born
     // a rider on a Mongolian horse; face 1 = left, 2 = right
-    const drawRider = (look, face, moving, wx, wy, z = 0) => {
+    const rider = (id, look, face, moving, wx, wy, depth, z = 0) => {
       const hf = z ? 2 : moving ? 1 + (Math.floor(t * (live.me.running && wx === live.me.px ? 17 : 12)) % 4) : 0, hs = PX.horse(look.coat || 'bay', hf, true), left = face === 1;
       const HX = wx * T - 6, HY = wy * T + 16 - hs.height - z;
-      ctx.fillStyle = 'rgba(30,20,10,.25)'; ctx.fillRect(SX(HX + 4), SY(HY + 21 + z), 20 * k, 2 * k);
-      sprite(PX.char({ ...look, pet: null }, left ? 1 : 2, 0), HX + 6, HY - 15);
-      sprite(hs, HX, HY, left);
+      F.shadows.push({ id: id + ':h', x: HX + 4, y: HY + 21 + z, w: 20, h: 2 });
+      sprite(id + ':r', PX.char({ ...look, pet: null }, left ? 1 : 2, 0), HX + 6, HY - 15, depth);
+      sprite(id + ':h', hs, HX, HY, depth + 0.001, left);
     };
-    if (live.race) for (const n of live.race.npcs) ents.push({ y: n.py, f: () => { drawRider(n.look, n.face, live.race.phase === 'go' && !n.done, n.px, n.py); const [lx, ly] = [(n.px * T + 8 - cf.x) * k, (n.py * T - 22 - cf.y) * k]; live.race.labels.push([n.name, lx, ly]); } });
-    for (const o of live.others.values()) person(o);
-    const v = V(); person({ ...live.me, look: v.look });
+    const person = (id, o) => {
+      if (o.look.pet) { const a = PX.animal(o.look.pet, frame(o)); shadow(id + ':pet', o.petPos.x * T - 2, o.petPos.y * T - 1); sprite(id + ':pet', a, o.petPos.x * T + 2, o.petPos.y * T + 16 - a.height, o.petPos.y, o.px > o.petPos.x + 0.05); }
+      const z = jumpZ(o, pn);
+      if (o.look.ride) rider(id, o.look, o.face || (o.dir === 1 ? 1 : 2), o.moving, o.px, o.py, o.py, z);
+      else { shadow(id, o.px * T, o.py * T); sprite(id, PX.char(o.look, o.dir, z ? 0 : frame(o)), o.px * T, o.py * T - 12 - z, o.py); }
+    };
+    if (live.race) live.race.npcs.forEach((n, i) => { rider('race:' + i, n.look, n.face, live.race.phase === 'go' && !n.done, n.px, n.py, n.py); if (live.race.phase === 'go') text('race:' + i, n.name, n.px * T + 8, n.py * T - 22, 0.8, '#ffffff'); });
+    for (const o of live.others.values()) person('o:' + o.id, o);
+    person('me', { ...live.me, look: v.look });
+    const p2 = live.p2 && !live.p2.hidden ? live.p2 : null;
+    if (p2) { person('p2', p2); F.zoomOut = clamp(Math.hypot(p2.px - live.me.px, p2.py - live.me.py) / 9, 1, 1.6); }
     const dg = live.dog, dfr = dg.moving ? 1 + (Math.floor(t * 8) % 2) : dg.idle > 1.5 ? 3 : 0;
-    ents.push({ y: dg.y + 0.05, f: () => { shadow(dg.x * T, dg.y * T + 1); sprite(PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.flip); } });
-    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; ents.push({ y: o.y + 2, f: () => sprite(PX.gerSprite(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2) }); });
+    shadow('dog', dg.x * T, dg.y * T + 1); sprite('dog', PX.bankhar(dfr), dg.x * T - 3, dg.y * T - 1, dg.y + 0.05, dg.flip);
+    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i]; sprite('lot:' + i, PX.gerStage(R.lotStage(l), R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red), o.x * T, o.y * T - 2, o.y + 2); text('lot:' + i, l.n, o.x * T + 24, o.y * T - 4, 1, l.by === v.id ? '#f7c646' : '#ffffff'); });
     // the dairy yard's animals: cows and goats shift about, mares stand by their foals on the зэл
     for (const o of WD.objects) {
-      if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); ents.push({ y: o.y + 0.2, f: () => { shadow(o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite(img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, turn); } }); }
-      if (o.kind === 'zel') { [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, k], i) => { const img = PX.beast(k, k === 'foal' && Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = k === 'mare' ? 0.75 : 0; ents.push({ y: o.y + my + 0.1, f: () => sprite(img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, i % 2 === 1) }); }); }
+      if (o.kind === 'cow' || o.kind === 'goat') { const turn = Math.floor(t / 4 + o.x) % 3 === 0, f = Math.floor(t * 2 + o.y) % 5 === 0 ? 1 : 0, img = PX.beast(o.kind, f); shadow('obj:' + o.id, o.x * T + (o.kind === 'cow' ? 6 : 0), o.y * T + 1); sprite('obj:' + o.id, img, o.x * T + (o.kind === 'cow' ? 4 : -1), o.y * T + 14 - img.height, o.y + 0.2, turn); }
+      if (o.kind === 'felt') sprite('obj:felt', PX.feltMat(), o.x * T, o.y * T, o.y + 0.4);
+      if (o.kind === 'zel') [[0.6, 'foal'], [2.2, 'foal'], [1.2, 'mare'], [3.1, 'mare']].forEach(([dx, kd], i) => { const img = PX.beast(kd, kd === 'foal' && Math.floor(t * 1.5 + i) % 7 === 0 ? 1 : 0), my = kd === 'mare' ? 0.75 : 0; sprite('zel:' + i, img, (o.x + dx) * T, (o.y + my) * T + 12 - img.height, o.y + my + 0.1, i % 2 === 1); });
     }
+    const still = (id, o, look, dir) => { shadow(id, o.x * T, o.y * T); sprite(id, PX.char(look, dir, 0), o.x * T, o.y * T - 12, o.y); };
     const zs = WD.objects.find((q) => q.kind === 'npc');
-    if (zs) ents.push({ y: zs.y, f: () => { shadow(zs.x * T, zs.y * T); sprite(PX.char(ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0, 0), zs.x * T, zs.y * T - 12); } });
-    const tps = WD.objects.filter((q) => q.kind === 'npcq');
-    for (const np of tps) { const d = NPCS[np.id]; if (d) ents.push({ y: np.y, f: () => { shadow(np.x * T, np.y * T); sprite(PX.char(d.look, Math.floor(t / 3 + np.x) % 5 === 4 ? 2 : 0, 0), np.x * T, np.y * T - 12); } }); }
+    if (zs) { still('zasuul', zs, ZASUUL, Math.floor(t / 2.5) % 4 === 3 ? 2 : 0); text('zasuul', L('Засуул', 'Herald'), zs.x * T + 8, zs.y * T - 16, 1, '#f7c646'); }
+    const bounce = (x) => Math.round(Math.sin(pn / 180 + x) * 2) / 2;
+    for (const np of WD.objects.filter((q) => q.kind === 'npcq')) {
+      const d = NPCS[np.id]; if (!d) continue;
+      still('npc:' + np.id, np, d.look, Math.floor(t / 3 + np.x) % 5 === 4 ? 2 : 0);
+      text('npc:' + np.id, tx(d.name).split(' ').pop(), np.x * T + 8, np.y * T - 16, 0.8, '#ffffff');
+      const mk = npcMark(np.id); if (mk) text('npc!:' + np.id, mk, np.x * T + 8, np.y * T - 25 + bounce(np.x), 1.8, mk === '?' ? '#7fe07a' : '#f7c646');
+    }
     const em = WD.objects.find((q) => q.kind === 'emee');
-    if (em) ents.push({ y: em.y, f: () => { shadow(em.x * T, em.y * T); sprite(PX.char(EMEE, Math.floor(t / 3) % 4 === 2 ? 1 : 0, 0), em.x * T, em.y * T - 12); } });
+    if (em) {
+      still('emee', em, EMEE, Math.floor(t / 3) % 4 === 2 ? 1 : 0); text('emee', L('Эмээ', 'Grandma'), em.x * T + 8, em.y * T - 16, 1, '#f7c646');
+      if (!(v.emee && v.emee.visits)) text('emee!', '!', em.x * T + 8, em.y * T - 25 + bounce(0), 1.8, '#f7c646');
+    }
     if (live.race) {
-      live.race.labels = [];
       const RC = live.race.path.P, fl = Math.floor(t * 4) % 2;
-      for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; ents.push({ y: p.y - 0.9, f: () => sprite(PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15) }); }
+      for (let i = Math.max(1, live.race.ci); i < Math.min(RC.length, live.race.ci + 4); i++) { const p = RC[i], last = i === RC.length - 1; sprite('flag:' + i, PX.raceFlag(last ? '#e14b3d' : i === live.race.ci ? '#f7c646' : '#ffffff', fl), (p.x - 0.3) * T, (p.y - 1) * T - 15, p.y - 0.9); }
+      if (live.race.phase !== 'done') { const nx = RC[Math.min(live.race.ci, RC.length - 1)]; F.marks.push({ id: 'race', kind: 'raceArrow', x: live.me.px * T + 8, y: live.me.py * T - 36, ang: Math.atan2(nx.y - (live.me.py + 0.82), nx.x - (live.me.px + 0.5)), color: '#f7c646' }); }
     }
-    battleDraw(ents, drawRider, t);
+    battleModel(F, rider, text);
     const tg = live.tut && live.tut.guide;
-    if (tg && TG.tutorial) ents.push({ y: tg.y, f: () => { // Nomin: a hop and a puff when she pops in, a puff when she pops out
+    if (tg && TG.tutorial) { // Nomin: a hop and a puff when she pops in, a puff when she pops out
       const qi = Math.min(1, (pn - tg.in) / POOF_MS), qo = tg.out ? (pn - tg.out) / POOF_MS : 0;
-      if (qi > 0.2 && qo < 0.35) { const hop = qi < 1 ? Math.round(Math.sin(qi * Math.PI) * 7) : 0; shadow(tg.x * T, tg.y * T); sprite(PX.char(TG.tutorial.LOOK, tg.dir || 0, 0), tg.x * T, tg.y * T - 12 - hop); }
-      if (qi < 1) poof(tg.x, tg.y, qi); if (tg.out) poof(tg.x, tg.y, Math.min(1, qo));
-    } });
+      if (qi > 0.2 && qo < 0.35) { const hop = qi < 1 ? Math.round(Math.sin(qi * Math.PI) * 7) : 0; shadow('nomin', tg.x * T, tg.y * T); sprite('nomin', PX.char(TG.tutorial.LOOK, tg.dir || 0, 0), tg.x * T, tg.y * T - 12 - hop, tg.y); }
+      if (qi < 1) F.marks.push({ id: 'nomin:in', kind: 'poof', x: tg.x * T + 8, y: tg.y * T + 6, q: qi });
+      if (tg.out) F.marks.push({ id: 'nomin:out', kind: 'poof', x: tg.x * T + 8, y: tg.y * T + 6, q: Math.min(1, qo) });
+      if (!tg.out && pn - tg.in > POOF_MS * 0.6) text('nomin', L('Номин', 'Nomin'), tg.x * T + 8, tg.y * T - 16, 0.8, '#f7c646');
+    }
     const gn = WD.objects.find((q) => q.kind === 'general'), hs0 = WD.objects.find((q) => q.kind === 'historian');
-    for (const [o, lk] of [[gn, GENERAL], [hs0, HISTORIAN]]) if (o) ents.push({ y: o.y, f: () => { shadow(o.x * T, o.y * T); sprite(PX.char(lk, Math.floor(t / 3 + o.x) % 5 === 4 ? 2 : 0, 0), o.x * T, o.y * T - 12); } });
-    ents.sort((a2, b2) => a2.y - b2.y).forEach((e) => e.f());
-    // 4) evening: dark tint + stepped lantern glow
-    if (TG.seasons.night()) {
-      ctx.fillStyle = 'rgba(18,22,70,.38)'; ctx.fillRect(0, 0, devW, devH);
-      ctx.globalCompositeOperation = 'lighter';
-      const glow = (cx, cy, rx, ry, col) => { ctx.fillStyle = col; for (let dy = -ry; dy <= ry; dy++) { const hw = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy * dy) / ((ry + 0.5) * (ry + 0.5))))); ctx.fillRect(SX(cx - hw), SY(cy + dy), (hw * 2 + 1) * k, k); } };
-      for (const o of WD.objects.filter((q) => q.kind === 'lantern')) { const X = o.x * T + 8, Y = o.y * T - 6; glow(X, Y, 26, 20, 'rgba(255,200,110,.10)'); glow(X, Y, 15, 12, 'rgba(255,200,110,.14)'); glow(X, Y, 6, 5, 'rgba(255,220,140,.2)'); }
-      ctx.globalCompositeOperation = 'source-over';
-    }
-    // 5) text layer (pixel font)
-    const S = (wx, wy) => [(wx - cf.x) * k, (wy - cf.y) * k];
-    lotsArr().forEach((l, i) => { if (!l) return; const o = WD.lots[i], [sx, sy] = S(o.x * T + 24, o.y * T - 4); pixelText(ctx, l.n, sx, sy, textSize(), l.by === v.id ? '#f7c646' : '#ffffff'); });
-    if (zs) { const [sx, sy] = S(zs.x * T + 8, zs.y * T - 16); pixelText(ctx, L('Засуул', 'Herald'), sx, sy, textSize(), '#f7c646'); }
-    if (gn) { const [sx, sy] = S(gn.x * T + 8, gn.y * T - 16); pixelText(ctx, L('Жанжин', 'General'), sx, sy, textSize() * 0.8, '#f7c646'); }
-    if (hs0) { const [sx, sy] = S(hs0.x * T + 8, hs0.y * T - 16); pixelText(ctx, L('Түүхч', 'Historian'), sx, sy, textSize() * 0.8, '#f7c646'); if (TG.history && TG.history.ready()) pixelText(ctx, '!', sx, sy - 9 * live.view.k, textSize() * 1.8, '#7fe07a'); }
-    battleOverlay(ctx, S, live.view.k);
-    for (const np of tps) { const d = NPCS[np.id]; if (!d) continue; const [sx, sy] = S(np.x * T + 8, np.y * T - 16); pixelText(ctx, tx(d.name).split(' ').pop(), sx, sy, textSize() * 0.8, '#ffffff'); const mk = npcMark(np.id); if (mk) pixelText(ctx, mk, sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180 + np.x) * 2) * live.view.k / 2, textSize() * 1.8, mk === '?' ? '#7fe07a' : '#f7c646'); }
-    if (em) { const [sx, sy] = S(em.x * T + 8, em.y * T - 16); pixelText(ctx, L('Эмээ', 'Grandma'), sx, sy, textSize(), '#f7c646'); if (!(V().emee && V().emee.visits)) pixelText(ctx, '!', sx, sy - 9 * live.view.k + Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2, textSize() * 1.8, '#f7c646'); }
-    for (const o of live.others.values()) labels(ctx, o, o.name, o.lvl, false, pn, S, dpr);
-    labels(ctx, live.me, live.name, R.level(v.xp).l, true, pn, S, dpr);
-    if (live.race) {
-      if (live.race.phase === 'go') for (const [nm, lx, ly] of live.race.labels) pixelText(ctx, nm, lx, ly, textSize() * 0.8, '#ffffff');
-      const nx = live.race.path.P[Math.min(live.race.ci, live.race.path.P.length - 1)], fx = live.me.px + 0.5, fy = live.me.py + 0.82, ang = Math.atan2(nx.y - fy, nx.x - fx);
-      if (live.race.phase !== 'done') { const [ax, ay] = S(live.me.px * T + 8, live.me.py * T - 36), r = 7 * k; ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(r + k, 0); ctx.lineTo(-r * 0.6, -r * 0.75); ctx.lineTo(-r * 0.6, r * 0.75); ctx.fill(); ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(r - k, 0); ctx.lineTo(-r * 0.4, -r * 0.5); ctx.lineTo(-r * 0.4, r * 0.5); ctx.fill(); ctx.restore(); }
-    }
-    if (tg && !tg.out && pn - tg.in > POOF_MS * 0.6) { const [sx, sy] = S(tg.x * T + 8, tg.y * T - 16); pixelText(ctx, L('Номин', 'Nomin'), sx, sy, textSize() * 0.8, '#f7c646'); }
+    if (gn) { still('general', gn, GENERAL, Math.floor(t / 3 + gn.x) % 5 === 4 ? 2 : 0); text('general', L('Жанжин', 'General'), gn.x * T + 8, gn.y * T - 16, 0.8, '#f7c646'); }
+    if (hs0) { still('historian', hs0, HISTORIAN, Math.floor(t / 3 + hs0.x) % 5 === 4 ? 2 : 0); text('historian', L('Түүхч', 'Historian'), hs0.x * T + 8, hs0.y * T - 16, 0.8, '#f7c646'); if (TG.history && TG.history.ready()) text('historian!', '!', hs0.x * T + 8, hs0.y * T - 25, 1.8, '#7fe07a'); }
+    const tag = (id, o, name, level, isMe) => {
+      const look = isMe ? v.look : o.look || {}, title = look.title && R.TITLES.find((q) => q.id === look.title);
+      const d = { id, name: name || '?', level, mine: isMe, title: title ? tx(title.name) : null, x: o.px * T + 8, y: o.py * T - 16 - (look.ride ? 10 : 0) };
+      if (o.bubble) { const age = (pn - o.bubble.t0) / 1000; if (age > 4.5) o.bubble = null; else { d.bubble = o.bubble.text; d.bubbleAlpha = age > 3.9 ? (4.5 - age) / 0.6 : 1; } }
+      F.tags.push(d);
+    };
+    for (const o of live.others.values()) tag('o:' + o.id, o, o.name, o.lvl, false);
+    tag('me', live.me, live.name, R.level(v.xp).l, true);
+    if (p2) tag('p2', p2, p2.name, '🤝', false);
     const tt = live.tut && live.tut.target;
     if (tt && !live.race) { // the tutorial points at where to go: a bouncing arrow over the spot, and a compass arrow over you when it is far away
-      const bob = Math.round(Math.abs(Math.sin(pn / 220)) * 4) * k, [ax, ay] = S(tt.x * T + 8, tt.y * T - 26), r = 6 * k;
-      ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(ax, ay + r + k + bob); ctx.lineTo(ax - r - k, ay - r * 0.4 + bob); ctx.lineTo(ax + r + k, ay - r * 0.4 + bob); ctx.fill();
-      ctx.fillStyle = '#f7c646'; ctx.beginPath(); ctx.moveTo(ax, ay + r - k + bob); ctx.lineTo(ax - r + k, ay - r * 0.4 + k + bob); ctx.lineTo(ax + r - k, ay - r * 0.4 + k + bob); ctx.fill();
-      if (tt.label) pixelText(ctx, tt.label, ax, ay - r - 2 * k + bob, textSize() * 0.9, '#ffffff');
+      F.marks.push({ id: 'tut', kind: 'arrow', x: tt.x * T + 8, y: tt.y * T - 26, label: tt.label });
       const fx = live.me.px + 0.5, fy = live.me.py + 0.82;
-      if (Math.hypot(tt.x + 0.5 - fx, tt.y + 0.5 - fy) > 3.5) {
-        const ang = Math.atan2(tt.y + 0.5 - fy, tt.x + 0.5 - fx), [px2, py2] = S(live.me.px * T + 8, live.me.py * T - 30), rr = 7 * k;
-        ctx.save(); ctx.translate(px2 + Math.cos(ang) * 10 * k, py2 + Math.sin(ang) * 6 * k); ctx.rotate(ang);
-        ctx.fillStyle = '#2b1e2e'; ctx.beginPath(); ctx.moveTo(rr + k, 0); ctx.lineTo(-rr * 0.6, -rr * 0.75); ctx.lineTo(-rr * 0.6, rr * 0.75); ctx.fill();
-        ctx.fillStyle = '#7fe07a'; ctx.beginPath(); ctx.moveTo(rr - k, 0); ctx.lineTo(-rr * 0.4, -rr * 0.5); ctx.lineTo(-rr * 0.4, rr * 0.5); ctx.fill(); ctx.restore();
-      }
+      if (Math.hypot(tt.x + 0.5 - fx, tt.y + 0.5 - fy) > 3.5) F.marks.push({ id: 'tut:c', kind: 'compass', x: live.me.px * T + 8, y: live.me.py * T - 30, ang: Math.atan2(tt.y + 0.5 - fy, tt.x + 0.5 - fx) });
     }
-    { const [sx, sy] = S(dg.x * T + 8, dg.y * T - 4); pixelText(ctx, L('Басар', 'Basar'), sx, sy, textSize() * 0.8, '#f7c646');
-      if (dg.bubble) { const bob = Math.round(Math.sin(pn / 180) * 2) * live.view.k / 2; pixelText(ctx, '!', sx + 5 * live.view.k, sy - 6 * live.view.k + bob, textSize() * 1.8, '#f7c646'); } }
+    text('dog', L('Басар', 'Basar'), dg.x * T + 8, dg.y * T - 4, 0.8, '#f7c646');
+    if (dg.bubble) text('dog!', '!', dg.x * T + 13, dg.y * T - 10 + Math.round(Math.sin(pn / 180) * 2) / 2, 1.8, '#f7c646');
     live.floaters = live.floaters.filter((f) => pn - f.t0 < 1400);
     for (const f of live.floaters) {
-      const q = (pn - f.t0) / 1400, [sx, sy] = S(f.x * T + 8, f.y * T + 10);
-      if (f.poof) { const qp = (pn - f.t0) / POOF_MS; if (qp < 1) poof(f.x, f.y, qp); continue; }
-      if (f.ring) { ctx.strokeStyle = `rgba(255,255,255,${1 - q})`; ctx.lineWidth = Math.max(2, k); ctx.strokeRect(Math.round(sx - (4 + q * 6) * k), Math.round(sy - (2 + q * 2) * k), Math.round((8 + q * 12) * k), Math.round((4 + q * 4) * k)); continue; }
-      pixelText(ctx, f.text, sx, sy - (8 + q * 14) * k, textSize(), f.color, 1 - q);
+      const q = (pn - f.t0) / 1400, id = 'float:' + f.t0;
+      if (f.poof) { const qp = (pn - f.t0) / POOF_MS; if (qp < 1) F.marks.push({ id, kind: 'poof', x: f.x * T + 8, y: f.y * T + 6, q: qp }); continue; }
+      if (f.ring) { F.marks.push({ id, kind: 'ring', x: f.x * T + 8, y: f.y * T + 10, q }); continue; }
+      text(id, f.text, f.x * T + 8, f.y * T + 10 - (8 + q * 14), 1, f.color, 1 - q);
     }
-  }
-  const textSize = () => 5 * Math.max(2, live.view.k); // Tiny5 is drawn on a 5-pixel grid
-  function blit(b, img, X, Y, flip) { if (!flip) return b.drawImage(img, X, Y); b.save(); b.translate(X + img.width, Y); b.scale(-1, 1); b.drawImage(img, 0, 0); b.restore(); }
-  function pixelText(ctx, text, x, y, size, color, alpha = 1, outline = '#2b1e2e') {
-    if (text == null || text === '') return; // never draw "null" for a missing name
-    const fs = Math.max(10, Math.round(size / 5) * 5), o = Math.max(1, Math.round(fs / 10));
-    ctx.save(); ctx.globalAlpha = alpha; ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = outline; for (const [dx, dy] of [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]]) ctx.fillText(text, Math.round(x) + dx, Math.round(y) + dy);
-    ctx.fillStyle = color; ctx.fillText(text, Math.round(x), Math.round(y)); ctx.restore();
-  }
-  function labels(ctx, o, name, level, isMe, pn, S, dpr) {
-    const rl = (isMe ? V().look : o.look || {}).ride ? 10 : 0;
-    const [x, y] = S(o.px * T + 8, o.py * T - 16 - rl), fs = textSize(), u = Math.max(1, Math.round(fs / 10));
-    ctx.font = `${fs}px Tiny5, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    const pad = Math.round(fs * 0.45), th = fs + u * 4, gap = u * 3;
-    name = name || '?';
-    const lvT = String(level || 1), lvW = Math.ceil(ctx.measureText(lvT).width) + pad * 2, nmW = Math.ceil(ctx.measureText(name).width) + pad * 2;
-    const X0 = Math.round(x - (lvW + gap + nmW) / 2), Y = Math.round(y - th / 2);
-    const box = (bx, w, bg, top, fg, text) => {
-      ctx.fillStyle = '#2b1e2e'; ctx.fillRect(bx - u, Y - u, w + u * 2, th + u * 2);
-      ctx.fillStyle = bg; ctx.fillRect(bx, Y, w, th); ctx.fillStyle = top; ctx.fillRect(bx, Y, w, u);
-      ctx.fillStyle = fg; ctx.fillText(text, Math.round(bx + w / 2), Math.round(Y + th / 2 + u / 2));
-    };
-    box(X0, lvW, '#f7c646', '#ffe58f', '#3a2600', lvT);                                   // level: its own gold box
-    box(X0 + lvW + gap, nmW, isMe ? '#3f76db' : '#5a3a22', isMe ? '#7fa6ee' : '#8a5a33', '#ffffff', name); // name
-    let top = Y;
-    const look = isMe ? V().look : o.look, title = look && look.title && R.TITLES.find((q) => q.id === look.title);
-    if (title) { top = Y - th - u * 2; pixelText(ctx, '★ ' + tx(title.name), x, top + th / 2, fs, '#f7c646'); }          // title above
-    if (!o.bubble) return;
-    const age = (pn - o.bubble.t0) / 1000;
-    if (age > 4.5) { o.bubble = null; return; }
-    ctx.save(); ctx.globalAlpha = age > 3.9 ? (4.5 - age) / 0.6 : 1;
-    ctx.font = `${fs}px Tiny5, monospace`;
-    const bw2 = Math.ceil(ctx.measureText(o.bubble.text).width) + fs * 1.4, bh2 = fs + u * 8, BX = Math.round(x - bw2 / 2), BY = Math.round(top - bh2 - u * 8);
-    ctx.fillStyle = '#2b1e2e'; ctx.fillRect(BX - u, BY - u, bw2 + u * 2, bh2 + u * 2); ctx.fillRect(Math.round(x - u * 3), BY + bh2, u * 6, u * 3); ctx.fillRect(Math.round(x - u), BY + bh2 + u * 3, u * 2, u * 2);
-    ctx.fillStyle = '#fff8e6'; ctx.fillRect(BX, BY, bw2, bh2); ctx.fillRect(Math.round(x - u * 2), BY + bh2, u * 4, u * 2);
-    ctx.fillStyle = '#2b1e2e'; ctx.fillText(o.bubble.text, Math.round(x), Math.round(BY + bh2 / 2 + u / 2));
-    ctx.restore();
+    return F;
   }
   function floatAt(p, text, color) { if (live) live.floaters.push({ x: p.px !== undefined ? p.px : p.x, y: p.py !== undefined ? p.py : p.y, text, color, t0: performance.now() }); }
 
@@ -1250,6 +1214,11 @@
                 TG.toast(`${tx(it.name)}: ${L('худалдаж авлаа!', 'purchased!')}`); save();
               } }, `${it.price}`, pic('ui:coin', 14)));
       });
+      if (cur === 'tool') { // the white cover for your ger: canvas the herders buy in town
+        const g = v.ger, need = g.stage < 7 && !(g.parts.buurees > 0);
+        list.unshift(h('div', { class: 'v-row v-cover' }, icon('part:buurees'), h('div', { class: 'v-row-b' }, h('b', null, L('Гэрийн цагаан бүрээс', 'White ger cover')), h('small', null, need ? L('Эсгийн гадуур хучиж, бороо, нарнаас хамгаална.', 'Goes over the felt and keeps out rain and sun.') : L('✓ Танд байгаа', '✓ You have it'))),
+          need ? h('button', { class: 'btn sm', 'data-buy': 'buurees', onclick: () => { if (!pay(R.COVER_PRICE)) return; g.parts.buurees = (g.parts.buurees || 0) + 1; TG.toast(L('Бүрээс худалдаж авлаа!', 'You bought the cover!')); save(); } }, `${R.COVER_PRICE}`, pic('ui:coin', 14)) : h('span', { class: 'v-owned' }, '✓')));
+      }
       rc(body, 
         h('div', { class: 'v-shop-head' }, h('h2', null, L('Наадмын дэлгүүр', 'Naadam Shop')), h('span', { class: 'v-pill dark' }, pic('ui:coin', 18), ` ${v.coins}`)),
         h('div', { class: 'chips v-tabs' }, TABS.map(([k, e, t]) => h('button', { class: 'chip' + (cur === k ? ' active' : ''), onclick: () => { cur = k; draw(); } }, pic(e, 18), ' ', t))),
@@ -1298,6 +1267,8 @@
     const close = TG.modal(h('div', null, h('h2', null, L('Цүнх', 'Bag')),
       h('div', { class: 'stat-cards' }, h('div', { class: 'stat' }, h('small', null, L('Түвшин', 'Level')), h('b', null, L1.l)), h('div', { class: 'stat' }, h('small', null, 'XP'), h('b', null, `${L1.cur}/${L1.need}`)), h('div', { class: 'stat' }, h('small', null, L('Зоос', 'Coins')), h('b', null, v.coins))),
       sec(L('Цагаан идээ', 'Dairy'), v.produce, R.DAIRY), sec(L('Загас', 'Fish'), v.fish, R.FISH),
+      (() => { const g = v.ger, have = [['wool', g.wool, L('Ноос', 'Wool')], ['wool', g.fluff, L('Сэвсгэр ноос', 'Fluffed wool')], ['esgii', g.mats, L('Нойтон ноос', 'Wet wool')], ...Object.entries(g.parts).map(([k, n]) => [k, n, k])].filter(([, n]) => n > 0);
+        return h('div', { class: 'v-slot' }, h('div', { class: 'label' }, L('Гэрийн хэрэгсэл', 'Ger parts')), have.length ? h('div', { class: 'v-chips' }, have.map(([k, n, name]) => h('span', { class: 'v-chip wide' }, pic('part:' + k, 24), ` ${name === k ? TG.gerwork.partName(k) : name} ×${n}`))) : h('p', { class: 'muted' }, L('Хонь хяргаж, Мужаан өвөөтэй уулзаарай.', 'Shear sheep and visit Grandpa Craftsman.'))); })(),
       h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, '👗 ', L('Хувцас', 'Wardrobe')), h('button', { class: 'btn primary', onclick: () => { close(); shopModal('sell'); } }, '💰 ', L('Зарах', 'Sell')))), { cls: 'v-modal' });
   }
 
@@ -1693,6 +1664,11 @@
       chain: [NQ('archery', 3, 'Сурын талбайд 3 бай онооорой.', 'Hit 3 targets at the archery range.', 25, 30), NQ('archery', 6, 'Одоо 6 бай онооорой. Салхийг тооцоорой!', 'Now hit 6 targets. Mind the wind!', 35, 40), NQ('together', 1, 'Гэр бүлтэйгээ нэг бодит ажил хамт хийгээрэй.', 'Do one real-life activity with your family.', 40, 45)],
       done: Tx('Чи мэргэн болж байна! Сайн харваачийг монголчууд “мэргэн” гэж цоллодог.', 'You’re becoming a mergen! That is what Mongols call a great archer.'),
       tic: Tx('Ш-ш… ', 'Shh… '), bio: Tx('Ш-ш… Тайван. Сур харваа бол тэвчээрийн спорт. Аав маань надад гурван настайгаас нум заасан.', 'Shh… calm. Archery is a sport of patience. My father taught me the bow when I was three.') },
+    craftsman: { name: Tx('Мужаан өвөө Тулга', 'Grandpa Craftsman Tulga'), look: { deel: 'brown', skin: '#C98E5E', hat: 'mongol', neck: null, face: null, pet: null },
+      hello: Tx('Сайн уу! Би гэрийн мод хийдэг мужаан. Хана, хаалга, тооно, униа бүгдийг гараараа хийнэ.', 'Hello! I am a craftsman: I make every wooden part of a ger by hand, walls, door, toono and poles.'),
+      chain: [NQ('shear', 1, 'Эсгий хийхэд ноос хэрэгтэй. Нэг хонь хяргаад ир.', 'Felt needs wool. Go and shear a sheep.', 15, 20), NQ('felt', 1, 'Хонины хашааны хажууд эсгий хийх газар бий. Нэг эсгий өнхрүүлээд ир.', 'There is a felt spot by the sheep pasture. Roll one felt.', 25, 30), NQ('ger', 1, 'Одоо гэрээ өөрийн гараар бариад үзүүлээрэй!', 'Now build your own ger with your own hands and show me!', 40, 50)],
+      done: Tx('Гайхалтай! Гэрээ өөрөө барьсан хүүхэд гэрийнхээ хэсэг бүрийг мэддэг болно.', 'Wonderful! A child who builds their own ger knows every part of it.'),
+      tic: Tx('Хм, ', 'Hmm, '), bio: Tx('Хм, би 50 жил гэрийн мод хийлээ. Хана бүрийг бургасаар, униаг шинэс модоор хийдэг. Хэзээ ч хадаас хэрэглэдэггүй, бүгдийг арьсан оосроор уяна!', 'Hmm, I have made ger frames for 50 years. Walls from willow, poles from larch. Never a nail: everything is tied with leather straps!') },
   };
   const npcState = (id) => { const v = V(); v.npc = v.npc || {}; return (v.npc[id] = v.npc[id] || { step: 0, p: 0, on: false }); };
   /** Progress the townspeople's tasks (called with every daily-quest event). */
@@ -1716,10 +1692,10 @@
     const draw = () => {
       const q = d.chain[st.step];
       const steps = h('div', { class: 'npc-steps' }, d.chain.map((_, i) => h('i', { class: i < st.step ? 'on' : i === st.step ? 'cur' : '' })));
-      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, speak(tx(d.tic) + tx(d.done))), asks(), h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
+      if (!q) { rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)), h('div', { class: 'emee-say' }, speak(tx(d.tic) + tx(d.done))), asks(), id === 'craftsman' ? TG.gerwork.tradeList(draw) : null, h('p', { class: 'muted' }, '✓ ', L('Бүх даалгаврыг биелүүлсэн. Баярлалаа!', 'All tasks complete. Thank you!'))); return; }
       const ready = st.on && st.p >= q.n;
       rc(body, h('div', { class: 'npc-head' }, npcPic(d.look), h('div', null, h('h2', null, tx(d.name)), steps)),
-        h('div', { class: 'emee-say' }, speak(st.on ? tx(d.tic) + (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)), asks(),
+        h('div', { class: 'emee-say' }, speak(st.on ? tx(d.tic) + (ready ? L('Чи хийчихжээ! Баярлалаа! 🎉', 'You did it! Thank you! 🎉') : tx(q.t)) : `${tx(d.hello)} ${tx(q.t)}`)), asks(), id === 'craftsman' ? TG.gerwork.tradeList(draw) : null,
         st.on ? h('div', null, h('div', { class: 'meter' }, h('span', { style: { width: (st.p / q.n) * 100 + '%' } })), h('small', { class: 'muted' }, `${st.p}/${q.n} · 🪙 +${q.c} · ⭐ +${q.x} XP`)) : null,
         h('div', { class: 'row-btns' },
           !st.on ? h('button', { class: 'btn primary', onclick: () => { st.on = true; st.p = 0; S.save(); TG.sfx.chime && TG.sfx.chime(); draw(); } }, L('Тэгье, хийе!', 'Okay, I’ll do it!'))
@@ -1984,9 +1960,10 @@
 
   // ================================================================ own ger (housing)
   function lotAction(i) {
-    const l = lotsArr()[i];
-    if (!l) return myLot() >= 0 ? TG.toast(L('Танд аль хэдийн гэр байна!', 'You already have a ger!')) : buyGer(i);
-    if (l.by === V().id) return enterGer(i);
+    const l = lotsArr()[i], v = V();
+    if (!l) return myLot() >= 0 && myLot() !== i ? TG.toast(L('Танд аль хэдийн гэр байна!', 'You already have a ger!')) : TG.gerwork.build(i);
+    if (l.by === v.id) return R.lotStage(l) < R.GER_DONE ? TG.gerwork.build(i) : enterGer(i);
+    if (R.lotStage(l) < R.GER_DONE) return TG.toast(`🏗️ ${l.n} ${L('гэрээ барьж байна. Дараа нь зочлоорой!', 'is still building their ger. Visit when it is done!')}`);
     enterGer(i, true);
   }
   function gerPreview(roof, door, scale) {
@@ -1995,40 +1972,24 @@
     return c;
   }
   const swatches = (map, cur, onPick, cls = '') => h('div', { class: 'v-chips' }, Object.entries(map).map(([k, c]) => h('button', { class: 'v-chip v-swatch ' + cls + (cur === k ? ' active' : ''), style: { background: c }, 'aria-label': k, onclick: () => onPick(k) })));
-  function buyGer(i) {
-    const v = V(), body = h('div'); let roof = 'blue', door = 'red';
-    const learned = TG.learn && TG.learn.done('ger');
-    if (!learned) {
-      const close2 = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-gerbox' }, gerPreview('blue', 'red', 3)), h('h2', null, L('Эхлээд гэр барьж сур!', 'Learn to build a ger first!')),
-        h('p', { class: 'muted' }, L('Жинхэнэ малчид гэрээ өөрсдөө барьдаг. Сургуулийн гэрт “Монгол гэр барих” хичээлийг дуусгавал энд өөрийн гэрээ барих эрх нээгдэнэ.', 'Real herders build their own gers. Finish the “Build a Mongol ger” lesson in the school ger to unlock your own ger here.')),
-        h('button', { class: 'btn primary big block', onclick: () => { close2(); TG.go('lesson', { id: 'ger' }); } }, '⛺ ', L('Хичээл эхлэх', 'Start the lesson'))), { cls: 'v-modal' });
-      return;
-    }
-    const buy = () => {
-      if (lvl() < R.GER_LEVEL) return TG.toast(L(`${R.GER_LEVEL}-р түвшинд хүрээрэй.`, `Reach level ${R.GER_LEVEL} first.`));
-      if (v.coins < R.GER_PRICE) return TG.toast(L('Зоос хүрэлцэхгүй байна. Тоглож, цагаан идээ зарж цуглуулаарай!', 'Not enough coins. Play games or sell dairy foods to earn more!'));
-      close();
-      if (live.online) net.send({ t: 'ger-buy', i, roof, door });
-      else { const lot = { by: v.id, n: live.name, roof, door, furn: [] }; onLot({ act: 'buy', i, lot, by: v.id }); }
-    };
-    const draw = () => rc(body, 
-      h('h2', null, L('Өөрийн гэр барих', 'Build your own ger')),
-      h('p', { class: 'muted' }, L('Гэр хороололд өөрийн монгол гэртэй болж, өнгийг нь сонгоод, тавилгаар чимээрэй. Найзууд чинь зочилж болно!', 'Get your own Mongolian ger, pick its colours and furnish it. Friends can come and visit!')),
+  /** Pick the roof band and door colours of a finished ger. */
+  function gerColours(i) {
+    const l = lotsArr()[i]; if (!l) return;
+    const body = h('div'); let roof = l.roof || 'blue', door = l.door || 'red';
+    const draw = () => rc(body,
+      h('h2', null, L('Гэрийнхээ өнгийг сонго', 'Choose your ger’s colours')),
       h('div', { class: 'v-gerbox' }, gerPreview(roof, door, 3)),
       h('div', { class: 'label' }, L('Дээврийн хээ', 'Roof band')), swatches(R.ROOF, roof, (k) => { roof = k; draw(); }),
       h('div', { class: 'label', style: { marginTop: '10px' } }, L('Хаалга', 'Door')), swatches(R.DOOR, door, (k) => { door = k; draw(); }, 'door'),
-      lvl() < R.GER_LEVEL ? h('div', { class: 'hint', style: { marginTop: '12px' } }, L(`Гэр барихад ${R.GER_LEVEL}-р түвшин хэрэгтэй.`, `You need level ${R.GER_LEVEL} to build a ger.`)) : null,
-      h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, disabled: lvl() < R.GER_LEVEL, onclick: buy }, L('Гэр барих', 'Build ger'), ` · ${R.GER_PRICE} `, pic('ui:coin', 16)));
+      h('button', { class: 'btn primary big block', style: { marginTop: '14px' }, onclick: () => { saveLot(i, { roof, door }); const own = V().lots[i]; if (own && own.by === V().id) Object.assign(own, { roof, door }); S.save(); close(); } }, L('Болсон', 'Done')));
     draw();
     const close = TG.modal(body, { cls: 'v-modal' });
   }
   function onLot(m) {
     const v = V();
     lotsArr()[m.i] = m.lot;
-    if (m.by === v.id && m.act === 'buy') {
-      v.coins = Math.max(0, v.coins - R.GER_PRICE); v.gerBuilt = true; reward(0, 30); TG.sfx.win(); TG.confetti(70);
-      factCard('ui:ger', L('Шинэ гэр!', 'Your new ger!'), L('Монгол гэрийг нэг цагийн дотор барьж, нүүж болдог. Хаалга нь ихэвчлэн урд зүг рүү харсан байдаг.', 'A Mongolian ger can be put up in about an hour and moved anywhere. Its door traditionally faces south.'), '+30 XP');
-    } else if (m.act === 'buy') TG.toast(`🏠 ${m.lot.n} ${L('гэр барилаа!', 'built a ger!')}`);
+    if (m.by !== v.id && m.act === 'claim') TG.toast(`🏠 ${m.lot.n} ${L('гэр барьж эхэллээ!', 'started building a ger!')}`);
+    else if (m.by !== v.id && m.act === 'stage' && R.lotStage(m.lot) === R.GER_DONE) TG.toast(`🏠 ${m.lot.n} ${L('гэрээ барьж дууслаа!', 'finished building their ger!')}`);
     S.save(); if (live) { hud(); updateCtx(); }
   }
   function saveLot(i, patch) {
