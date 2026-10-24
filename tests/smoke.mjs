@@ -490,7 +490,7 @@ try {
   const shots0 = await page.evaluate(() => TG._village.battleState().shots || 0);
   await page.keyboard.press('KeyF'); await sleep(100);
   // a raider one step away is hit (and the arrow gone) within a frame or two, so count the shot itself
-  if (!(await page.evaluate((n) => (TG._village.battleState().shots || 0) > n, shots0))) errors.push('first-person battle: F did not shoot');
+  if (!(await page.evaluate((n) => (TG._village.battleState().shots || 0) > n, shots0))) errors.push('first-person battle: F did not shoot, ' + (await page.evaluate(() => { const bt = TG._village.battleState(), L = TG._village.live(); return JSON.stringify({ over: bt.over, cd: bt.cd, herd: bt.herd, enemies: bt.enemies.map((e) => ({ x: +e.x.toFixed(1), y: +e.y.toFixed(1), flee: !!e.flee })), me: [+(L.me.px + 0.5).toFixed(1), +(L.me.py + 0.82).toFixed(1)] }); })));
   await page.evaluate(() => { const bt = TG._village.battleState(); bt.herd = 0; }); await sleep(600);
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(300);
   await page.evaluate(() => TG._village.fpScene.close()); await sleep(400);
