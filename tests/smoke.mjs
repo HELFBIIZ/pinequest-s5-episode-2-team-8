@@ -31,6 +31,10 @@ await page.setRequestInterception(true);
 page.on('request', (r) => { const u = new URL(r.url()); if (u.protocol.startsWith('http') && u.hostname !== 'localhost') { external.push(r.url()); r.abort(); } else r.continue(); });
 let step = 'load';
 page.on('pageerror', (e) => errors.push(`${step}: ${e.message}`));
+// if the page ever reloads by itself, say when and whether the offline cache's take-over did it
+await page.evaluateOnNewDocument(() => { if (navigator.serviceWorker) navigator.serviceWorker.addEventListener('controllerchange', () => sessionStorage.setItem('smoke-cc', String(Date.now()))); });
+let settled = false;
+page.on('framenavigated', async (f) => { if (!settled || f !== page.mainFrame()) return; const cc = await page.evaluate(() => sessionStorage.getItem('smoke-cc')).catch(() => '?'); errors.push(`${step}: the page reloaded by itself (offline-cache take-over before it: ${cc ? 'yes' : 'no'})`); });
 page.on('console', (m) => { if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push(`${step}: console error: ${m.text()}`); });
 const check = async (label, selector) => {
   step = label;
@@ -47,6 +51,7 @@ try {
   for (let i = 0; i < 100 && !(await page.evaluate(() => !navigator.serviceWorker || !!navigator.serviceWorker.controller)); i++) await sleep(100);
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle0' });
+  settled = true;
   await check('register screen', '.auth .big-input');
 
   // register through the real screens: name -> age -> mascot -> picture password
