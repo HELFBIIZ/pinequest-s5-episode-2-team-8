@@ -70,6 +70,15 @@ try {
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && o.bubble && /Сайн уу/.test(o.bubble.text); }), 'B sees A say hi');
   ok('preset phrases appear as speech bubbles');
 
+  await until(() => b.evaluate(() => document.querySelector('.v-talk .v-badge').textContent === '1'), 'B gets an unread badge');
+  await b.evaluate(() => document.querySelector('.v-talk').click());
+  await until(() => b.evaluate(() => [...document.querySelectorAll('.v-chatlog .v-chat-line')].some((x) => /Бат/.test(x.textContent) && /Сайн уу/.test(x.textContent))), "B sees A's phrase in the chat log");
+  if (!(await b.evaluate(() => [...document.querySelectorAll('.v-chatlog .v-chat-line.sys')].some((x) => /Бат/.test(x.textContent))))) throw new Error('the chat log has no join line');
+  if (await b.evaluate(() => !document.querySelector('.v-talk .v-badge').classList.contains('hidden'))) throw new Error('opening the chat log did not clear the badge');
+  await b.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click()));
+  await sleep(300);
+  ok('the chat log shows phrases and joins, inside the talk window, with an unread badge');
+
   await a.evaluate(() => document.querySelector('.v-jump').click());
   await until(() => b.evaluate(() => { const o = [...TG._village.live().others.values()][0]; return o && performance.now() - (o.jt || -1e9) < 2000; }), 'B sees A jump');
   ok('jumping shows for everyone');
@@ -123,6 +132,8 @@ try {
   await until(() => c.evaluate(() => TG._village.live().online && TG._village.live().room === 'NUTAG' && TG._village.live().others.size === 2), 'C joins the main village and sees both');
   await until(() => a.evaluate(() => [...TG._village.live().others.values()].some((o) => o.name === 'Тэмүүлэн')), 'A sees C');
   ok('a player stuck in another room is pointed to the main village and joins in one tap');
+  if (!(await c.evaluate(() => (TG._village.live().chat || []).some((l) => l.k === 'p' && l.n === 'Бат' && l.i === 0)))) throw new Error('a late joiner did not get the recent chat');
+  ok("a player who joins later gets the room's recent chat");
 
   // the same profile opened in a second tab: the old tab steps aside, no reconnect fight
   const c2 = await player('Тэмүүлэн', null, null, c.browserContext());
@@ -147,8 +158,21 @@ try {
   ghost.destroy();
   ok('a player whose connection silently died is removed automatically');
 
+  // chat flood guard: only one phrase a second gets through
+  const spam = new WebSocket(`ws://127.0.0.1:${port}/ws`), heard = [];
+  await new Promise((r) => (spam.onopen = r));
+  spam.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'say' && m.id === 'spam-1') heard.push(m); };
+  spam.send(JSON.stringify({ t: 'join', room: 'SPAM', id: 'spam-1', name: 'Spam', look: {}, x: 20, y: 13 }));
+  await sleep(200);
+  for (let k = 0; k < 5; k++) spam.send(JSON.stringify({ t: 'say', k: 'e', i: 0 }));
+  await sleep(400);
+  spam.close();
+  if (heard.length !== 1) throw new Error(`chat flood guard let ${heard.length} phrases through instead of 1`);
+  ok('sending many phrases at once only lets one through');
+
   await b.close();
   await until(() => a.evaluate(() => TG._village.live().others.size === 0), 'A sees B leave');
+  if (!(await a.evaluate(() => (TG._village.live().chat || []).some((l) => l.k === 'leave' && l.n === 'Сарнай')))) throw new Error('the chat log has no leave line');
   ok('leaving removes the player for others');
 } catch (e) {
   errors.push(e.message);

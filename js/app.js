@@ -70,7 +70,7 @@
   }
   const shell = (children) => h('div', { class: 'shell' }, topbar(), h('main', { class: 'page' }, children), bottomNav());
 
-  /** Main menu (village ☰ button and the profile chip). */
+  /** Main menu (the village profile card and the profile chip). */
   TG.openMenu = () => {
     const p = S.active(); if (!p) return;
     const m = TG.MASCOTS.find((x) => x.e === p.avatar);
@@ -78,6 +78,7 @@
     const close = TG.modal(h('div', null,
       h('div', { class: 'menu-me' }, h('span', { class: 'av big' }, p.avatar), h('div', null, h('b', null, p.name), h('small', null, `${p.age} ${L('настай', 'years old')}${TG.ethnic.byId(p.eth) ? ' · ' + tx(TG.ethnic.byId(p.eth).name) : m ? ' · ' + tx(m.name) : ''}${TG.aimags.byId(p.aimag) ? ' · 📍 ' + tx(TG.aimags.byId(p.aimag).name) : ''}`))),
       h('div', { class: 'menu-list' },
+        TG._village && TG._village.live() && item('👕', L('Хувцас', 'Wardrobe'), () => TG._village.wardrobe()),
         item('⛺', L('Нутаг', 'Nutag'), () => TG.go('village')),
         item('📚', L('Өв соёлын сургууль', 'Heritage school'), () => TG.go('learn')),
         item('✍️', L('Монгол бичгийн академи', 'Mongol script academy'), () => TG.go('bichig')),

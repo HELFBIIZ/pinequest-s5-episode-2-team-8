@@ -92,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { wardrobe: () => wardrobe(), phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -221,13 +221,14 @@
       case 'welcome':
         live.online = true; live.offset = m.now - Date.now(); live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room; live.serverV = m.v;
         live.others.clear(); (m.players || []).forEach(addOther);
+        live.chat = (m.chat || []).slice(-CHAT_KEEP); renderChat();
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
         TG.gerwork.sync();
         if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Сервер хуучин хувилбартай байна. Барилдаан зөв ажиллахын тулд серверийг дахин асаагаарай (Ctrl+C, дараа нь node server.js).', '⚠️ The server is running an old version. Restart it (Ctrl+C, then node server.js) so wrestling works.')), 2500);
         break;
-      case 'join': addOther(m.p); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
-      case 'leave': live.others.delete(m.id); hud(); break;
+      case 'join': addOther(m.p); addChat({ k: 'join', id: m.p.id, n: m.p.name }); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
+      case 'leave': { const o = live.others.get(m.id); if (o) addChat({ k: 'leave', id: m.id, n: o.name }); live.others.delete(m.id); hud(); break; }
       case 'lot': onLot(m); break;
       case 'wr-invite': case 'wr-declined': case 'wr-start': case 'wr-wait': case 'wr-result': case 'wr-end': onWrestleMsg(m); break;
       case 'move': { const o = live.others.get(m.id); if (o) { o.x = m.x; o.y = m.y; o.dir = m.dir; } break; }
@@ -236,6 +237,7 @@
       case 'say': {
         const who = m.id === v.id ? live.me : live.others.get(m.id);
         if (who) who.bubble = { text: m.k === 'e' ? R.EMOTES[m.i] : tx(R.PHRASES[m.i]), t0: performance.now() };
+        if (who) addChat({ k: m.k, id: m.id, n: who === live.me ? live.name : who.name, i: m.i });
         break;
       }
       case 'census': {
@@ -385,7 +387,7 @@
     quests();
     const canvas = h('canvas', { class: 'v-canvas', 'aria-label': L('Нутаг: тоглоомын талбар', 'Village play area') });
     const els = {
-      me: h('button', { class: 'v-me px-frame', onclick: () => wardrobe() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
+      me: h('button', { class: 'v-me px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }), coins: h('button', { class: 'v-pill px-frame', onclick: () => shopModal() }),
       energy: h('button', { class: 'v-pill px-frame v-energy', title: L('Хоол, ундаа', 'Food & drink'), onclick: () => eatModal() }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
       season: h('button', { class: 'v-pill px-frame v-season', onclick: () => TG.seasons.open() }),
       loc: h('button', { class: 'v-loc px-frame', onclick: () => TG.go('passport') }),
@@ -401,6 +403,8 @@
       run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), onclick: () => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); } }, '🏃'),
       fp: h('button', { class: 'v-round px-frame v-fpbtn', 'aria-label': L('Өөрийн нүдээр', 'First person'), title: L('Өөрийн нүдээр (3D)', 'First person (3D)'), onclick: () => openFP() }, '👁'),
       jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
+      talk: h('button', { class: 'v-round px-frame v-talk', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32), h('i', { class: 'v-badge hidden' })),
+      more: h('div', { class: 'v-more', onclick: (e) => { if (e.target.closest('button') && !e.target.closest('.v-music')) e.currentTarget.classList.remove('open'); } }),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
       help: h('button', { class: 'v-pill px-frame v-help', 'aria-label': L('Заавар', 'Tutorial'), title: L('Заавар: хөтөчтэй хамт тоглоом сурах', 'Tutorial: learn the game with the guide'), onclick: () => TG.tutorial && TG.tutorial.start(true) }, '?'),
       stick: h('div', { class: 'v-stick', 'aria-hidden': 'true' }, h('i')),
@@ -410,19 +414,23 @@
     };
     const root = h('div', { class: 'village' }, canvas,
       h('div', { class: 'v-top' },
-        h('button', { class: 'v-back px-frame', 'aria-label': L('Цэс', 'Menu'), onclick: () => TG.openMenu() }, pic('ui:menu', 26)),
         h('div', { class: 'v-mecol' }, els.me, els.loc, els.mini), h('div', { class: 'v-pills' }, els.coins, els.energy, els.season, els.net, els.together, els.help)),
       els.race, els.battle, els.stick, els.stick2, els.stickHint,
       h('div', { class: 'v-bottom' },
+        // the three buttons used most stay out; the rest wait behind "more" so the map stays clear
         h('div', { class: 'v-tools' },
-          els.fp, els.horse,
+          els.horse,
           h('button', { class: 'v-round px-frame v-basar', 'aria-label': 'basar', title: L('Басар (B)', 'Basar (B)'), onclick: () => openBasar() }, pic('ui:dog', 34)),
-          h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
+          els.talk,
           h('button', { class: 'v-round px-frame', 'aria-label': 'bag', onclick: () => bag() }, pic('ui:bag', 32)),
-          h('button', { class: 'v-round px-frame', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32)),
-          h('button', { class: 'v-round px-frame', 'aria-label': 'quests', onclick: () => questModal() }, pic('ui:scroll', 32)),
-          els.music),
+          h('div', { class: 'v-more-wrap' },
+            h('button', { class: 'v-round px-frame v-morebtn', 'aria-label': L('Бусад', 'More'), 'aria-expanded': 'false', onclick: (e) => { const open = els.more.classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', String(open)); TG.sfx.tap(); } }, '•••'),
+            els.more)),
         els.hotbar, els.run, els.jump, els.ctx, els.sprint, els.shoot));
+    els.more.append(els.fp,
+      h('button', { class: 'v-round px-frame', 'aria-label': 'learn', title: L('Сурах', 'Learn'), onclick: () => TG.go('learn') }, pic('ui:book', 32)),
+      h('button', { class: 'v-round px-frame', 'aria-label': 'quests', title: L('Даалгавар', 'Quests'), onclick: () => questModal() }, pic('ui:scroll', 32)),
+      els.music);
     setTimeout(() => start(root, canvas, els, setCleanup), 0);
     return root;
   };
@@ -469,7 +477,7 @@
   function hud() {
     if (!live) return;
     const v = V(), L1 = R.level(v.xp), e = live.els;
-    rc(e.me, portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
+    rc(e.me, portrait(v.look, 30), h('span', { class: 'v-me-body' }, h('b', null, live.name, h('span', { class: 'v-caret', 'aria-hidden': 'true' })), h('span', { class: 'v-lvl-row' }, h('span', { class: 'v-lvl' }, `${L('ТҮВ', 'LV')} ${L1.l}`), h('span', { class: 'v-xp' }, h('i', { style: { width: (L1.cur / L1.need) * 100 + '%' } })))));
     rc(e.coins, pic('ui:coin', 20), h('span', null, v.coins));
     hudEnergy();
     e.battle.classList.toggle('hidden', !live.battle); e.shoot.classList.toggle('hidden', !live.battle); if (live.battle) e.battle.textContent = battleLabel();
@@ -490,7 +498,7 @@
     const v = V(), have = Object.keys(R.DAIRY).filter((k) => v.produce[k] > 0);
     rc(live.els.hotbar, ...(have.length ? have.map((k) => h('button', { class: 'v-slot-btn', title: tx(R.DAIRY[k].name),
       onclick: () => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); } }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
-      : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), h('small', null, '→'))]));
+      : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), L('Саах →', 'Go milk →'))]));
   }
   /** While a ger is still to be built, a sheep with its wool grown is for shearing; otherwise for petting. */
   const sheepAct = (q) => (V().ger.stage < R.GER_DONE && TG.gerwork.shearable(q.i) ? 'shear' : 'sheep');
@@ -579,6 +587,7 @@
   /** p comes from the Phaser view: id, x/y (screen), wx/wy (world art px). */
   function onPointerDown(e) {
     if (!live) return;
+    if (live.els.more.classList.contains('open')) { live.els.more.classList.remove('open'); return; } // a tap on the map just closes "more"
     if (live.els.mini.classList.contains('big')) { live.els.mini.classList.remove('big'); return; }
     if (TG.dialog && TG.dialog.active() && !TG.dialog.free()) return; // the guide just talking doesn't stop you walking (tap or joystick)
     if (live.p2 && !live.p2.hidden && e.x > innerWidth / 2) { if (!live.drag2) live.drag2 = { id: e.id, x0: e.x, y0: e.y, on: false }; return; } // player 2's thumb
@@ -1809,10 +1818,40 @@
       else live.me.bubble = { text: k === 'e' ? R.EMOTES[i] : tx(R.PHRASES[i]), t0: performance.now() };
       close();
     };
-    const close = TG.modal(h('div', null, h('h2', null, L('Хэлэх үг', 'Say something')),
+    // the room's recent chat sits on top of the phrases, so reading and answering is one window
+    const log = h('div', { class: 'v-chatlog', role: 'log', 'aria-live': 'polite', 'aria-label': L('Чатын түүх', 'Chat log') });
+    live.chatLog = log; live.unread = 0; renderChat();
+    const close = TG.modal(h('div', null, h('h2', null, L('Хэлэх үг', 'Say something')), log,
       h('p', { class: 'muted' }, '🛡️ ', L('Хүүхдийн аюулгүй байдлын үүднээс зөвхөн бэлэн үг, эможи ашиглана.', 'For child safety, only friendly preset phrases and emoji are allowed.')),
       h('div', { class: 'v-phrases' }, R.PHRASES.map((p, i) => h('button', { class: 'v-chip wide', onclick: () => say('p', i) }, tx(p)))),
-      h('div', { class: 'v-chips v-emotes' }, R.EMOTES.map((e, i) => h('button', { class: 'v-chip', onclick: () => say('e', i) }, e)))));
+      h('div', { class: 'v-chips v-emotes' }, R.EMOTES.map((e, i) => h('button', { class: 'v-chip', onclick: () => say('e', i) }, e)))),
+      { onClose: () => { if (live) live.chatLog = null; } });
+  }
+
+  // ---------------------------------------------------------------- chat log: the room's recent phrases, joins and leaves
+  const CHAT_KEEP = 30;
+  function addChat(line) {
+    if (!live) return;
+    (live.chat = live.chat || []).push(line);
+    if (live.chat.length > CHAT_KEEP) live.chat.splice(0, live.chat.length - CHAT_KEEP);
+    if (!live.chatLog && (line.k === 'p' || line.k === 'e') && line.id !== V().id) live.unread = (live.unread || 0) + 1;
+    renderChat();
+  }
+  function chatText(l) {
+    if (l.k === 'join') return '👋 ' + L('нутагт ирлээ', 'joined the village');
+    if (l.k === 'leave') return '🚶 ' + L('нутгаас явлаа', 'left the village');
+    return l.k === 'e' ? R.EMOTES[l.i] || '' : tx(R.PHRASES[l.i] || R.PHRASES[0]);
+  }
+  function renderChat() {
+    if (!live) return;
+    const chat = live.chatLog, lines = live.chat || [], badge = live.els.talk.querySelector('.v-badge');
+    badge.textContent = live.unread > 9 ? '9+' : String(live.unread || '');
+    badge.classList.toggle('hidden', !live.unread);
+    if (!chat) return;
+    chat.classList.toggle('hidden', !lines.length && !live.online); // playing alone: no empty log, just the phrases
+    chat.replaceChildren(...(lines.length ? lines.map((l) => h('div', { class: 'v-chat-line' + (l.k === 'join' || l.k === 'leave' ? ' sys' : '') }, h('b', null, l.n), ' ', chatText(l)))
+      : [h('div', { class: 'v-chat-line sys' }, L('Одоохондоо мессеж алга.', 'No messages yet.'))]));
+    chat.scrollTop = chat.scrollHeight;
   }
 
   function playerCard(o) {

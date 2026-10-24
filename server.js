@@ -66,7 +66,7 @@ function room(code) {
   if (!rooms.has(code)) {
     const lots = Array.isArray(saved[code] && saved[code].lots) ? saved[code].lots.slice(0, R.LOTS) : [];
     while (lots.length < R.LOTS) lots.push(null);
-    rooms.set(code, { code, players: new Map(), lots, matches: new Map() });
+    rooms.set(code, { code, players: new Map(), lots, matches: new Map(), chat: [] });
   }
   return rooms.get(code);
 }
@@ -143,6 +143,9 @@ const pub = (p) => ({ id: p.id, name: p.name, look: p.look, lvl: p.lvl, x: p.x, 
 function counts() { let total = 0; for (const r of rooms.values()) total += r.players.size; const main = rooms.get('NUTAG'); return { total, nutag: main ? main.players.size : 0 }; }
 function census() { const c = counts(); for (const r of rooms.values()) if (r.players.size) broadcast(r, { t: 'census', ...c }); }
 function broadcast(r, msg, except) { for (const p of r.players.values()) if (p.conn !== except) p.conn.send(msg); }
+/** The room's chat log: the last few phrases, joins and leaves, kept in memory only (gone when the server restarts). */
+const CHAT_KEEP = 30, SAY_GAP = 1000;
+function logChat(r, line) { r.chat.push(line); if (r.chat.length > CHAT_KEEP) r.chat.splice(0, r.chat.length - CHAT_KEEP); }
 
 function onMessage(conn, text) {
   const t = Date.now();                                     // simple rate limit: ~20 messages per second
@@ -161,7 +164,8 @@ function onMessage(conn, text) {
     if (old) { old.conn.player = null; old.conn.room = null; old.conn.send({ t: 'replaced' }); setTimeout(() => old.conn.socket.destroy(), 50); } // same player in another tab: keep the newest, and tell the old one why
     const p = { id, conn, name: cleanName(m.name), look: R.cleanLook(m.look), lvl: num(m.lvl, 1, 99), x: numf(m.x, 0.5, R.W - 2), y: numf(m.y, 0.5, R.H - 2), dir: num(m.dir, 0, 3) };
     r.players.set(id, p); conn.player = p; conn.room = r;
-    conn.send({ t: 'welcome', v: R.VERSION, now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), lots: r.lots });
+    if (!old) logChat(r, { k: 'join', id, n: p.name }); // a second tab of the same player is not a new arrival
+    conn.send({ t: 'welcome', v: R.VERSION, now: t, room: code, players: [...r.players.values()].filter((x) => x !== p).map(pub), lots: r.lots, chat: r.chat });
     broadcast(r, { t: 'join', p: pub(p) }, conn);
     census();
     return;
@@ -185,6 +189,8 @@ function onMessage(conn, text) {
     case 'say': {
       const kind = m.k === 'e' ? 'e' : 'p', max = kind === 'e' ? R.EMOTES.length : R.PHRASES.length;
       if (!Number.isInteger(m.i) || m.i < 0 || m.i >= max) return;
+      const t = Date.now(); if (t - (p.st || 0) < SAY_GAP) return; p.st = t; // one phrase a second, so nobody floods the room
+      logChat(r, { k: kind, id: p.id, n: p.name, i: m.i });
       broadcast(r, { t: 'say', id: p.id, k: kind, i: m.i });   // to everyone, including the sender
       break;
     }
@@ -282,6 +288,7 @@ function leave(conn) {
   if (!p || !r || r.players.get(p.id) !== p) return;
   if (p.match && r.matches.get(p.match)) { const match = r.matches.get(p.match); endMatch(r, match, match.a === p.id ? match.b : match.a, 'left'); }
   r.players.delete(p.id);
+  logChat(r, { k: 'leave', id: p.id, n: p.name });
   broadcast(r, { t: 'leave', id: p.id });
   census();
 }
