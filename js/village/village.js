@@ -92,7 +92,7 @@
   TG.villageReward = (c, x) => reward(c, x);   // lessons, quizzes and family activities pay out in Нутаг
   TG.villageQuest = (k, n) => quest(k, n);
   const checkAch = () => { if (TG.achievements) TG.achievements.check(); };
-  TG._village = { wardrobe: () => wardrobe(), phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
+  TG._village = { wardrobe: () => wardrobe(), hud: () => hud(), recipes: () => Object.values(RECIPES).flat(), phaser: () => live && live.view, battle: (id) => startBattle(id), battleState: () => live && live.battle, shootNearest: () => shootNearest(), general: () => generalModal(), fp: () => openFP(), live: () => live, milk: (id) => milkGame(id), station: (st) => dairyStation(st), goTo: (...a) => goTo(...a), lots: () => lotsArr(), build: (i) => TG.gerwork.build(i), together: (id) => together(id), reconnect: () => net.rejoin(), shear: (i) => TG.gerwork.shear(i), shearable: (i) => TG.gerwork.shearable(i), felt: () => TG.gerwork.felt(), invite: (id) => net.send({ t: 'wr-invite', to: id }), context: () => contextAction(), arena: () => arenaModal(), school: () => wrestleSchool(), practice: () => practiceBout(), tournament: (r) => tournament(r), dog: () => live && live.dog, lot: (i) => lotAction(i), archery: () => archeryGame(), emee: () => emeeVisit(), npc: (id) => npcTalk(id), enterGer: (i) => enterGer(i), mount: (c) => mount(c), dismount: () => dismount(), race: (c) => raceStart(c), raceState: () => live && live.race,
     tut: (st) => { if (live) live.tut = st; }, nomin: (cmd) => nomin(cmd), basar: () => openBasar(),
     questsState: () => ({ day: S.dkey(), list: quests(), defs: QUESTS, seen: V().questsSeen }),
     npcs: () => WD.objects.filter((o) => o.kind === 'npcq' && NPCS[o.id]).map((o) => ({ id: o.id, x: o.x, y: o.y, mark: npcMark(o.id), name: NPCS[o.id].name })), objects: () => WD.objects, jump: () => jump() }; // used by automated tests and the tutorial
@@ -112,6 +112,10 @@
   }
   const itemKey = (it) => (it.slot === 'deel' ? 'deel:' + it.val : it.cat === 'pet' ? 'pet:' + it.val : it.cat === 'tool' ? 'tool:' + it.id : 'wear:' + it.slot + '-' + it.val);
   const pic = (key, size = 32) => PX.icon(key, size);
+  /** Button props that act the moment a finger lands: phones send no click for a second finger (one thumb steering, the other pressing).
+   *  A keyboard click (detail 0) still acts; the click that follows a press does not act again. A finger's touch is cancelled at the
+   *  start: no click comes after it (a window the press just opened would take that click), and the village engine leaves it alone. */
+  const press = (fn) => ({ onpointerdown: (e) => { if (e.button === 0) fn(); }, onclick: (e) => { if (e.detail === 0) fn(); }, ontouchstart: (e) => { if (e.cancelable) e.preventDefault(); } });
   const ZASUUL = { deel: 'gold', skin: '#D9A06E', hat: 'mongol', face: null, neck: 'khadag', pet: null };
   TG.drawAvatarPixel = (ctx, look, scale) => { ctx.imageSmoothingEnabled = false; ctx.drawImage(PX.char(look, 0, 0), 0, 0, 16 * scale, 28 * scale); };
 
@@ -323,17 +327,13 @@
   }
   // recipes at each station: what milk they need, what they give, the real steps, and how you do them
   const RECIPES = {
-    rack: [{ id: 'aaruul', need: { milk: 2 }, gives: 3, how: 'steps',
-      steps: [Tx('Сүүгээ исгэж тараг болгоно', 'Let the milk sour into tarag'), Tx('Тарагаа буцалгаж ээдэм гаргана', 'Boil it until curds (ээдэм) form'), Tx('Ээдмээ даавуунд хийж шахна', 'Press the curds in a cloth'), Tx('Хэрчиж хэлбэр оруулна', 'Cut them into pieces'), Tx('Тавиур дээр наранд хатаана', 'Dry them in the sun on the rack')],
+    rack: [{ id: 'aaruul', need: { milk: 2 }, gives: 3,
       fact: Tx('Ааруулыг наранд хэд хоног хатаадаг. Хатсан ааруул бүтэн жил хадгалагддаг тул өвөл, аянд авч явдаг.', 'Aaruul dries in the sun for several days. Dried, it keeps for a whole year, so herders take it on journeys and through winter.') }],
-    tulga: [{ id: 'urum', need: { milk: 2 }, gives: 1, how: 'mash', taps: 12, verb: Tx('Самрах', 'Ladle'),
-      steps: [Tx('Сүүгээ бага галд аажмаар буцалгана', 'Heat the milk slowly on a low fire'), Tx('Шанагаар дээш өргөж самарна: хөөс гарна', 'Ladle it up high so it foams'), Tx('Шөнөжин хөргөнө, дээр нь өрөм тогтоно', 'Leave it overnight: the öröm forms on top')],
+    tulga: [{ id: 'urum', need: { milk: 2 }, gives: 1,
       fact: Tx('Өрөм бол сүүг зөөлөн буцалгаж, самраад, хөргөхөд дээр нь тогтдог өтгөн цөцгий. Цагаан сараар хамгийн хүндэт зочинд өргөдөг.', 'Öröm is the thick cream that forms on top of gently boiled, ladled and cooled milk, offered to honoured guests at Tsagaan Sar.') },
-      { id: 'tarag', need: { milk: 1 }, gives: 2, how: 'steps',
-      steps: [Tx('Сүүгээ буцалгана', 'Boil the milk'), Tx('Бүлээн болтол хөргөнө', 'Let it cool until warm'), Tx('Хөрөнгө нэмнэ: өмнөх тарагнаас жаахан', 'Add a starter: a little old tarag'), Tx('Дулаан газар хононо', 'Keep it warm overnight')],
+      { id: 'tarag', need: { milk: 1 }, gives: 2,
       fact: Tx('Тарагны “хөрөнгө”-ийг айлууд үеэс үед хадгалж, бие биедээ өгдөг.', 'Families keep their tarag starter for generations and share it with each other.') }],
-    churn: [{ id: 'airag', need: { mare: 2 }, gives: 2, how: 'mash', taps: 30, verb: Tx('Бүлэх', 'Churn'),
-      steps: [Tx('Гүүний сүүгээ хөхүүрт хийнэ', 'Pour the mare’s milk into the khukhuur'), Tx('Бүлүүрээр олон дахин бүлнэ', 'Churn it with the stick, again and again'), Tx('Нэг хоног исгэнэ', 'Let it ferment for a day')],
+    churn: [{ id: 'airag', need: { mare: 2 }, gives: 2,
       fact: Tx('Айргийг мянга гаруй удаа бүлдэг. Айлд орж ирсэн хүн бүр хэдэн удаа бүлээд өгдөг заншилтай.', 'Airag is churned over a thousand times, and everyone who comes into the ger gives it a few stirs.') }],
   };
   /** A dairy station: pick a recipe you have the milk for, then do the real steps (tap each in order, or churn/ladle many times). */
@@ -346,30 +346,16 @@
         return h('div', { class: 'v-row' + (ok ? '' : ' locked') }, pic('dairy:' + r.id, 32), h('div', { class: 'v-row-b' }, h('b', null, `${tx(d.name)} ×${r.gives}`), h('small', null, Object.entries(r.need).map(([k, n]) => `${R.DAIRY[k].e} ${n} ${tx(R.DAIRY[k].name)}`).join(' + '))),
           h('button', { class: 'btn sm primary', disabled: !ok, onclick: () => make(r) }, ok ? L('Хийх', 'Make') : L('Саах хэрэгтэй', 'Milk first'))); })),
       h('p', { class: 'privacy' }, '🐄 ', L('Сүү авахын тулд үнээ, ямаа, гүүгээ саагаарай.', 'Milk the cows, goats and mares to get milk.')));
-    function make(r) {
-      let step = 0, taps = 0;
-      const show = () => {
-        const s = r.steps[Math.min(step, r.steps.length - 1)];
-        const mashing = r.how === 'mash' && step === 1;
-        rc(body, h('h2', null, `${R.DAIRY[r.id].e} ${tx(R.DAIRY[r.id].name)}`),
-          h('ol', { class: 'v-steps' }, r.steps.map((q, i) => h('li', { class: i < step ? 'done' : i === step ? 'on' : '' }, tx(q)))),
-          mashing ? h('div', { class: 'meter' }, h('span', { style: { width: (taps / r.taps) * 100 + '%' } })) : null,
-          h('button', { class: 'btn primary big block', onclick: () => {
-            if (mashing) { taps++; TG.sfx.scrub && TG.sfx.scrub(); if (taps < r.taps) return show(); }
-            else TG.sfx.tap();
-            step++;
-            if (step >= r.steps.length) return finish();
-            show();
-          } }, mashing ? `${tx(r.verb)}! ${taps}/${r.taps}` : `${step + 1}. ${tx(s)} ✓`));
-      };
-      const finish = () => {
-        Object.entries(r.need).forEach(([k, n]) => stock(k, -n)); stock(r.id, r.gives); quest('dairy'); reward(3, 10);
-        v.seen = v.seen || {}; const first = !v.seen['made_' + r.id]; v.seen['made_' + r.id] = 1; S.save(); if (live) hud(); TG.sfx.good(); if (first) TG.confetti(40);
-        rc(body, h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('dairy:' + r.id, 64)), h('h2', null, `+${r.gives} ${tx(R.DAIRY[r.id].name)}`),
-          h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(r.fact))),
-          h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: list }, L('Дахиад хийх', 'Make more')), h('button', { class: 'btn primary', onclick: () => close() }, L('Боллоо', 'Done')))));
-      };
-      show();
+    // every step is done by hand on the village stage (dairywork.js); the milk is used only once the food is made
+    async function make(r) {
+      close();
+      if (!(await TG.dairywork.make(r.id)) || !live) return;
+      if (!has(r.need)) return TG.toast('🥛 ' + L('Сүү хүрэлцэхгүй байна.', 'Not enough milk.'));
+      Object.entries(r.need).forEach(([k, n]) => stock(k, -n)); stock(r.id, r.gives); quest('dairy'); reward(3, 10);
+      v.seen = v.seen || {}; const first = !v.seen['made_' + r.id]; v.seen['made_' + r.id] = 1; S.save(); hud(); TG.sfx.good(); if (first) TG.confetti(40);
+      const done = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('dairy:' + r.id, 64)), h('h2', null, `+${r.gives} ${tx(R.DAIRY[r.id].name)}`),
+        h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(r.fact))),
+        h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { done(); dairyStation(st); } }, L('Дахиад хийх', 'Make more')), h('button', { class: 'btn primary', onclick: () => done() }, L('Боллоо', 'Done')))), { cls: 'v-modal' });
     }
     list();
     const close = TG.modal(body, { cls: 'v-modal' });
@@ -391,18 +377,18 @@
       energy: h('button', { class: 'v-pill px-frame v-energy', title: L('Хоол, ундаа', 'Food & drink'), onclick: () => eatModal() }), net: h('button', { class: 'v-pill px-frame v-net', onclick: () => roomModal() }),
       season: h('button', { class: 'v-pill px-frame v-season', onclick: () => TG.seasons.open() }),
       loc: h('button', { class: 'v-loc px-frame', onclick: () => TG.go('passport') }),
-      ctx: h('button', { class: 'v-act px-frame hidden', onclick: () => { const a = contextAction(); if (a) doAction(a); } }),
+      ctx: h('button', { class: 'v-act px-frame hidden', ...press(() => { const a = contextAction(); if (a) doAction(a); }) }),
       hotbar: h('div', { class: 'v-hotbar px-frame', role: 'toolbar', 'aria-label': L('Цагаан идээ', 'Dairy') }),
       race: h('div', { class: 'v-race px-frame hidden', 'aria-live': 'polite' }),
       battle: h('div', { class: 'v-race v-battle px-frame hidden', 'aria-live': 'polite' }),
-      shoot: h('button', { class: 'v-sprint v-shoot px-frame hidden', 'aria-label': L('Харвах (F)', 'Shoot (F)'), onclick: () => shootNearest() }, '🏹'),
+      shoot: h('button', { class: 'v-sprint v-shoot px-frame hidden', 'aria-label': L('Харвах (F)', 'Shoot (F)'), ...press(() => shootNearest()) }, '🏹'),
       sprint: h('button', { class: 'v-sprint px-frame hidden', 'aria-label': L('Чү! (Shift)', 'Chü! (Shift)'),
         onpointerdown: (e) => { e.preventDefault(); if (live && live.race) live.race.sprint = true; }, onpointerup: () => { if (live && live.race) live.race.sprint = false; }, onpointerleave: () => { if (live && live.race) live.race.sprint = false; }, oncontextmenu: (e) => e.preventDefault() }, L('Чү!', 'Chü!')),
       horse: h('button', { class: 'v-round px-frame hidden', 'aria-label': 'horse', title: L('Мориноос буух', 'Get off the horse'), onclick: () => dismount() }, pic('ui:horse', 34)),
       mini: h('canvas', { class: 'v-mini px-frame', width: WD.W * 3, height: WD.H * 3, 'aria-label': L('Газрын зураг', 'Map'), title: L('Газрын зураг: дарж томруулна', 'Map: tap to enlarge') }),
-      run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), onclick: () => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); } }, '🏃'),
+      run: h('button', { class: 'v-run px-frame', 'aria-label': L('Гүйх', 'Run'), 'aria-pressed': 'false', title: L('Гүйх (Shift)', 'Run (Shift)'), ...press(() => { if (!live) return; live.runLock = !live.runLock; live.els.run.classList.toggle('on', live.runLock); live.els.run.setAttribute('aria-pressed', String(live.runLock)); TG.sfx.tap(); }) }, '🏃'),
       fp: h('button', { class: 'v-round px-frame v-fpbtn', 'aria-label': L('Өөрийн нүдээр', 'First person'), title: L('Өөрийн нүдээр (3D)', 'First person (3D)'), onclick: () => openFP() }, '👁'),
-      jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), onclick: () => jump() }, '⤒'),
+      jump: h('button', { class: 'v-jump px-frame', 'aria-label': L('Үсрэх', 'Jump'), title: L('Үсрэх (Space)', 'Jump (Space)'), ...press(() => jump()) }, '⤒'),
       talk: h('button', { class: 'v-round px-frame v-talk', 'aria-label': 'talk', onclick: () => talk() }, pic('ui:chat', 32), h('i', { class: 'v-badge hidden' })),
       more: h('div', { class: 'v-more', onclick: (e) => { if (e.target.closest('button') && !e.target.closest('.v-music')) e.currentTarget.classList.remove('open'); } }),
       music: h('button', { class: 'v-round px-frame v-music hidden', 'aria-label': L('Хөгжим', 'Music'), onclick: () => { TG.music.toggle(); } }),
@@ -449,6 +435,7 @@
       view: null, ctxTimer: 0, sel: null };
     document.fonts && document.fonts.load('10px Tiny5', 'Нутаг ӨҮ');
     window.addEventListener('keydown', onKey, true); window.addEventListener('keyup', onKeyUp, true); window.addEventListener('blur', clearKeys);
+    document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', clearKeys); // phones lock or switch apps without a blur, and the lifted finger is never heard
     root.addEventListener('click', (e) => { const b = e.target.closest && e.target.closest('button'); if (b) b.blur(); }); // HUD buttons never keep focus
     live.miniBase = miniBase();
     els.mini.addEventListener('pointerdown', onMiniTap);
@@ -460,13 +447,15 @@
     else if (!v.tips) tips();
     setCleanup(stop);
   }
-  const clearKeys = () => { if (live) { live.keys.clear(); live.run = false; endStick(); } };
+  const clearKeys = () => { if (live) { live.keys.clear(); live.run = false; endStick(); if (live.p2) { live.p2.keys.clear(); live.p2.running = false; endStick2(); } } };
+  const onHide = () => { if (document.hidden) clearKeys(); };
   function stop() {
     if (!live) return;
     live.race = null;
     if (TG.tutorial) TG.tutorial.stop();
     live.view.destroy();
     window.removeEventListener('keydown', onKey, true); window.removeEventListener('keyup', onKeyUp, true); window.removeEventListener('blur', clearKeys);
+    document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', clearKeys);
     net.close();
     if (live.unMusic) live.unMusic();
     const v = V(); if (v) { v.pos = { x: +live.me.px.toFixed(2), y: +live.me.py.toFixed(2) }; v.energy = Math.round(v.energy * 10) / 10; S.save(); }
@@ -497,8 +486,8 @@
   function hotbar() {
     const v = V(), have = Object.keys(R.DAIRY).filter((k) => v.produce[k] > 0);
     rc(live.els.hotbar, ...(have.length ? have.map((k) => h('button', { class: 'v-slot-btn', title: tx(R.DAIRY[k].name),
-      onclick: () => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); } }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
-      : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), onclick: () => goTo({ x: 9, y: 14 }, null) }, pic('beast:cow', 28), L('Саах →', 'Go milk →'))]));
+      ...press(() => { if (R.DAIRY[k].food) eat(k); else TG.toast(`${R.DAIRY[k].e} ${tx(R.DAIRY[k].name)}: ${L('тавиур, тулга, хөхүүр дээр цагаан идээ хийнэ.', 'make dairy foods at the rack, stove or churn.')}`); }) }, pic('dairy:' + k, 28), h('small', null, v.produce[k])))
+      : [h('button', { class: 'v-slot-btn empty', title: L('Хот айл', 'Dairy yard'), ...press(() => goTo({ x: 9, y: 14 }, null)) }, pic('beast:cow', 28), L('Саах →', 'Go milk →'))]));
   }
   /** While a ger is still to be built, a sheep with its wool grown is for shearing; otherwise for petting. */
   const sheepAct = (q) => (V().ger.stage < R.GER_DONE && TG.gerwork.shearable(q.i) ? 'shear' : 'sheep');
@@ -599,6 +588,7 @@
     if (d2 && d2.id === e.id) { // player 2's joystick
       const dx = e.x - d2.x0, dy = e.y - d2.y0, dist = Math.hypot(dx, dy), st = live.els.stick2;
       if (!d2.on) { if (dist < 12) return; d2.on = true; const r = live.root.getBoundingClientRect(); st.style.left = d2.x0 - r.left + 'px'; st.style.top = d2.y0 - r.top + 'px'; st.classList.add('on'); }
+      slideBase(d2, e.x, e.y, st);
       const q = dist > STICK_R ? STICK_R / dist : 1; live.p2.stick = { x: (dx * q) / STICK_R, y: (dy * q) / STICK_R };
       st.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`; return;
     }
@@ -611,6 +601,7 @@
       els.stick.style.left = d.x0 - r.left + 'px'; els.stick.style.top = d.y0 - r.top + 'px'; els.stick.classList.add('on');
       if (!els.stickHint.classList.contains('gone')) { els.stickHint.classList.add('gone'); const v = V(); if (v) { v.stickUsed = true; S.save(); } }
     }
+    slideBase(d, e.x, e.y, els.stick);
     const q = dist > STICK_R ? STICK_R / dist : 1;
     live.stick = { x: (dx * q) / STICK_R, y: (dy * q) / STICK_R };
     els.stick.firstChild.style.transform = `translate(${Math.round(dx * q)}px, ${Math.round(dy * q)}px)`;
@@ -621,6 +612,12 @@
     live.drag = null;
     if (d.on) return endStick();
     onTap(d.wx / T, d.wy / T);
+  }
+  /** Once the thumb passes the ring, the ring slides along behind it, so pulling back turns around at once. */
+  function slideBase(d, x, y, el) {
+    const dx = x - d.x0, dy = y - d.y0, dist = Math.hypot(dx, dy); if (dist <= STICK_R) return;
+    const k = (dist - STICK_R) / dist, r = live.root.getBoundingClientRect(); d.x0 += dx * k; d.y0 += dy * k;
+    el.style.left = d.x0 - r.left + 'px'; el.style.top = d.y0 - r.top + 'px';
   }
   function endStick2() { if (!live) return; live.drag2 = null; if (live.p2) live.p2.stick = null; live.els.stick2.classList.remove('on'); live.els.stick2.firstChild.style.transform = ''; }
   function endStick() { if (!live) return; live.drag = null; live.stick = null; live.els.stick.classList.remove('on'); live.els.stick.firstChild.style.transform = ''; }
