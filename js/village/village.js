@@ -337,6 +337,12 @@
       fact: Tx('Айргийг мянга гаруй удаа бүлдэг. Айлд орж ирсэн хүн бүр хэдэн удаа бүлээд өгдөг заншилтай.', 'Airag is churned over a thousand times, and everyone who comes into the ger gives it a few stirs.') }],
   };
   /** A dairy station: pick a recipe you have the milk for, then do the real steps (tap each in order, or churn/ladle many times). */
+  /** Done by hand: the parents' log hears of it the first time, and the real-life family activity that goes with it is offered until it is done. */
+  function handsOnDone(id, first) {
+    if (first) S.logActivity({ kind: 'hand', id });
+    const a = R.HANDS_ON.find((x) => x.id === id), l = a && a.home && TG.learn && TG.learn.byId(a.lesson);
+    return l && l.family && !TG.learn.progress(l.id).family ? TG.learn.familyCard(l) : null;
+  }
   function dairyStation(st) {
     const v = V(), body = h('div');
     const has = (need) => Object.entries(need).every(([k, n]) => (v.produce[k] || 0) >= n);
@@ -355,6 +361,7 @@
       v.seen = v.seen || {}; const first = !v.seen['made_' + r.id]; v.seen['made_' + r.id] = 1; S.save(); hud(); TG.sfx.good(); if (first) TG.confetti(40);
       const done = TG.modal(h('div', { class: 'center' }, h('div', { class: 'v-fact-e' }, pic('dairy:' + r.id, 64)), h('h2', null, `+${r.gives} ${tx(R.DAIRY[r.id].name)}`),
         h('div', { class: 'teach' }, h('b', null, '💡 ', L('Мэдсэн үү?', 'Did you know?')), h('p', null, tx(r.fact))),
+        handsOnDone(r.id, first),
         h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => { done(); dairyStation(st); } }, L('Дахиад хийх', 'Make more')), h('button', { class: 'btn primary', onclick: () => done() }, L('Боллоо', 'Done')))), { cls: 'v-modal' });
     }
     list();
@@ -1621,6 +1628,7 @@
       TG.sfx.win(); TG.confetti(50);
       sayEmee(perfect ? L('Ёстой ёсорхог хүүхэд вэ! Энэ ааруулаас ав, миний хүү/охин. 🧀', 'Such a well-mannered child! Have some aaruul, dear. 🧀') : L('Сайн байна! Алдах нь сурах л гэсэн үг. Энэ ааруулаас ав. 🧀', 'Well done! Making mistakes is how we learn. Have some aaruul. 🧀'));
       rc(opts, h('div', { class: 'l-reward' }, r ? `🪙 +${r.coins} · ⭐ +${r.xp} XP` : ''), h('p', { class: 'muted' }, perfect ? L('Нэг ч алдаагүй! 🏅', 'Not a single slip! 🏅') : L(`Эмээ ${slips} удаа зөөлөн зааж өглөө.`, `Grandma gently helped you ${slips} time(s).`)),
+        handsOnDone('emee', em.visits === 1),
         h('div', { class: 'row-btns' }, h('button', { class: 'btn', onclick: () => close() }, L('Баяртай, эмээ!', 'Bye, Grandma!')), h('button', { class: 'btn primary', onclick: () => { close(); TG.go('lesson', { id: 'customs' }); } }, L('Ёс заншлын хичээл', 'Manners lesson'))));
     }
     show();

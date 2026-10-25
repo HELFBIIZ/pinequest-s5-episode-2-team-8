@@ -233,6 +233,9 @@ try {
   await sleep(300);
   { const p = await page.evaluate(() => { const p = TG.store.active().village.produce; return { milk: p.milk || 0, tarag: p.tarag || 0 }; });
     if (p.tarag !== 2 || p.milk !== 1) errors.push(`dairy yard: making tarag did not work ${JSON.stringify(p)}`); }
+  // what you just made by hand, you can make for real at home: the family card comes right after, and the parent's log notes it
+  await check('tarag made: make it at home with the family', '.modal .l-family');
+  if (!(await page.evaluate(() => TG.store.state.log.some((x) => x.k === 'hand' && x.id === 'tarag')))) errors.push('dairy yard: making tarag by hand was not noted for the parents');
   // every recipe at every station has its hands-on steps
   { const missing = await page.evaluate(() => TG._village.recipes().filter((r) => !(TG.dairywork.steps(r.id) > 0)).map((r) => r.id)); if (missing.length) errors.push(`dairy yard: no hands-on steps for ${missing.join(', ')}`); }
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
@@ -534,6 +537,7 @@ try {
     if (k === 0) { const gentle = await page.evaluate(() => !!document.querySelector('.emee-say .gentle')); if (!gentle) errors.push('grandma visit: a wrong move should get a gentle explanation'); }
   }
   if (!(await page.evaluate(() => (TG.store.active().village.emee || {}).visits === 1))) errors.push('grandma visit: the visit was not completed');
+  await check('grandma visit: learn the customs at home with the family', '.emee-visit .l-family');
   await page.evaluate(() => document.querySelectorAll('.modal-x').forEach((x) => x.click())); await sleep(250);
   // archery: one arrow
   step = 'archery';
@@ -652,6 +656,10 @@ try {
   await page.evaluate(() => { const g = document.querySelector('.gate-q'); if (!g) return; const q = g.textContent.match(/(\d+) × (\d+)/); document.querySelector('.gate-input').value = q[1] * q[2]; [...document.querySelectorAll('.gate .btn')].pop().click(); }); await sleep(400);
   await check('parent sees badges', '.ach-earned .ach-chip');
   await check('parent sees what was learned', '.learned li');
+  // what the child learned by doing it by hand in the village counts too, not only the school lessons
+  { const hand = await page.evaluate(() => [...document.querySelectorAll('.learned[data-hand]')].map((e) => e.dataset.hand));
+    for (const id of ['aaruul', 'tarag', 'emee']) if (!hand.includes(id)) errors.push(`parent report: "${id}", learned by hand in the village, is not shown`); }
+  { const n = await page.evaluate(() => (document.querySelector('.stat[data-stat="hand"] b') || {}).textContent); if (!/^[3-6]\/6$/.test(n || '')) errors.push(`parent report: the learned-by-hand count is wrong (${n})`); }
 
   // aimag passport: Ulaanbaatar first, then the next province unlocks
   step = 'aimag passport';

@@ -234,11 +234,13 @@
   function learnedReport(child) {
     const learn = child.learn || {}, bs = child.basar || {}, topics = bs.topics || {};
     const done = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].done);
+    const did = TG.vrules.handsOn(child.village), hand = TG.vrules.HANDS_ON.filter((a) => did.includes(a.id)); // done by hand in Нутаг
     const got = Object.entries(child.ach || {}).sort((a, b) => b[1] - a[1]);
     const logs = S.state.log.filter((x) => x.pid === child.id && x.k).slice(-12).reverse();
     const withTxt = (w) => !w ? '' : [w.family ? L(`гэр бүлтэйгээ ${w.family}`, `with family ${w.family}×`) : '', w.friends ? L(`найзуудтайгаа ${w.friends}`, `with friends ${w.friends}×`) : '', w.solo ? L(`ганцаараа ${w.solo}`, `alone ${w.solo}×`) : ''].filter(Boolean).join(', ');
     const logLine = (x) => {
       if (x.k === 'lesson') { const l = TG.learn.byId(x.id); return ['📚', L(`“${l ? tx(l.title) : x.id}” хичээлийг дуусгасан`, `Finished “${l ? tx(l.title) : x.id}”`)]; }
+      if (x.k === 'hand') { const a = TG.vrules.HANDS_ON.find((q) => q.id === x.id); return [a ? a.icon : '✋', a ? tx(a.name) : x.id]; }
       if (x.k === 'ach') { const a = TG.achievements.byId(x.id); return ['🏅', L('Амжилт: ', 'Badge: ') + (a ? tx(a.name) : x.id)]; }
       if (x.k === 'race') return ['🐎', L(`Морин уралдаанд ${x.id}-р байр`, `Horse race: place ${x.id}`)];
       if (x.k === 'together') { const [what, mode, who] = x.id.split('|'); const l = TG.learn.byId(what); return [mode === 'family' ? '👨‍👩‍👧' : '🤝', `${l ? tx(l.title) : L('Асуулт хариулт', 'Quiz')} · ${who}`]; }
@@ -249,8 +251,10 @@
       h('p', { class: 'muted' }, L(`${child.name} ${got.length}/${TG.achievements.LIST.length} амжилт авсан.`, `${child.name} has ${got.length}/${TG.achievements.LIST.length} badges.`)),
       got.length ? h('div', { class: 'ach-earned' }, got.map(([id, ts]) => { const a = TG.achievements.byId(id); return a ? h('span', { class: 'ach-chip', title: tx(a.desc) }, TG.achievements.badge(a, 'chip'), ' ', tx(a.name), h('small', null, fmtDay(ts))) : null; })) : h('p', { class: 'muted' }, L('Одоохондоо амжилт алга.', 'No badges yet.')),
       h('h4', null, L('Сурсан зүйлс', 'What they learned')),
-      done.length ? done.map((l) => h('div', { class: 'learned' }, h('b', null, l.icon, ' ', tx(l.title)), withTxt(learn[l.id].with) ? h('small', null, ' · ', withTxt(learn[l.id].with)) : null,
-        h('ul', null, (l.learned || []).map((t) => h('li', null, tx(t)))))) : h('p', { class: 'muted' }, L('Хичээл дуусгаагүй байна.', 'No lessons finished yet.')),
+      done.length || hand.length ? [done.map((l) => h('div', { class: 'learned' }, h('b', null, l.icon, ' ', tx(l.title)), withTxt(learn[l.id].with) ? h('small', null, ' · ', withTxt(learn[l.id].with)) : null,
+        h('ul', null, (l.learned || []).map((t) => h('li', null, tx(t)))))),
+        hand.map((a) => h('div', { class: 'learned', 'data-hand': a.id }, h('b', null, a.icon, ' ', tx(a.name)), h('small', null, ' · ', L('Нутагт гараараа', 'by hand in Нутаг')),
+          h('ul', null, a.learned.map((t) => h('li', null, tx(t))))))] : h('p', { class: 'muted' }, L('Одоохондоо юу ч сураагүй байна.', 'Nothing learned yet.')),
       Object.keys(topics).length ? h('div', null, h('h4', null, L('Басарын асуултын сэдвүүд', 'Basar quiz topics')),
         Object.entries(TG.BASAR.TOPICS).map(([k, t]) => { const x = topics[k] || { right: 0, total: 0 }; return h('div', { class: 'topic-row' }, h('span', null, t.icon, ' ', tx(t.name)), h('div', { class: 'bar' }, h('span', { style: { width: (x.total ? (x.right / x.total) * 100 : 0) + '%' } })), h('b', null, `${x.right}/${x.total}`)); })) : null,
       logs.length ? h('div', null, h('h4', null, L('Сүүлийн үйл ажиллагаа', 'Recent activity')), h('ul', { class: 'activity' }, logs.map((x) => { const [i, t] = logLine(x); return h('li', null, h('span', null, i, ' ', t), h('small', null, x.d)); }))) : null);
@@ -362,6 +366,7 @@
     const learn = child.learn || {}, bs = child.basar || {};
     const lessonsDone = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].done).length;
     const together = TG.learn.LESSONS.filter((l) => learn[l.id] && learn[l.id].family).length;
+    const hand = TG.vrules.handsOn(child.village);
     const toggle = (key, label) => h('label', { class: 'switch-row' }, h('span', null, label),
       h('input', { type: 'checkbox', class: 'switch', checked: !!st.settings[key], onchange: (e) => { st.settings[key] = e.target.checked; S.save(); render(); } }));
     const famName2 = h('input', { class: 'input', placeholder: L('Нэр (ж: Нагац эгч)', 'Name (e.g. Auntie)'), maxlength: 16 });
@@ -381,8 +386,9 @@
           h('p', null, next ? L(`Дараагийнх: “${tx(next.family.what)}”. Хүүхэд тань “${tx(next.title)}” хичээлээр бэлтгэнэ.`, `Next up: “${tx(next.family.what)}”. Your child prepares in the “${tx(next.title)}” lesson.`)
             : L('Бүх гэр бүлийн ажлыг хамт хийжээ. Гайхалтай! 💛', 'You have done every family activity together. Wonderful! 💛')),
           h('p', { class: 'muted' }, L('Хүүхэд “Тоглохоо боль” гэхэд “Ээж ээ, хамтдаа гэр барьцгаая!” гэж хариулдаг болох нь бидний зорилго.', 'Our goal: when you say “stop playing”, your child answers “Mom, let’s build a ger together!”')))),
-      h('div', { class: 'stat-cards' },
+      h('div', { class: 'stat-cards four' },
         h('div', { class: 'stat' }, h('small', null, L('Сурсан хичээл', 'Lessons learned')), h('b', null, `${lessonsDone}/${TG.learn.LESSONS.length}`)),
+        h('div', { class: 'stat', 'data-stat': 'hand' }, h('small', null, L('Гараараа сурсан', 'Learned by hand')), h('b', null, `${hand.length}/${TG.vrules.HANDS_ON.length}`)),
         h('div', { class: 'stat' }, h('small', null, L('Басарын асуулт', 'Basar quiz')), h('b', null, `${bs.right || 0}/${bs.total || 0}`)),
         h('div', { class: 'stat' }, h('small', null, L('Амжилт', 'Badges')), h('b', null, `${Object.keys(child.ach || {}).length}/${TG.achievements.LIST.length}`))),
       h('section', { class: 'card' },
