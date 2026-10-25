@@ -506,6 +506,8 @@ blockquote { margin: 12px 0; padding: 14px 16px; background: var(--surface-2); b
 .card.highlight { display: flex; gap: 18px; align-items: center; background: linear-gradient(135deg, #fff, #FFF6E5); }
 .ring-stat { --p: 0; flex: none; width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.35rem; background: radial-gradient(closest-side, #fff 77%, transparent 79%), conic-gradient(var(--red) calc(var(--p) * 1%), var(--bg-2) 0); }
 .stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.stat-cards.four { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 640px) { .stat-cards.four { grid-template-columns: repeat(4, 1fr); } }
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 14px 10px; text-align: center; box-shadow: var(--sh-1); }
 .stat small { display: block; color: var(--muted); font-size: .7rem; font-weight: 700; }
 .stat b { font-family: var(--font-display); font-size: 1.45rem; font-weight: 700; }

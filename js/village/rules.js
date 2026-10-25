@@ -187,6 +187,37 @@
   /** Roof poles go in all around the crown to keep it level: three in a row on one side tilts it. sides: 0 east, 1 south, 2 west, 3 north. */
   function unisTilt(sides) { const n = sides.length; return n >= 3 && sides[n - 1] === sides[n - 2] && sides[n - 2] === sides[n - 3]; }
 
-  return { GER_STEPS, GER_DONE, GER_NEEDS, gerTry, gerUse, TRADES, COVER_PRICE, tradeCost, SHEAR_WOOL, SHEAR_REGROW_MS, FELT_WOOL, lotStage, unisTilt,
+  // ---- learned by hand in Нутаг: shown to parents next to the school lessons. lesson = the lesson whose real-life family
+  // activity goes with it; home = this is the one to try at home right after doing it in the game.
+  const HANDS_ON = [
+    { id: 'ger', icon: '⛺', lesson: 'ger', home: true, name: T('Монгол гэр гараараа барьсан', 'Built a Mongol ger by hand'),
+      learned: [T('Гэр барих 9 алхам, дарааллаар нь: шал, хана, хаалга, тооно, унь, эсгий, бүрээс, бүслүүр, тулга', 'The 9 steps of building a ger, in order: floor, walls, door, toono, roof poles, felt, cover, ropes, stove'),
+        T('Хаалгаа урагш харуулдаг: нар урдаас тусч, хүйтэн салхи хойноос үлээдэг', 'The door faces south: the sun comes from the south and cold winds from the north'),
+        T('Хонины ноосыг цохиж, норгож, өнхрүүлж эсгий болгодог', 'Sheep’s wool becomes felt by beating, wetting and rolling it')] },
+    { id: 'aaruul', icon: '🧀', lesson: 'idee', name: T('Ааруул гараараа хийсэн', 'Made aaruul by hand'),
+      learned: [T('Ааруул хийх: исгэх, буцалгаж ээдэм гаргах, даавуунд шахах, хэрчих, наранд хатаах', 'Making aaruul: sour the milk, boil out the curds, press them in a cloth, cut, dry in the sun'),
+        T('Хатсан ааруул бүтэн жил хадгалагддаг тул өвөл, аянд авч явдаг', 'Dried aaruul keeps for a whole year, so herders take it through winter and on journeys')] },
+    { id: 'urum', icon: '🧈', lesson: 'idee', name: T('Өрөм гараараа хийсэн', 'Made öröm by hand'),
+      learned: [T('Өрөм хийх: бага галд халааж, шанагаар самраад, шөнөжин хөргөх', 'Making öröm: warm the milk gently, ladle it up high, cool it overnight'),
+        T('Сүүг хурдан буцалгавал түлэгддэг', 'Milk boiled too fast burns')] },
+    { id: 'tarag', icon: '🥣', lesson: 'idee', home: true, name: T('Тараг гараараа исгэсэн', 'Made tarag by hand'),
+      learned: [T('Тараг исгэх: буцалгах, бүлээн болтол хөргөх, хөрөнгө хийх, дулаан хонуулах', 'Making tarag: boil, cool until warm, add the starter, keep it warm overnight'),
+        T('Хэт халуун сүүнд хөрөнгийн ашигтай нян үхдэг, хүйтэн сүүнд ажилладаггүй', 'In milk that is too hot the starter’s good bacteria die; in cold milk they can’t work')] },
+    { id: 'airag', icon: '🍶', lesson: 'idee', name: T('Айраг гараараа бүлсэн', 'Churned airag by hand'),
+      learned: [T('Гүүний сүүг хөхүүрт хийж мянга гаруй удаа бүлдэг', 'Mare’s milk is churned in the khukhuur over a thousand times'),
+        T('Айлд ирсэн хүн бүр хэдэн удаа бүлж өгдөг заншилтай', 'Everyone who visits gives it a few stirs')] },
+    { id: 'emee', icon: '🫖', lesson: 'customs', home: true, name: T('Эмээгийн гэрт ёсоор зочилсон', 'Visited Grandma with good manners'),
+      learned: [T('Босгыг гишгэлгүй алхаж давна, орохдоо ахмадтайгаа мэндэлнэ', 'Step over the threshold, never on it, and greet the elders first'),
+        T('Гэрт нар зөв явна, зочин баруун талд сууна', 'Walk sunwise inside the ger; guests sit on the west side'),
+        T('Цайг баруун гараараа авч, зүүн гараараа тохойгоо түшинэ', 'Take tea with the right hand, the left hand under the right elbow')] },
+  ];
+  /** The hands-on ids a child has done, read from their village save (so progress from before this list counts too). */
+  function handsOn(v) {
+    if (!v) return [];
+    const did = { ger: !!v.gerBuilt || ((v.ger || {}).stage || 0) >= GER_DONE, emee: ((v.emee || {}).visits || 0) > 0 };
+    return HANDS_ON.filter((a) => (a.id in did ? did[a.id] : !!(v.seen || {})['made_' + a.id])).map((a) => a.id);
+  }
+
+  return { GER_STEPS, GER_DONE, GER_NEEDS, gerTry, gerUse, TRADES, COVER_PRICE, tradeCost, SHEAR_WOOL, SHEAR_REGROW_MS, FELT_WOOL, lotStage, unisTilt, HANDS_ON, handsOn,
     VERSION, W, H, LOTS, TITLES, MOVES, beats, exchange, titleFor, ROOF, DOOR, FURNITURE, DAIRY_ANIMALS, DAIRY, FISH, PHRASES, EMOTES, SKINS, DEELS, LOOKS, ITEMS, ROOM_RE, level, cleanLook, now };
 });

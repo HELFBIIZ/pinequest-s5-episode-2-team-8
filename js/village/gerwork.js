@@ -139,6 +139,7 @@
   function finish(i) {
     const v = api.V(), G = g(), p2 = (api.live() || {}).p2;
     v.gerBuilt = true; G.perfect = G.mistakes === 0;
+    TG.store.logActivity({ kind: 'hand', id: 'ger' }); // the parents' log: built by hand
     api.reward(0, 30); api.quest('ger'); TG.sfx.win(); TG.confetti(70);
     if (together && p2) TG.store.logActivity && TG.store.logActivity({ kind: 'together', id: 'ger|family|' + p2.name });
     api.save(); TG.achievements && TG.achievements.check();

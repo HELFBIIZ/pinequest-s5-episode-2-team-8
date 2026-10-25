@@ -304,7 +304,7 @@ tests/                 автомат шалгалтууд
 7. **GitHub Pages-д нийтлэх.** `main` шинэчлэгдэх бүрт аппыг нийтэлнэ (Басар тэнд офлайн мэдлэгээр ажиллана).
 
 ```bash
-node tests/check-assets.mjs && node tests/basar-api.mjs
+node tests/check-assets.mjs && node tests/basar-api.mjs && node tests/ger-rules.mjs && node tests/learned.mjs
 npm install --no-save puppeteer-core@22.15.0 && node tests/smoke.mjs && node tests/multiplayer.mjs && node tests/touch.mjs
 ```
 
