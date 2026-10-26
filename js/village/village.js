@@ -49,15 +49,20 @@
   }
 
   // ================================================================ rewards + quests (also used by the rest of Naadamy)
+  function notifyUnverifiedOnlineReward() {
+    if (live && !live.rewardNoticeShown) {
+      live.rewardNoticeShown = true;
+      TG.toast(L('Онлайн шагналыг сервер баталгаажуулах үед олгоно.', 'Online rewards are granted only after server verification.'));
+    }
+  }
   function reward(coins, xp) {
     const v = V(); if (!v) return null;
+    if (live && live.status !== 'solo') {
+      notifyUnverifiedOnlineReward();
+      return null;
+    }
     const before = R.level(v.xp).l;
     v.coins += coins; v.xp += xp; S.save();
-    if (live && live.online) {
-      net.walletOperation('reward', coins, xp).then((result) => {
-        if (result && !result.accepted) TG.toast(L('Шагналын өөрчлөлтийг сервер баталгаажуулсангүй.', 'The server could not confirm this reward.'));
-      });
-    }
     const after = R.level(v.xp).l;
     announceLevelUp(before, after);
     if (live) hud();
@@ -250,11 +255,9 @@
       this.ws = ws;
       ws.onopen = () => {
         this.retry = 0;
-        live.progressJoinSeedSignature = progressSignature();
         ws.send(JSON.stringify({
           t: 'join', room: v.room, id: v.id, ticket, name: live.name, look: v.look, lvl: lvl(),
           x: +live.me.px.toFixed(2), y: +live.me.py.toFixed(2), dir: live.me.dir,
-          wallet: { coins: v.coins, xp: v.xp }, inventory: { owned: v.owned, rod: v.rod }, progress: progressSnapshot(),
         }));
       };
       ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (err) { return; } if (live) handle(m); };
@@ -262,8 +265,6 @@
         if (this.ws !== ws) return;
         this.ws = null;
         if (!live) return;
-        clearTimeout(live.progressTimer);
-        live.progressInFlight = null;
         live.online = false; live.others.clear(); live.lots = null; endRemoteMatch();
         if (this.closed) return setStatus('solo');
         setStatus('reconnecting');
@@ -314,9 +315,7 @@
         }, 8000);
         this.pendingQuestClaims.set(quest, pending);
         try {
-          this.ws.send(JSON.stringify({
-            t: 'quest-claim', quest, revision: live.progressRevision, state: progressSnapshot(),
-          }));
+          this.ws.send(JSON.stringify({ t: 'quest-claim', quest }));
         } catch (error) {
           clearTimeout(pending.timer); this.pendingQuestClaims.delete(quest); resolve(null);
           console.error('Could not send daily quest claim:', error.message);
@@ -370,91 +369,39 @@
     v.rod = inventory.rod;
     S.save(); hud();
   }
-  function progressSnapshot() {
-    const v = V();
-    return {
-      produce: v.produce,
-      fish: v.fish,
-      quests: v.quests,
-    };
-  }
-  function progressSignature(state = progressSnapshot()) {
-    return JSON.stringify(state);
-  }
   function progressProfileMatches() {
     const profile = S.active();
     return Boolean(live && profile && profile.id === live.profileId);
   }
-  function applyProgress(state) {
-    if (!progressProfileMatches() || !state || typeof state !== 'object' || Array.isArray(state)) return false;
-    const v = V(); if (!v) return false;
-    const cleanCounts = (source, allowed) => {
-      if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
-      return Object.fromEntries(Object.entries(source)
-        .filter(([key, amount]) => Object.hasOwn(allowed, key) && Number.isSafeInteger(amount) && amount >= 0)
-        .map(([key, amount]) => [key, Math.min(1000, amount)]));
-    };
-    const rawQuests = state.quests && typeof state.quests === 'object' && !Array.isArray(state.quests) ? state.quests : {};
-    const quests = {
-      d: typeof rawQuests.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawQuests.d) ? rawQuests.d : '',
-      list: Array.isArray(rawQuests.list) ? rawQuests.list.slice(0, 4).flatMap((quest) => {
-        if (!quest || typeof quest !== 'object' || Array.isArray(quest)
-          || typeof quest.k !== 'string' || !Object.hasOwn(R.QUEST_TARGETS, quest.k)) return [];
-        const target = R.QUEST_TARGETS[quest.k];
-        const progress = Number.isSafeInteger(quest.p) ? Math.max(0, Math.min(target, quest.p)) : 0;
-        const clean = { k: quest.k, p: progress, done: quest.done === true && progress >= target };
-        if (typeof quest.season === 'string' && /^[a-z0-9-]{1,32}$/i.test(quest.season)) clean.season = quest.season;
-        return [clean];
-      }) : [],
-    };
-    v.produce = cleanCounts(state.produce, R.DAIRY);
-    v.fish = cleanCounts(state.fish, R.FISH);
-    v.quests = quests;
-    live.progressSignature = progressSignature();
-    S.save(); hud();
-    return true;
-  }
-  function scheduleProgressSync() {
-    if (!live || !live.online || !progressProfileMatches() || !net.ws || net.ws.readyState !== 1) return;
-    const state = progressSnapshot(), signature = progressSignature(state);
-    if (signature === live.progressSignature) return;
-    live.progressQueued = true;
-    if (live.progressInFlight) return;
-    clearTimeout(live.progressTimer);
-    live.progressTimer = setTimeout(() => {
-      if (!live || !live.online || !progressProfileMatches() || !net.ws || net.ws.readyState !== 1 || live.progressInFlight) return;
-      const latest = progressSnapshot(), latestSignature = progressSignature(latest);
-      if (latestSignature === live.progressSignature) { live.progressQueued = false; return; }
-      live.progressQueued = false;
-      live.progressInFlight = { signature: latestSignature };
-      try {
-        net.ws.send(JSON.stringify({ t: 'progress-save', revision: live.progressRevision, state: latest }));
-      } catch (error) {
-        live.progressInFlight = null;
-        console.error('Could not send player progress:', error.message);
-      }
-    }, 300);
-  }
-  S.onSave(scheduleProgressSync);
   function handle(m) {
     const v = V();
     switch (m.t) {
       case 'welcome':
         live.online = true; live.serverDay = /^\d{4}-\d{2}-\d{2}$/.test(m.day || '') ? m.day : S.dkey();
         live.offset = m.now - Date.now(); live.lots = m.lots || new Array(R.LOTS).fill(null); live.room = m.room; live.serverV = m.v;
+        if (m.position && Number.isFinite(m.position.x) && Number.isFinite(m.position.y)) {
+          const me = live.me;
+          me.px = m.position.x; me.py = m.position.y;
+          me.dir = me.face = Number.isInteger(m.position.dir) && m.position.dir >= 0 && m.position.dir <= 3 ? m.position.dir : 0;
+          me.vx = me.vy = 0; me.path = []; me.sent = { x: me.px, y: me.py }; live.pending = null;
+          me.x = Math.floor(me.px + 0.5); me.y = Math.floor(me.py + 0.82);
+          live.cam.x = me.px; live.cam.y = me.py; v.pos = { x: me.px, y: me.py }; S.save();
+        }
+        const localWalletChanged = m.wallet && (v.coins !== m.wallet.coins || v.xp !== m.wallet.xp);
+        const localInventoryChanged = m.inventory && (v.rod !== m.inventory.rod
+          || v.owned.length !== m.inventory.owned.length || v.owned.some((item) => !m.inventory.owned.includes(item)));
         applyWallet(m.wallet);
         applyInventory(m.inventory);
-        if (m.progress && Number.isSafeInteger(m.progress.revision) && m.progress.revision >= 0) {
-          live.progressRevision = m.progress.revision;
-          live.progressSignature = progressSignature(m.progress.state);
-          if (progressSignature() !== live.progressJoinSeedSignature) scheduleProgressSync();
-          else applyProgress(m.progress.state);
-        }
+        if (m.look && typeof m.look === 'object') { v.look = m.look; S.save(); }
         quests();
         live.others.clear(); (m.players || []).forEach(addOther);
         live.chat = (m.chat || []).slice(-CHAT_KEEP); renderChat();
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
+        if (localWalletChanged || localInventoryChanged) setTimeout(() => live && TG.toast(L(
+          'Офлайн зоос, XP болон дэлгүүрийн өмчлөл серверт импортлогдохгүй. Серверийн хадгалсан өгөгдлийг ашиглана.',
+          'Offline coins, XP and shop ownership are not imported; the server account is authoritative.',
+        )), 1800);
         TG.gerwork.sync();
         if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Тоглоом болон серверийн хувилбар зөрж байна. Хуудсаа дахин ачаалж, серверээ шинэчилнэ үү.', '⚠️ The game and server versions differ. Reload the page and update the server if needed.')), 2500);
         break;
@@ -476,11 +423,6 @@
       }
       case 'quest-claim-result': {
         const pending = net.pendingQuestClaims.get(m.quest);
-        if (m.progress && Number.isSafeInteger(m.progress.revision) && m.progress.revision >= 0 && m.progress.state) {
-          live.progressRevision = m.progress.revision;
-          live.progressSignature = progressSignature(m.progress.state);
-          if (!m.accepted && progressSignature() !== live.progressSignature) applyProgress(m.progress.state);
-        }
         applyWallet(m.wallet);
         if (pending) {
           clearTimeout(pending.timer); net.pendingQuestClaims.delete(m.quest); pending.resolve(m);
@@ -496,25 +438,18 @@
         }
         break;
       }
-      case 'progress-result': {
-        const pending = live.progressInFlight;
-        if (!pending) break;
-        live.progressInFlight = null;
-        if (m.reason === 'storage') {
-          TG.toast(L('Ахиц серверт хадгалагдсангүй. Дахин холбогдоход дахин оролдоно.', 'Progress was not saved. It will retry after reconnecting.'));
-          break;
-        }
-        if (!Number.isSafeInteger(m.revision) || m.revision < 0 || !m.state) break;
-        live.progressRevision = m.revision;
-        if (progressSignature() === pending.signature && m.state) applyProgress(m.state);
-        else {
-          live.progressSignature = m.state ? progressSignature(m.state) : pending.signature;
-          scheduleProgressSync();
+      case 'wr-invite': case 'wr-declined': case 'wr-start': case 'wr-wait': case 'wr-result': case 'wr-end': onWrestleMsg(m); break;
+      case 'move': { const o = live.others.get(m.id); if (o) { o.x = m.x; o.y = m.y; o.dir = m.dir; } break; }
+      case 'move-correct': {
+        if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
+          const me = live.me;
+          me.px = m.x; me.py = m.y;
+          me.dir = me.face = Number.isInteger(m.dir) && m.dir >= 0 && m.dir <= 3 ? m.dir : 0;
+          me.vx = me.vy = 0; me.path = []; me.sent = { x: me.px, y: me.py }; live.pending = null;
+          me.x = Math.floor(me.px + 0.5); me.y = Math.floor(me.py + 0.82); live.cam.x = me.px; live.cam.y = me.py;
         }
         break;
       }
-      case 'wr-invite': case 'wr-declined': case 'wr-start': case 'wr-wait': case 'wr-result': case 'wr-end': onWrestleMsg(m); break;
-      case 'move': { const o = live.others.get(m.id); if (o) { o.x = m.x; o.y = m.y; o.dir = m.dir; } break; }
       case 'jump': { const o = live.others.get(m.id); if (o) o.jt = performance.now(); break; }
       case 'look': { const o = live.others.get(m.id); if (o) { o.look = m.look; o.lvl = m.lvl; } break; }
       case 'say': {
@@ -1582,23 +1517,12 @@
     const draw = () => rc(body, h('h2', null, L('Өнөөдрийн даалгавар', "Today's quests")),
       h('p', { class: 'muted' }, L('Даалгавар өдөр бүр шинэчлэгдэнэ.', 'Quests refresh every day.')),
       h('div', { class: 'v-list' }, quests().map((q) => {
-        const d = QUESTS[q.k], ready = q.p >= d.n && !q.done;
+        const d = QUESTS[q.k], ready = q.p >= d.n && !q.done, online = live && live.status !== 'solo';
         return h('div', { class: 'v-row' + (q.done ? ' done' : '') }, icon(q.done ? 'ui:star' : 'ui:scroll'),
           h('div', { class: 'v-row-b' }, h('b', null, q.season ? `${TG.seasons.byId(q.season).icon} ` : '', tx(d.t), q.season ? h('small', { class: 'v-season-tag' }, ` ${tx(TG.seasons.byId(q.season).name)} ×1.5`) : null), h('div', { class: 'meter' }, h('span', { style: { width: (q.p / d.n) * 100 + '%' } })), h('small', null, `${q.p}/${d.n} · +${d.c} ${L('зоос', 'coins')} · +${d.x} XP`)),
-          ready ? h('button', { class: 'btn sm primary', onclick: async (e) => {
-            e.currentTarget.disabled = true;
-            let accepted = true;
-            const beforeLevel = lvl();
-            if (live && live.online) {
-              const result = await net.claimQuest(q.k);
-              accepted = Boolean(result && result.accepted);
-              if (!accepted) {
-                TG.toast(L('Даалгаврын шагналыг сервер баталгаажуулж чадсангүй. Ахиц синк хийсний дараа дахин оролдоорой.', 'The server could not confirm this quest reward. Sync progress and try again.'));
-                draw();
-                return;
-              }
-              announceLevelUp(beforeLevel, lvl());
-            } else reward(Math.round(d.c * (q.season ? 1.5 : 1)), Math.round(d.x * (q.season ? 1.5 : 1)));
+          ready && online ? h('span', { class: 'muted' }, L('Онлайн шагнал хаалттай', 'Reward unavailable online'))
+            : ready ? h('button', { class: 'btn sm primary', onclick: () => {
+            reward(Math.round(d.c * (q.season ? 1.5 : 1)), Math.round(d.x * (q.season ? 1.5 : 1)));
             q.done = true;
             if (q.season) { v.seasonDone = v.seasonDone || {}; v.seasonDone[q.season] = Date.now(); }
             S.save(); TG.confetti(40); setTimeout(() => TG.achievements && TG.achievements.check(), 0); draw();
@@ -2317,6 +2241,11 @@
   function onLot(m) {
     const v = V();
     lotsArr()[m.i] = m.lot;
+    if (live && m.by === v.id && (m.act === 'claim' || m.act === 'stage')) {
+      v.ger.lot = m.i;
+      v.ger.stage = R.lotStage(m.lot);
+      v.gerBuilt = v.ger.stage >= R.GER_DONE;
+    }
     if (m.by !== v.id && m.act === 'claim') TG.toast(`🏠 ${m.lot.n} ${L('гэр барьж эхэллээ!', 'started building a ger!')}`);
     else if (m.by !== v.id && m.act === 'stage' && R.lotStage(m.lot) === R.GER_DONE) TG.toast(`🏠 ${m.lot.n} ${L('гэрээ барьж дууслаа!', 'finished building their ger!')}`);
     S.save(); if (live) { hud(); updateCtx(); }
@@ -2329,6 +2258,10 @@
   function claimDailyHomeActivity(activity) {
     const v = V(), payout = R.DAILY_ACTIVITY_REWARDS[activity];
     if (!v || !payout) return Promise.resolve(null);
+    if (live && live.status !== 'solo') {
+      notifyUnverifiedOnlineReward();
+      return Promise.resolve(null);
+    }
     v.homeDay = v.homeDay || {};
     const day = questDay();
     if (v.homeDay[activity] === day) return Promise.resolve(null);
@@ -2361,16 +2294,18 @@
     const draw = () => {
       PX.interior(cv, R.ROOF[l.roof] || R.ROOF.blue, l.furn || []);
       const today = questDay(), rested = v.rest === today, restRewardClaimed = v.homeDay && v.homeDay.rest === today;
+      const onlineRewardsDisabled = live && live.status !== 'solo';
       rc(body, h('h2', null, L('Гэрээ тохижуулах', 'Decorate my ger')), cv,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, L('Хувцас', 'Wardrobe')),
-          h('button', { class: 'btn primary', disabled: rested && restRewardClaimed, onclick: () => {
+          h('button', { class: 'btn primary', disabled: onlineRewardsDisabled || (rested && restRewardClaimed), onclick: () => {
             if (!rested) { v.rest = today; v.energy = 100; S.save(); TG.sfx.chime(); }
             if (!restRewardClaimed) {
               claimDailyHomeActivity('rest').then(draw);
             }
             draw();
-          } }, rested ? (restRewardClaimed ? L('Өнөөдөр амарсан', 'Rested today') : L('Шагналаа авах', 'Claim reward')) : L('Амрах', 'Rest'))),
+          } }, onlineRewardsDisabled ? L('Онлайн шагнал хаалттай', 'Reward unavailable online')
+            : rested ? (restRewardClaimed ? L('Өнөөдөр амарсан', 'Rested today') : L('Шагналаа авах', 'Claim reward')) : L('Амрах', 'Rest'))),
         h('div', { class: 'label', style: { marginTop: '12px' } }, L('Тавилга', 'Furniture')),
         h('div', { class: 'v-list' }, R.FURNITURE.map((f) => {
           const owned = (l.furn || []).includes(f.id), locked = lvl() < f.lvl;
