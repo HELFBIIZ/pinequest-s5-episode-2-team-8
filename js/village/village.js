@@ -273,6 +273,7 @@
     pendingWallet: new Map(),
     pendingPurchase: new Map(),
     pendingQuestClaims: new Map(),
+    pendingDailyActivityClaims: new Map(),
     walletOperation(action, coins, xp) {
       if (!this.ws || this.ws.readyState !== 1 || !live || !live.online) return Promise.resolve(null);
       const op = Array.from(window.crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -319,6 +320,26 @@
         } catch (error) {
           clearTimeout(pending.timer); this.pendingQuestClaims.delete(quest); resolve(null);
           console.error('Could not send daily quest claim:', error.message);
+        }
+      });
+      pending.promise = promise;
+      return promise;
+    },
+    claimDailyActivity(activity) {
+      if (!this.ws || this.ws.readyState !== 1 || !live || !live.online) return Promise.resolve(null);
+      if (this.pendingDailyActivityClaims.has(activity)) return this.pendingDailyActivityClaims.get(activity).promise;
+      let pending;
+      const promise = new Promise((resolve) => {
+        pending = { resolve, promise: null };
+        pending.timer = setTimeout(() => {
+          this.pendingDailyActivityClaims.delete(activity);
+          resolve(null);
+        }, 8000);
+        this.pendingDailyActivityClaims.set(activity, pending);
+        try { this.ws.send(JSON.stringify({ t: 'daily-activity-claim', activity })); }
+        catch (error) {
+          clearTimeout(pending.timer); this.pendingDailyActivityClaims.delete(activity); resolve(null);
+          console.error('Could not send daily activity claim:', error.message);
         }
       });
       pending.promise = promise;
@@ -435,7 +456,7 @@
         setStatus('online');
         TG.toast(`🟢 ${L('Нутагт холбогдлоо', 'Connected to village')} · ${m.room}` + (live.others.size ? ` · ${live.others.size} ${L('найз байна', 'friends here')}` : ''));
         TG.gerwork.sync();
-        if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Сервер хуучин хувилбартай байна. Барилдаан зөв ажиллахын тулд серверийг дахин асаагаарай (Ctrl+C, дараа нь node server.js).', '⚠️ The server is running an old version. Restart it (Ctrl+C, then node server.js) so wrestling works.')), 2500);
+        if (m.v !== R.VERSION) setTimeout(() => TG.toast(L('⚠️ Тоглоом болон серверийн хувилбар зөрж байна. Хуудсаа дахин ачаалж, серверээ шинэчилнэ үү.', '⚠️ The game and server versions differ. Reload the page and update the server if needed.')), 2500);
         break;
       case 'join': addOther(m.p); addChat({ k: 'join', id: m.p.id, n: m.p.name }); TG.toast(`👋 ${m.p.name} ${L('нутагт ирлээ', 'joined the village')}`); hud(); break;
       case 'leave': { const o = live.others.get(m.id); if (o) addChat({ k: 'leave', id: m.id, n: o.name }); live.others.delete(m.id); hud(); break; }
@@ -463,6 +484,15 @@
         applyWallet(m.wallet);
         if (pending) {
           clearTimeout(pending.timer); net.pendingQuestClaims.delete(m.quest); pending.resolve(m);
+        }
+        break;
+      }
+      case 'daily-activity-result': {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(m.day || '')) live.serverDay = m.day;
+        applyWallet(m.wallet);
+        const pending = net.pendingDailyActivityClaims.get(m.activity);
+        if (pending) {
+          clearTimeout(pending.timer); net.pendingDailyActivityClaims.delete(m.activity); pending.resolve(m);
         }
         break;
       }
@@ -2029,7 +2059,7 @@
   }
   function enterGer(i, visitor) {
     const l = lotsArr()[i]; if (!l) return;
-    const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id), today = S.dkey();
+    const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id), today = questDay();
     v.homeDay = v.homeDay || {};
     const room = PX.gerRoom(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red, furn), cx = PX.ROOM.cx;
     const fx = { steam: -1e9, zzz: -1e9, notes: -1e9, churn: -1e9 };
@@ -2051,7 +2081,7 @@
     else things.push(spot('tulga', cx, 158, 'Голомт', 'The hearth', () => sayIt(L('Гал голомт бол гэрийн зүрх. Тулга авбал энд цай чанаж болно.', 'The hearth is the heart of the ger. Get a stove and you can make tea here.'))));
     if (has('or')) for (const [bx, side] of [[48, 'w'], [272, 'e']]) things.push(spot('or' + side, bx, 140, 'Унтаж амрах', 'Sleep and rest', () => {
       fx.zzz = performance.now(); fx.zx = bx; TG.sfx.chime && TG.sfx.chime();
-      if (own && v.rest !== today) { v.rest = today; v.energy = 100; S.save(); reward(5, 10); sayIt(L('😴 Сайхан амарлаа! Хүч бүрэн дүүрч, +10 XP.', '😴 A good rest! Energy full again, +10 XP.')); hud(); }
+      if (own && v.rest !== today) { v.energy = 100; S.save(); claimHomeRestReward(today); sayIt(L('😴 Сайхан амарлаа! Хүч бүрэн дүүрлээ.', '😴 A good rest! Energy is full again.')); hud(); }
       else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
     }));
     if (has('avdar')) things.push(spot('avdar', 206, 106, 'Авдраа нээх', 'Open the chest', () => chestModal()));
@@ -2289,15 +2319,36 @@
     if (live.online) net.send({ t: 'ger-style', roof: l.roof, door: l.door, furn: l.furn });
     S.save();
   }
+  function claimHomeRestReward(day) {
+    if (!live || !live.online) {
+      V().rest = day; S.save(); reward(5, 10);
+      return Promise.resolve({ accepted: true });
+    }
+    if (live.restClaimPending) return Promise.resolve(null);
+    live.restClaimPending = true;
+    return net.claimDailyActivity('rest').then((result) => {
+      if (!result) return TG.toast(L('Амралтын шагналыг серверээс авч чадсангүй.', 'Could not claim the rest reward from the server.'));
+      if (!result.accepted) {
+        const message = result.reason === 'home-required'
+          ? L('Амралтын шагнал авахын тулд өөрийн гэр хэрэгтэй.', 'You need your own ger to claim this reward.')
+          : L('Амралтын шагналыг сервер баталгаажуулж чадсангүй.', 'The server could not confirm the rest reward.');
+        return TG.toast(message);
+      }
+      V().rest = /^\d{4}-\d{2}-\d{2}$/.test(result.day || '') ? result.day : day; S.save();
+      TG.toast(result.duplicate
+        ? L('Өнөөдрийн амралтын шагналыг аль хэдийн авсан байна.', 'You already claimed today’s rest reward.')
+        : L('Гэртээ амарлаа: +5 зоос, +10 XP.', 'Rested at home: +5 coins, +10 XP.'));
+    }).finally(() => { if (live) live.restClaimPending = false; });
+  }
   function homeModal(i) {
     const v = V(), l = lotsArr()[i], body = h('div'), cv = h('canvas', { class: 'v-interior', width: 240, height: 170 });
     const draw = () => {
       PX.interior(cv, R.ROOF[l.roof] || R.ROOF.blue, l.furn || []);
-      const today = S.dkey(), rested = v.rest === today;
+      const today = questDay(), rested = v.rest === today;
       rc(body, h('h2', null, L('Гэрээ тохижуулах', 'Decorate my ger')), cv,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, L('Хувцас', 'Wardrobe')),
-          h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.rest = today; v.energy = 100; S.save(); reward(5, 10); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: +10 XP, хүч дүүрлээ.', 'You rested at home: +10 XP, energy full.')); draw(); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),
+          h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.energy = 100; S.save(); claimHomeRestReward(today).then(draw); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: хүч дүүрлээ.', 'You rested at home: energy full.')); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),
         h('div', { class: 'label', style: { marginTop: '12px' } }, L('Тавилга', 'Furniture')),
         h('div', { class: 'v-list' }, R.FURNITURE.map((f) => {
           const owned = (l.furn || []).includes(f.id), locked = lvl() < f.lvl;

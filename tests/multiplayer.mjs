@@ -135,6 +135,7 @@ try {
   const walletProbe = await browser.newPage();
   await walletProbe.goto(`${base}/api/hello`);
   const probeId = 'wallet-test-' + crypto.randomBytes(4).toString('hex');
+  const probeTicket = crypto.randomBytes(32).toString('hex');
   await walletProbe.evaluate((url, id, ticket) => {
     window.walletEvents = [];
     window.walletSocket = new WebSocket(url);
@@ -146,7 +147,7 @@ try {
         quests: { d: '2026-02-31', list: [{ k: 'milk', p: 99, done: true }, { k: 'forged', p: 2, done: true }, { k: { toString: 'bad' }, p: 9, done: true }] },
       },
     })));
-  }, `ws://${new URL(base).host}/ws`, probeId, crypto.randomBytes(32).toString('hex'));
+  }, `ws://${new URL(base).host}/ws`, probeId, probeTicket);
   await walletProbe.waitForFunction(() => window.walletEvents.some((message) => message.t === 'welcome'), { timeout: 5000 });
   await until(() => a.evaluate(() => [...TG._village.live().others.values()].some((player) => player.name === 'Wallet test' && player.lvl === 1)),
     'server derives the shared level from XP instead of the join payload');
@@ -229,6 +230,38 @@ try {
   if (lockedCrown.accepted || lockedCrown.reason !== 'level' || lockedCrown.wallet.coins !== 10) {
     throw new Error('the server allowed a purchase above the player level');
   }
+  const restRoom = `REST${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+  await walletProbe.evaluate(({ room, id, ticket }) => window.walletSocket.send(JSON.stringify({
+    t: 'join', room, id, ticket, name: 'Wallet test', look: {}, lvl: 99,
+  })), { room: restRoom, id: probeId, ticket: probeTicket });
+  await until(() => walletProbe.evaluate((room) => window.walletEvents.some((message) => message.t === 'welcome' && message.room === room), restRoom),
+    'wallet probe joins an isolated home-reward room');
+  const sendDailyActivityClaim = async (activity) => {
+    const previous = await walletProbe.evaluate((kind) => window.walletEvents.filter((message) => message.t === 'daily-activity-result' && message.activity === kind).length, activity);
+    await walletProbe.evaluate((kind) => window.walletSocket.send(JSON.stringify({ t: 'daily-activity-claim', activity: kind })), activity);
+    await until(() => walletProbe.evaluate(({ activity, previous }) => window.walletEvents.filter((message) => message.t === 'daily-activity-result' && message.activity === activity).length > previous,
+      { activity, previous }), `daily activity ${activity}`);
+    return walletProbe.evaluate((kind) => {
+      const events = window.walletEvents.filter((message) => message.t === 'daily-activity-result' && message.activity === kind);
+      return events[events.length - 1];
+    }, activity);
+  };
+  const restWithoutHome = await sendDailyActivityClaim('rest');
+  if (restWithoutHome.accepted || restWithoutHome.reason !== 'home-required') throw new Error('the server awarded a rest reward without an owned home');
+  await walletProbe.evaluate(() => window.walletSocket.send(JSON.stringify({ t: 'ger-claim', i: 0 })));
+  await until(() => walletProbe.evaluate((id) => window.walletEvents.some((message) => message.t === 'lot' && message.act === 'claim' && message.by === id), probeId),
+    'wallet probe claims a home for the rest reward');
+  const restClaim = await sendDailyActivityClaim('rest');
+  if (!restClaim.accepted || restClaim.wallet.coins !== lockedCrown.wallet.coins + 5
+    || restClaim.wallet.xp !== lockedCrown.wallet.xp + 10 || restClaim.wallet.revision !== lockedCrown.wallet.revision + 1) {
+    throw new Error(`the server did not grant its fixed daily home-rest reward: ${JSON.stringify(restClaim)}`);
+  }
+  const repeatedRestClaim = await sendDailyActivityClaim('rest');
+  if (!repeatedRestClaim.accepted || !repeatedRestClaim.duplicate
+    || repeatedRestClaim.wallet.revision !== restClaim.wallet.revision) {
+    throw new Error('the server duplicated a daily home-rest reward');
+  }
+  ok('home-rest rewards require a server-owned ger and can only be claimed once per Mongolia day');
   await walletProbe.close();
   ok('wallet overspending is denied and transaction replays do not duplicate changes');
   const questProbe = await browser.newPage();

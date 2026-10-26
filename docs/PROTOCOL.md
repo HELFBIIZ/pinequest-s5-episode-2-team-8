@@ -1,7 +1,7 @@
 # Naadamy multiplayer protocol
 
 This is how a game client (the web game today, maybe a Unity client later) talks to `server.js`.
-It describes protocol **version 8** (`VERSION` in `js/village/rules.js`).
+It describes protocol **version 9** (`VERSION` in `js/village/rules.js`).
 
 - Transport: WebSocket at `ws://<host>/ws` (`wss://` on HTTPS).
 - Every message is one JSON text frame: an object with a `t` (type) field.
@@ -59,6 +59,7 @@ Public player object (`pub`): `{ id, name, look, lvl, x, y, dir }`.
 | `shop-buy` | `op, item` | Buy a catalog shop item. The server looks up its price and level requirement in `rules.js`, checks canonical ownership and wallet balance, then atomically records ownership and deducts the price. |
 | `progress-save` | `revision, state` | Save bounded `produce`, `fish` and daily `quests` state. Revisions use optimistic concurrency: stale writes are rejected and the canonical server state is returned. Values are sanitized but remain client-reported gameplay progress, not proof of earned items or completed actions. |
 | `quest-claim` | `quest, revision, state` | Save the latest bounded snapshot, verify the quest is assigned to this player for the current Mongolia day and its reported progress reached the target, then grant the catalog reward once. The server calculates the reward and records a namespaced idempotency key; reported progress is still not proof of gameplay. |
+| `daily-activity-claim` | `activity` | Claim a fixed daily activity payout. Currently `rest` requires a server-owned ger and can pay once per player per Mongolia day; the server chooses the reward. |
 
 ### Chat (preset only)
 | `t` | Fields | What it does |
@@ -122,6 +123,7 @@ Room lots and the recent chat log are saved every 5 seconds when changed and on 
 | `wr-result` | `ma, pa, mb, pb, r, score` | Round result. `r` = `1` a wins, `-1` b wins, `0` draw. `score` = `{ a, b }`. |
 | `wr-end` | `id, winner, playerIds, reason` | Match over. `id` is the match id, `playerIds` are its participants, and `reason` is `''` (normal) or `'left'` (the other quit or dropped). The server grants each participant's idempotent match reward. |
 | `quest-claim-result` | `quest, accepted, reason?, wallet, progress, reward?` | Reply to `quest-claim`; includes canonical wallet/progress and the fixed reward when accepted. |
+| `daily-activity-result` | `activity, day, accepted, reason?, duplicate?, wallet` | Reply to `daily-activity-claim`. `day` is the server's Mongolia day; `rest` may fail with `home-required`; duplicate requests return the canonical wallet without a second payout. |
 | `deny` | `act, why` | Request refused. `act: 'ger'` → `why: 'taken' \| 'own'`; `act: 'wr'` → `why: 'busy'`. |
 | `error` | `why` | `why: 'bad-join'` = bad room code or id; `'identity'` = the ticket does not authenticate that profile id. A refused `join` doesn't change an existing room session. |
 | `replaced` | (none) | Your id joined from another tab or device; this connection will close. Don't reconnect. |
@@ -137,8 +139,8 @@ Room lots and the recent chat log are saved every 5 seconds when changed and on 
 Good to know before building on this:
 - **Identity:** the server verifies a random ticket bound to each profile id. Tickets remain on the device and cannot be recovered or used to sync a profile to another device; anyone who obtains a ticket can act as that profile. Use HTTPS/WSS outside a trusted local network.
 - **Position:** clamped to the map only; no speed or wall checks.
-- **Progress:** coins and XP balances persist server-side, but the one-time wallet/inventory/progress migration and generic reward requests come from the client; the server does not validate lesson/minigame results or legacy ownership. Purchases are checked against canonical balance, ownership, catalog prices and level. Bounded dairy/fish counts and daily quest state sync through revisioned snapshots, but their values are client-reported, not gameplay-validated. The shared player `lvl` is derived from canonical XP (which can still originate from a client-reported migration seed or generic reward).
-- The server is the source of truth for **authenticated player ids, shared room state, wallet balances, limited shop ownership, daily quest payouts, live PvP wrestling payouts and levels derived from canonical XP**. With PostgreSQL, shared room state and account changes work across instances. Progress snapshots synchronize storage, not achievement verification. The client still controls generic reward claims and initial migration values, so most XP/coin earning, legacy ownership and quest completion are not cheat-proof.
+- **Progress:** coins and XP balances persist server-side, but the one-time wallet/inventory/progress migration and generic reward requests come from the client; the server does not validate lesson/minigame results or legacy ownership. Purchases are checked against canonical balance, ownership, catalog prices and level. Bounded dairy/fish counts and daily quest state sync through revisioned snapshots, but their values are client-reported, not gameplay-validated. The shared player `lvl` is derived from canonical XP (which can still originate from a client-reported migration seed or generic reward). The daily `rest` activity payout checks ger ownership and server-day idempotency, but not whether the user completed the rest interaction.
+- The server is the source of truth for **authenticated player ids, shared room state, wallet balances, limited shop ownership, daily quest/rest payouts, live PvP wrestling payouts and levels derived from canonical XP**. With PostgreSQL, shared room state and account changes work across instances. Progress snapshots synchronize storage, not achievement verification. The client still controls generic reward claims and initial migration values, so most XP/coin earning, legacy ownership and quest completion are not cheat-proof.
 
 ## Changing the protocol
 

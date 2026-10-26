@@ -663,6 +663,41 @@ function villageSeason(day) {
   const index = Math.floor(Date.UTC(year, month - 1, date) / 864e5) % 4;
   return ['spring', 'summer', 'autumn', 'winter'][index];
 }
+async function handleDailyActivityClaim(conn, message) {
+  const p = conn.player;
+  if (!p || !conn.room) return;
+  const activity = typeof message.activity === 'string' && message.activity.length <= 16 ? message.activity : '';
+  const reward = Object.hasOwn(R.DAILY_ACTIVITY_REWARDS, activity) ? R.DAILY_ACTIVITY_REWARDS[activity] : null;
+  const day = villageDay();
+  if (!reward) {
+    return conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'invalid', wallet: conn.wallet });
+  }
+  if (activity === 'rest' && !conn.room.lots.some((lot) => lot && lot.by === p.id)) {
+    return conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'home-required', wallet: conn.wallet });
+  }
+  const operation = `activity:${day}:${activity}`;
+  try {
+    const outcome = await roomStore.mutateWallet(p.id, operation, (wallet) => {
+      if (wallet.coins > WALLET_MAX - reward.coins || wallet.xp > WALLET_MAX - reward.xp) {
+        return { changed: false, result: { accepted: false, reason: 'limit' } };
+      }
+      return {
+        changed: true,
+        wallet: { ...wallet, coins: wallet.coins + reward.coins, xp: wallet.xp + reward.xp },
+        result: { accepted: true },
+      };
+    });
+    conn.wallet = outcome.wallet;
+    conn.inventory = outcome.inventory;
+    syncPlayerLevel(conn);
+    conn.send({
+      t: 'daily-activity-result', activity, day, ...outcome.result, duplicate: outcome.duplicate, wallet: outcome.wallet,
+    });
+  } catch (error) {
+    console.error('Could not claim daily activity reward:', error.message);
+    conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'storage', wallet: conn.wallet });
+  }
+}
 async function handleQuestClaim(conn, message) {
   const p = conn.player;
   if (!p) return;
@@ -895,6 +930,9 @@ function onMessage(conn, text) {
       break;
     case 'quest-claim':
       handleQuestClaim(conn, m);
+      break;
+    case 'daily-activity-claim':
+      handleDailyActivityClaim(conn, m);
       break;
     case 'shop-buy':
       handleShopPurchase(conn, m);
