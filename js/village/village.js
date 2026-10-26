@@ -2059,21 +2059,22 @@
   }
   function enterGer(i, visitor) {
     const l = lotsArr()[i]; if (!l) return;
-    const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id), today = questDay();
+    const v = V(), own = !visitor && l.by === v.id, furn = l.furn || [], has = (id) => furn.includes(id);
     v.homeDay = v.homeDay || {};
     const room = PX.gerRoom(R.ROOF[l.roof] || R.ROOF.blue, R.DOOR[l.door] || R.DOOR.red, furn), cx = PX.ROOM.cx;
     const fx = { steam: -1e9, zzz: -1e9, notes: -1e9, churn: -1e9 };
-    const dayOnce = (k) => { if (!own || v.homeDay[k] === today) return false; v.homeDay[k] = today; S.save(); return true; };
+    const dayOnce = (k) => { const day = questDay(); if (!own || v.homeDay[k] === day) return false; v.homeDay[k] = day; S.save(); return true; };
+    const claimHomeActivity = (activity) => { if (own) claimDailyHomeActivity(activity); };
     const sayIt = (txt) => sc.say(h('p', null, txt));
     const spot = (id, x, y, mn, en, run) => ({ id, x, y, label: () => L(mn, en), run });
     const things = [
       spot('door', cx, 192, 'Гарах', 'Go outside', () => sc.close()),
       spot('khoimor', cx, 105, 'Хойморт суух', 'Sit in the khoimor', () => sayIt(L('Хоймор бол гэрийн хамгийн хүндэт газар. Гэр бүлийн шүтээн, зураг энд байдаг. Ахмад хүн, хүндтэй зочныг хойморт урьдаг.', 'The khoimor, opposite the door, is the place of honour. The family shrine and photos are kept here, and elders and honoured guests are invited to sit here.'))),
-      spot('table', 138, 118, 'Хоол идэх', 'Eat a meal', () => { sayIt('🍽️ ' + tx(TG.pick(SNACKS))); if (dayOnce('snack')) reward(0, 5); eatModal({ home: own }); }),
+      spot('table', 138, 118, 'Хоол идэх', 'Eat a meal', () => { sayIt('🍽️ ' + tx(TG.pick(SNACKS))); claimHomeActivity('snack'); eatModal({ home: own }); }),
       spot('bagana', 184, 132, 'Баганыг харах', 'Look at the posts', () => sayIt(L('Хоёр багана тоноо даадаг. Хоёр баганын дундуур гарч болохгүй, баганыг түшиж болохгүй гэдэг ёс бий.', 'The two bagana posts hold up the toono. By custom you never walk between the two posts and never lean on them.'))),
       spot('toono', 132, 168, 'Тооно руу харах', 'Look up at the toono', () => sayIt(L('Тооноор тусах нарны гэрэл униар гулсаж явдгаар малчид цагийг мэддэг байжээ. Тооно бол гэрийн нар цаг!', 'Herders told the time by the patch of sunlight from the toono creeping across the roof poles. The toono is the ger’s sun clock!'))),
       spot('saddle', 90, 176, 'Эмээл үзэх', 'Look at the saddle', () => sayIt(L('Баруун тал бол эрэгтэй хүний тал: эмээл, хазаар, уурга энд байна. Монгол эмээл өндөр бүүрэгтэй, мөнгөн товруудтай.', 'The west side is the men’s side: the saddle, bridle and lasso pole live here. A Mongol saddle has a high front and back and silver studs.'))),
-      spot('khukhuur', 60, 158, 'Айраг бүлж уух', 'Churn and drink airag', () => { fx.churn = performance.now(); TG.sfx.scrub && TG.sfx.scrub(); setTimeout(() => eat('airag', { free: true }), 700); sayIt(L('🥛 Хөхүүрт гүүний сүүг мянга гаруй удаа бүлж айраг исгэдэг. Гэрт орж ирсэн хүн бүр бүлүүрээр хэдэн удаа бүлээд өгдөг заншилтай!', '🥛 Mare’s milk is churned more than a thousand times in the khukhuur to make airag. Everyone who comes in gives it a few stirs!')); if (dayOnce('churn')) reward(0, 5); }),
+      spot('khukhuur', 60, 158, 'Айраг бүлж уух', 'Churn and drink airag', () => { fx.churn = performance.now(); TG.sfx.scrub && TG.sfx.scrub(); setTimeout(() => eat('airag', { free: true }), 700); sayIt(L('🥛 Хөхүүрт гүүний сүүг мянга гаруй удаа бүлж айраг исгэдэг. Гэрт орж ирсэн хүн бүр бүлүүрээр хэдэн удаа бүлээд өгдөг заншилтай!', '🥛 Mare’s milk is churned more than a thousand times in the khukhuur to make airag. Everyone who comes in gives it a few stirs!')); claimHomeActivity('churn'); }),
       spot('cupboard', 244, 178, 'Цай уух', 'Have some milk tea', () => { sayIt(L('Зүүн тал бол эмэгтэй хүний тал: аяга таваг, тогоо шанага, хоол хүнс энд байдаг. Зочинд цайг баруун гараараа өргөдөг.', 'The east side is the women’s side: bowls, pots, ladles and food are kept here. Tea is offered with the right hand.')); eat('tsai', { free: true }); }),
       spot('water', 210, 190, 'Ус уух', 'Drink some water', () => { eat('us', { free: true }); sayIt(L('💧 Усыг худаг, булгаас зөөж авчирдаг. Усыг хэзээ ч бохирдуулдаггүй, хайрлан гамнадаг.', '💧 Water is carried in from the well or spring. It is never wasted or made dirty.')); }),
     ];
@@ -2081,8 +2082,14 @@
     else things.push(spot('tulga', cx, 158, 'Голомт', 'The hearth', () => sayIt(L('Гал голомт бол гэрийн зүрх. Тулга авбал энд цай чанаж болно.', 'The hearth is the heart of the ger. Get a stove and you can make tea here.'))));
     if (has('or')) for (const [bx, side] of [[48, 'w'], [272, 'e']]) things.push(spot('or' + side, bx, 140, 'Унтаж амрах', 'Sleep and rest', () => {
       fx.zzz = performance.now(); fx.zx = bx; TG.sfx.chime && TG.sfx.chime();
-      if (own && v.rest !== today) { v.energy = 100; S.save(); claimHomeRestReward(today); sayIt(L('😴 Сайхан амарлаа! Хүч бүрэн дүүрлээ.', '😴 A good rest! Energy is full again.')); hud(); }
-      else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
+      const day = questDay(), rested = v.rest === day;
+      if (own) {
+        if (!rested) { v.rest = day; v.energy = 100; S.save(); hud(); }
+        claimHomeActivity('rest');
+        sayIt(rested
+          ? L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.')
+          : L('😴 Сайхан амарлаа! Хүч бүрэн дүүрлээ.', '😴 A good rest! Energy is full again.'));
+      } else sayIt(L('😴 Өнөөдөр аль хэдийн амарсан. Маргааш дахин унтаарай.', '😴 You already rested today. Sleep again tomorrow.'));
     }));
     if (has('avdar')) things.push(spot('avdar', 206, 106, 'Авдраа нээх', 'Open the chest', () => chestModal()));
     if (has('morinkhuur')) things.push(spot('morinkhuur', 104, 110, 'Морин хуур тоглох', 'Play the morin khuur', () => { fx.notes = performance.now(); playMelody(); sayIt(L('🎻 Морин хуурын аялгуу гэрийг дүүргэлээ. Морин хуурыг хойморын баруун талд хүндэтгэн байрлуулдаг.', '🎻 The fiddle’s tune fills the ger. The morin khuur is honoured with a place on the west of the khoimor.')); if (dayOnce('music')) reward(0, 8); }));
@@ -2319,36 +2326,51 @@
     if (live.online) net.send({ t: 'ger-style', roof: l.roof, door: l.door, furn: l.furn });
     S.save();
   }
-  function claimHomeRestReward(day) {
+  function claimDailyHomeActivity(activity) {
+    const v = V(), payout = R.DAILY_ACTIVITY_REWARDS[activity];
+    if (!v || !payout) return Promise.resolve(null);
+    v.homeDay = v.homeDay || {};
+    const day = questDay();
+    if (v.homeDay[activity] === day) return Promise.resolve(null);
     if (!live || !live.online) {
-      V().rest = day; S.save(); reward(5, 10);
-      return Promise.resolve({ accepted: true });
+      v.homeDay[activity] = day; S.save();
+      return Promise.resolve(reward(payout.coins, payout.xp));
     }
-    if (live.restClaimPending) return Promise.resolve(null);
-    live.restClaimPending = true;
-    return net.claimDailyActivity('rest').then((result) => {
-      if (!result) return TG.toast(L('Амралтын шагналыг серверээс авч чадсангүй.', 'Could not claim the rest reward from the server.'));
-      if (!result.accepted) {
-        const message = result.reason === 'home-required'
-          ? L('Амралтын шагнал авахын тулд өөрийн гэр хэрэгтэй.', 'You need your own ger to claim this reward.')
-          : L('Амралтын шагналыг сервер баталгаажуулж чадсангүй.', 'The server could not confirm the rest reward.');
-        return TG.toast(message);
+    live.homeActivityClaims = live.homeActivityClaims || new Set();
+    if (live.homeActivityClaims.has(activity)) return Promise.resolve(null);
+    live.homeActivityClaims.add(activity);
+    return net.claimDailyActivity(activity).then((result) => {
+      if (!result) {
+        TG.toast(L('Шагналын хүсэлтийг серверт хүргэж чадсангүй.', 'Could not send the reward request to the server.'));
+        return null;
       }
-      V().rest = /^\d{4}-\d{2}-\d{2}$/.test(result.day || '') ? result.day : day; S.save();
+      if (!result.accepted) {
+        TG.toast(L('Сервер энэ өдрийн шагналыг олгож чадсангүй.', 'The server could not grant this daily reward.'));
+        return result;
+      }
+      const serverDay = /^\d{4}-\d{2}-\d{2}$/.test(result.day || '') ? result.day : questDay();
+      v.homeDay[activity] = serverDay; S.save();
       TG.toast(result.duplicate
-        ? L('Өнөөдрийн амралтын шагналыг аль хэдийн авсан байна.', 'You already claimed today’s rest reward.')
-        : L('Гэртээ амарлаа: +5 зоос, +10 XP.', 'Rested at home: +5 coins, +10 XP.'));
-    }).finally(() => { if (live) live.restClaimPending = false; });
+        ? L('Энэ үйл ажиллагааны өнөөдрийн шагналыг авсан байна.', 'You already claimed today’s reward for this activity.')
+        : `+${payout.coins} ${L('зоос', 'coins')} · +${payout.xp} XP`);
+      return result;
+    }).finally(() => live && live.homeActivityClaims.delete(activity));
   }
   function homeModal(i) {
     const v = V(), l = lotsArr()[i], body = h('div'), cv = h('canvas', { class: 'v-interior', width: 240, height: 170 });
     const draw = () => {
       PX.interior(cv, R.ROOF[l.roof] || R.ROOF.blue, l.furn || []);
-      const today = questDay(), rested = v.rest === today;
+      const today = questDay(), rested = v.rest === today, restRewardClaimed = v.homeDay && v.homeDay.rest === today;
       rc(body, h('h2', null, L('Гэрээ тохижуулах', 'Decorate my ger')), cv,
         h('div', { class: 'row-btns' },
           h('button', { class: 'btn', onclick: () => { close(); wardrobe(); } }, L('Хувцас', 'Wardrobe')),
-          h('button', { class: 'btn primary', disabled: rested, onclick: () => { v.energy = 100; S.save(); claimHomeRestReward(today).then(draw); TG.sfx.chime(); TG.toast(L('Гэртээ амарлаа: хүч дүүрлээ.', 'You rested at home: energy full.')); } }, rested ? L('Өнөөдөр амарсан', 'Rested today') : L('Амрах', 'Rest'))),
+          h('button', { class: 'btn primary', disabled: rested && restRewardClaimed, onclick: () => {
+            if (!rested) { v.rest = today; v.energy = 100; S.save(); TG.sfx.chime(); }
+            if (!restRewardClaimed) {
+              claimDailyHomeActivity('rest').then(draw);
+            }
+            draw();
+          } }, rested ? (restRewardClaimed ? L('Өнөөдөр амарсан', 'Rested today') : L('Шагналаа авах', 'Claim reward')) : L('Амрах', 'Rest'))),
         h('div', { class: 'label', style: { marginTop: '12px' } }, L('Тавилга', 'Furniture')),
         h('div', { class: 'v-list' }, R.FURNITURE.map((f) => {
           const owned = (l.furn || []).includes(f.id), locked = lvl() < f.lvl;

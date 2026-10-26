@@ -261,7 +261,23 @@ try {
     || repeatedRestClaim.wallet.revision !== restClaim.wallet.revision) {
     throw new Error('the server duplicated a daily home-rest reward');
   }
-  ok('home-rest rewards require a server-owned ger and can only be claimed once per Mongolia day');
+  const snackClaim = await sendDailyActivityClaim('snack');
+  if (!snackClaim.accepted || snackClaim.wallet.coins !== restClaim.wallet.coins
+    || snackClaim.wallet.xp !== restClaim.wallet.xp + 5 || snackClaim.wallet.revision !== restClaim.wallet.revision + 1) {
+    throw new Error(`the server did not grant its fixed daily snack reward: ${JSON.stringify(snackClaim)}`);
+  }
+  const repeatedSnackClaim = await sendDailyActivityClaim('snack');
+  if (!repeatedSnackClaim.accepted || !repeatedSnackClaim.duplicate
+    || repeatedSnackClaim.wallet.revision !== snackClaim.wallet.revision) throw new Error('the server duplicated the daily snack reward');
+  const churnClaim = await sendDailyActivityClaim('churn');
+  if (!churnClaim.accepted || churnClaim.wallet.coins !== snackClaim.wallet.coins
+    || churnClaim.wallet.xp !== snackClaim.wallet.xp + 5 || churnClaim.wallet.revision !== snackClaim.wallet.revision + 1) {
+    throw new Error(`the server did not grant its fixed daily churn reward: ${JSON.stringify(churnClaim)}`);
+  }
+  const invalidActivity = await sendDailyActivityClaim('unknown');
+  if (invalidActivity.accepted || invalidActivity.reason !== 'invalid'
+    || invalidActivity.wallet.revision !== churnClaim.wallet.revision) throw new Error('the server accepted an unknown daily activity');
+  ok('daily ger-activity rewards require a server-owned ger and are idempotent per activity and Mongolia day');
   await walletProbe.close();
   ok('wallet overspending is denied and transaction replays do not duplicate changes');
   const questProbe = await browser.newPage();
@@ -409,6 +425,25 @@ try {
   await until(() => b.evaluate(() => TG._village.lots().some((l, i) => i !== 2 && l && l.n === 'Сарнай' && TG.vrules.lotStage(l) === 1)), 'B re-claims a different free plot when its old one is taken');
   if ((await b.evaluate(() => TG._village.lots()[2].n)) !== 'Бат') throw new Error('a taken lot was overwritten');
   ok('building a ger syncs stage by stage; taken plots are protected; progress follows the player into a room');
+
+  const snackWalletBefore = await a.evaluate(() => ({ coins: TG.store.active().village.coins, xp: TG.store.active().village.xp }));
+  await a.evaluate(() => TG._village.enterGer(2));
+  await a.waitForSelector('.ger-scene');
+  await a.evaluate(async () => {
+    const scene = TG._village.ger;
+    scene.me.x = 138; scene.me.y = 118;
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    scene.interact();
+  });
+  await until(() => a.evaluate((xp) => TG.store.active().village.xp === xp, snackWalletBefore.xp + 5),
+    'client sends the daily snack activity claim', 8000);
+  const snackWalletAfter = await a.evaluate(() => ({ coins: TG.store.active().village.coins, xp: TG.store.active().village.xp }));
+  if (snackWalletAfter.coins !== snackWalletBefore.coins || snackWalletAfter.xp !== snackWalletBefore.xp + 5) {
+    throw new Error(`the ger snack interaction did not apply the server wallet: ${JSON.stringify({ snackWalletBefore, snackWalletAfter })}`);
+  }
+  await a.evaluate(() => { document.querySelectorAll('.modal-x').forEach((button) => button.click()); TG._village.ger.close(); });
+  await sleep(250);
+  ok('the online ger snack interaction claims its fixed reward from the server');
 
   // live wrestling: A invites B, B accepts, both play exchanges until someone wins
   const bId = await b.evaluate(() => TG.store.active().village.id);

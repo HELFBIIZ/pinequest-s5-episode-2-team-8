@@ -672,11 +672,14 @@ async function handleDailyActivityClaim(conn, message) {
   if (!reward) {
     return conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'invalid', wallet: conn.wallet });
   }
-  if (activity === 'rest' && !conn.room.lots.some((lot) => lot && lot.by === p.id)) {
-    return conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'home-required', wallet: conn.wallet });
-  }
-  const operation = `activity:${day}:${activity}`;
   try {
+    const latestRoom = await roomStore.getRoomState(conn.room.code);
+    const lots = normalizeLots(latestRoom ? latestRoom.lots : conn.room.lots);
+    const home = lots.find((lot) => lot && lot.by === p.id);
+    if (!home) {
+      return conn.send({ t: 'daily-activity-result', activity, day, accepted: false, reason: 'home-required', wallet: conn.wallet });
+    }
+    const operation = `activity:${day}:${activity}`;
     const outcome = await roomStore.mutateWallet(p.id, operation, (wallet) => {
       if (wallet.coins > WALLET_MAX - reward.coins || wallet.xp > WALLET_MAX - reward.xp) {
         return { changed: false, result: { accepted: false, reason: 'limit' } };

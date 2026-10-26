@@ -43,7 +43,9 @@
     race: { coins: 25, xp: 35 }, archery: { coins: 25, xp: 35 }, wrestle: { coins: 25, xp: 35 },
     etiquette: { coins: 30, xp: 40 }, defend: { coins: 40, xp: 60 }, eat: { coins: 15, xp: 20 },
   };
-  const DAILY_ACTIVITY_REWARDS = { rest: { coins: 5, xp: 10 } };
+  const DAILY_ACTIVITY_REWARDS = {
+    rest: { coins: 5, xp: 10 }, snack: { coins: 0, xp: 5 }, churn: { coins: 0, xp: 5 },
+  };
   const DAILY_QUEST_POOL = ['milk', 'dairy', 'milk', 'fish', 'basar', 'quiz', 'pet', 'sell', 'basar', 'quiz', 'eat'];
   const SEASON_TASKS = {
     spring: ['pet', 'milk'], summer: ['race', 'archery', 'fish'],
